@@ -1,0 +1,70 @@
+=======================================================================
+  WATCHLOG  v3.3.0  -  QUICK START  (one page)
+  Shortcuts that type finished surveillance log entries for you
+=======================================================================
+
+WHAT IT DOES
+  Type a short code like ;jack in iTrak and it becomes the full log
+  entry. Codes with blanks open a small form first: fill in the boxes,
+  press Enter, and the finished entry goes where you were typing.
+  It can also type your logins, open your work apps at the start of a
+  shift, and keep a count of your logs for the End of Shift entry.
+
+
+SET IT UP  (about 5 minutes, once per PC)
+  1. AutoHotkey v2 must be installed on the PC (IT installs it if you
+     can't). Check: the Start menu has "AutoHotkey".
+  2. Copy this whole folder to your own Documents (OneDrive), for
+     example  Documents\Watchlog.  Don't run it from the shared
+     folder: your settings would end up where others can see them.
+  3. Double-click  Watchlog.ahk.  The Watchlog icon (a white
+     page with an eye, on teal) appears near the clock, and a Welcome
+     window opens:
+       - Add your logins (optional): the shortcut you'll type, your
+         username, and your password. The password goes into Windows
+         Credential Manager on this PC only, never into a file.
+       - Templates: press Browse and pick the team's templates.txt in
+         the SharePoint folder (your supervisor will say where). Then
+         everyone uses the same wording and gets updates automatically.
+       - Tick "Start Watchlog when I sign in to Windows".
+       - Press Save.
+  4. In File Explorer, right-click the synced SharePoint folder and
+     choose "Always keep on this device", so the team templates are
+     there even when the network is slow.
+
+
+USE IT
+  ;jack, ;audit, ;bv ...   Type a code anywhere. No Space or Enter
+                           needed: it fires as soon as you finish it.
+  Ctrl+Alt+Space           Can't remember a code? Type any word (like
+                           jackpot or medical) and press Enter.
+  Ctrl+Alt+H               Cheat sheet: every code, login and hotkey.
+  Tab / Enter / Esc        In a form: next box / insert / cancel.
+  Ctrl+Alt+J               This shift's log counts, with Copy summary.
+  Ctrl+Alt+L               Start of shift: opens the work apps and
+                           websites.  Ctrl+Alt+Shift+L closes them.
+  Ctrl+Alt+P               Pause all shortcuts (press again to resume).
+
+  Right-click the Watchlog icon for Settings, Security and status, your
+  Activity log, and Edit my templates (your own extra codes).
+
+
+WHAT IT KEEPS  (tray menu > Security and status shows it all, live)
+  - Passwords: Windows Credential Manager on your PC only. Never in a
+    file, never synced, never shown.
+  - settings.ini: your login shortcuts and usernames. No passwords.
+  - Shift journal: a copy of each log you insert, in Documents\Shift
+    Journal, deleted after 30 days (Settings can change or turn it off).
+  - Activity log: what the tool did and when (on this PC only). Never
+    passwords or log text.
+  It makes no internet connections and doesn't keep what you type.
+
+
+IF SOMETHING'S WRONG
+  - A code doesn't fire: check the tray shows the Watchlog icon. It
+    changes while shortcuts are paused, and Ctrl+Alt+P turns them back
+    on. Then press Ctrl+Alt+R to reload.
+  - "Couldn't open the team templates": start OneDrive and let it sync.
+    The last good copy is used meanwhile, so codes keep working.
+  - Anything else: tray menu > Security and status > Copy report, and
+    send it to whoever gave you this folder. README.txt has the details.

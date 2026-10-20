@@ -1,0 +1,145 @@
+# =====================================================================
+#  WATCHLOG - template wording
+#  Edit this file freely and save it. The script reloads by itself.
+#
+#  TEAM COPY
+#    When this file is the team's shared copy on SharePoint, every
+#    operator's Watchlog reads it and reloads when it changes.
+#    Change the wording version line whenever you change the wording,
+#    so anyone can see which version they have (tray menu > Security
+#    and status).
+#    The program version line says which Watchlog everyone should
+#    be running. When you hand out a new Watchlog.ahk, change it
+#    here too: any PC on an older one gets told to update.
+#
+# Wording version: Oct 18, 2026 (3)
+# Program version: 3.3.0
+#
+#  HOW A LINE WORKS
+#    ;trigger (Name) = the text that gets pasted
+#    - The trigger is what you type. Start it with ; so it never
+#      fires by accident. Don't start one with ;t ;dd or ;dt
+#      (those are the time/date stamps).
+#    - It fires the moment you finish typing it - no space or Enter.
+#      So no trigger can be the start of another one (;count would
+#      fire before you finish ;counttables). The script tells you
+#      if two clash.
+#    - (Name) is optional. It shows on the form and the cheat sheet.
+#    - Lines starting with # are notes like this one and are ignored.
+#    - Type \n where you want a new line.
+#
+#  MAKING A FORM
+#    Put a blank in curly brackets and the template becomes a form
+#    automatically. Each blank becomes a box:
+#      {Machine}                      plain box
+#      {Who: employee | guest}        list you can pick from or type over
+#      {Outcome: pick | A | B}        list you must pick from
+#      {From: now}                    time box, filled with the time now
+#      {To: now+20}                   time box, filled with now + 20 min
+#      {Time paid: time}              time box (2130 becomes 21:30)
+#      {Amount: money}                10000 becomes 10,000
+#      {Buy-in: money | thousands}    3.3 becomes 3,300 (a decimal point
+#                                     means thousands; 500 stays 500)
+#      {Match: percent}               67 becomes 67%
+#      {Employee #: clip}             fills in a copied employee #
+#      {Bay: last}                    remembers what you typed last time
+#      {Step: next | A | B | C}       opens on the step after the one
+#                                     you used last time (C wraps to A)
+#      {Machine: blank=AXXXX}         what to leave if the box is empty
+#                                     (otherwise it leaves XX)
+#      {Asset #: prefix=# | blank=}   adds # in front only if you fill it
+#                                     in; blank= leaves nothing if empty
+#      {Player #: numberprefix=#}    adds # only in front of a number
+#                                     (12345 becomes #12345, RN stays RN)
+#      {Player #: upper}              all capitals (rn becomes RN)
+#      {Machine: caps}                capitals in machine numbers
+#                                     (b1410 becomes B1410)
+#      {Table: @tables}               uses the @tables list below
+#      {Amount: if ATM=100000}        fills in 100000 when another box
+#                                     starts with ATM (you can change it)
+#    In a box with a list, typing just the number picks the item that
+#    ends in it: 202 becomes FB202.
+#    Combine options with | like {Employee #: clip | blank=XXXXXXX}
+#    Write a/an before a blank and it picks "a" or "an" for you.
+#
+#  SEVERAL IN ONE LOG
+#    Put {repeat} at the end of a form line and the form gets an
+#    "Add another" button (or press Ctrl+Enter). Fill in one, add
+#    another, and Insert pastes them all as one log, one per line.
+#
+#  SHARED LISTS
+#    A line starting with @ is a list you can use in any blank. Change
+#    it here and every template that uses it changes too.
+# =====================================================================
+
+@tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206
+
+
+# ----- FORMS ---------------------------------------------------------
+
+;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}.
+
+;audit (Audit) = Surveillance observed {Employee type: Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: blank=MX}. Nothing suspicious observed.
+
+;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results.
+
+;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident.
+
+;face (Facial recognition) = Facial Recognition Alert #{Alert #}\n{Result: Rejected} ({Match: percent})
+
+
+# ----- START / END OF SHIFT (asks which bay, remembers the last one) -
+
+;start (Start of shift) = Start of Shift Bay {Bay: last} Operator
+;end (End of shift) = End of Shift Bay {Bay: last} Operator
+
+
+# ----- QUICK TEMPLATES -----------------------------------------------
+
+;interior (Interior door check) = Security Supervisor performed interior door check
+;exterior (Exterior door check) = Security Officer performed exterior door check
+;parking (Parking lot patrol) = Security Officer performed parking lot patrol
+
+;noid (Refused - no ID) = Security Officer refused one patron entry due to no ID.
+;insuf (Refused - insufficient ID) = Security Officer refused one patron entry due to insufficient ID.
+;expired (Refused - expired ID) = Security Officer refused one patron entry due to expired ID.
+;intox (Refused - signs of intox) = Security Officer refused one patron entry due to showing signs of intox ({Signs observed}).
+;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
+
+;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
+;account (Account review) = Account #{Account #: blank=} reviewed, not banned player, Guest Services notified
+;drop (Table drop) = Security Officers performed Table Drop
+
+
+# ----- TABLES --------------------------------------------------------
+
+;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes.
+;open (Table opening) = {Table: @tables | blank=XXXXX} Opened.
+;auto (Auto-close) = {Table: @tables | blank=XXXXX} Closed and Auto-Close started.
+;cards (Card change) = Card change on {Table: @tables}.
+;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat}
+;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {repeat}
+;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=}
+
+
+# ----- SLOTS ---------------------------------------------------------
+
+;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat}
+;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money})
+;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found.
+;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious.
+;maint (Maintenance) = {Machines: caps | NRT2 and NRT4} Maintenance.
+
+
+# ----- SOFT COUNT  (time fills in as now, step opens on the next one) -
+
+;countstep (Soft count step) = {Time: now} - {Step: next | Count Team entered Count Room. Tables soft count started. | Main Banker entered Count Room for tables Buy. | Buy confirmed, Pod #1 Soft Count started. | Money secured, Count Team on break. | Pod 2 Soft Count started. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security entered for Sweep. | Sweep complete.}
+;counttables (Soft count - table totals) = {Time: now} - Tables totals: 1st; ${1st: money}, 2nd; ${2nd: money}, called Main banker for Table buy.
+;countslots (Soft count - slots total) = {Time: now} - Pod 2 completed. Slots Total: ${Slots total: money}. Called Main Banker for Buy.
+;countpull (Soft count - emergency pull) = {Time: now} - completed emergency pull for {Machine: caps | blank=XXXXX}.
+
+
+# ----- OTHER ---------------------------------------------------------
+
+;destroy (Card destruction) = Security Officers entered Card Destruction Room for Card Destruction.
+;badge (Visitor badge) = Visitor Badge #17-0{Badge # (1-9): pick | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9} issued to {To: employee} for {Reason: training} in {Location: Kitchen}.
