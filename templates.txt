@@ -13,7 +13,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 18, 2026 (3)
-# Program version: 3.3.0
+# Program version: 3.3.1
 #
 #  HOW A LINE WORKS
 #    ;trigger (Name) = the text that gets pasted

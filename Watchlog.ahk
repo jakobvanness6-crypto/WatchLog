@@ -26,8 +26,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.3.0"
-VERSION_DATE := "Oct 20, 2026"
+VERSION := "3.3.1"
+VERSION_DATE := "Oct 21, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
 MyTemplatesFile := A_ScriptDir "\my-templates.txt"
@@ -2330,28 +2330,55 @@ CitrixTab(wait) {
         return
     stopAt := A_TickCount + (wait ? 15000 : 0)
     rounds := wait ? 3 : 1
+    drift := 0
     Loop {
+        ; the Citrix tab may already be showing in one of the Chrome windows
+        for id in ChromeWindows() {
+            if InStr(WinGetTitle("ahk_id " id), want) {
+                WinActivate "ahk_id " id
+                Activity("Citrix tab: already showing in a Chrome window (" WinGetTitle("ahk_id " id) ")")
+                return
+            }
+        }
         if hwnd := ChromeWindow() {
             WinActivate "ahk_id " hwnd
-            if !WinWaitActive("ahk_id " hwnd, , 2)
+            if !WinWaitActive("ahk_id " hwnd, , 2) {
+                Activity("Citrix tab: Chrome would not come to the front (front window is " WinGetTitle("A") ")")
                 return
+            }
             ; Ctrl+Tab through the tabs until it's back where it started
             first := WinGetTitle("ahk_id " hwnd)
+            seen := first
             Loop 30 {
-                if InStr(WinGetTitle("ahk_id " hwnd), want)
+                if InStr(WinGetTitle("ahk_id " hwnd), want) {
+                    Activity("Citrix tab: found it (" WinGetTitle("ahk_id " hwnd) ")")
                     return
-                if !WinActive("ahk_id " hwnd)
-                    return
+                }
+                if !WinActive("ahk_id " hwnd) {
+                    ; another window (a Java app opening, say) took the focus: take it back, a few times
+                    if ++drift > 3 {
+                        Activity("Citrix tab: gave up, focus kept leaving Chrome (now " WinGetTitle("A") ")")
+                        return
+                    }
+                    WinActivate "ahk_id " hwnd
+                    if !WinWaitActive("ahk_id " hwnd, , 2)
+                        return
+                }
                 SendInput "^{Tab}"
                 Sleep 150
+                seen .= " | " WinGetTitle("ahk_id " hwnd)
                 if WinGetTitle("ahk_id " hwnd) = first
                     break
             }
-            if --rounds <= 0
+            if --rounds <= 0 {
+                Activity("Citrix tab: not found. Tab titles seen: " seen)
                 return
+            }
         }
-        if A_TickCount >= stopAt
+        if A_TickCount >= stopAt {
+            Activity("Citrix tab: gave up, " (hwnd ? "tab not found" : "no Chrome window appeared"))
             return
+        }
         Sleep 1000          ; Chrome or its tabs still opening
     }
 }
@@ -2359,10 +2386,18 @@ CitrixTab(wait) {
 ; The front-most Chrome window with a title (Chrome also keeps hidden
 ; windows with no title in the background), or 0
 ChromeWindow() {
+    for id in ChromeWindows()
+        return id
+    return 0
+}
+
+; Every Chrome window that has a title, front-most first
+ChromeWindows() {
+    list := []
     for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe chrome.exe")
         if WinGetTitle(id) != ""
-            return id
-    return 0
+            list.Push(id)
+    return list
 }
 
 
