@@ -8,6 +8,7 @@ Current version: v3.3.0 (Oct 20, 2026).
 ## Waiting to be built
 
 - Overview (wait for Jakob's own edited copy, so his edits aren't overwritten): easier to follow, screenshots version, a short time saved tracker section, and a plain line that end of shift logs out of SDS properly before closing it (the room worries about lockouts), plus the Ctrl+Alt+K shortcut.
+- Ctrl+Alt+K asks first (Jakob, Oct 21: the shortcut works well but never asks): a Watchlog "Log out of SDS?" Yes/No before it runs LogOutSDS(), so an accidental press can't log someone out. Waiting on Jakob's yes.
 
 ## Built in v3.3.0 (Oct 20)
 
