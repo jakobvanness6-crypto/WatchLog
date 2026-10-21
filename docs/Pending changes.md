@@ -3,12 +3,33 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.3.0 (Oct 20, 2026).
+Current version: v3.4.1 (Oct 21, 2026, check code 6BD2-8E5E).
 
 ## Waiting to be built
 
-- Overview (wait for Jakob's own edited copy, so his edits aren't overwritten): easier to follow, screenshots version, a short time saved tracker section, and a plain line that end of shift logs out of SDS properly before closing it (the room worries about lockouts), plus the Ctrl+Alt+K shortcut.
-- Overview (Oct 21): the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt.
+- `;audit` Location box (found in the Oct 21 review): add `caps`, so typing m3 gives M3 like the machine boxes do. Today it keeps what you type ("on m3"). templates.txt only.
+- Start of shift (Oct 21 review, small hardening): ChromeWindows() and KeepChromeFront() read window titles while Chrome is opening and closing windows. If a window closes in that instant, AutoHotkey shows an error box. Wrap those title reads in `try`. Also bring the Ctrl+Alt+L and CitrixTab comments up to date with the v3.4.0 order. No behaviour change, so it can wait for the next script version.
+- Wording review sheet: swap the four old refusal rows for one `;refuse` row once Jakob has finished his own edits.
+
+## Done Oct 21 (no version change)
+
+- Overview: the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt. Overview easier to follow, screenshots version, time saved section, SDS logout line and Ctrl+Alt+K are all done too. Both say v3.4.1 now.
+- settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
+- README: `suffix=` added to the box options list.
+
+## Built in v3.4.1 (Oct 21)
+
+- New box option `suffix=` (added after what you type, only if something is typed).
+- `;refuse` replaces `;noid`, `;insuf`, `;expired` and `;intox`: number of patrons (one to 5), reason list, and a Signs observed box that goes in brackets only when filled in. 33 templates.
+
+## Built in v3.4.0 (Oct 21)
+
+- Ctrl+Alt+L order (Jakob): SDS, AlertGrid and CMP open first and it waits for their windows (at least 20 s), then the websites, then the Citrix tab comes to the front last.
+
+## Built in v3.3.1 to v3.3.3 (Oct 21)
+
+- Citrix tab: searches every Chrome window, also matches apps.gcgaming.com (a tab still opening has that as its title), takes the focus back if another window grabs it, and writes "Citrix tab:" lines to the activity log.
+- For 25 s after start of shift, if one of the apps it opened jumps in front, Chrome goes back on top (at most 6 times).
 
 ## Built in v3.3.0 (Oct 20)
 

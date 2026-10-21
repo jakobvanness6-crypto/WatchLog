@@ -569,6 +569,8 @@ Blanks (any of these makes the template a form):
                                (otherwise it leaves XX)
   {Asset #: prefix=# | blank=} adds # in front only if you fill it in;
                                blank= leaves nothing if empty
+  {Signs: prefix=( | suffix=) | blank=}
+                               adds ( ) around it only if you fill it in
   {Machine: caps}              capitals in machine numbers
                                (b1410 becomes B1410)
   {Table: @tables}             uses the @tables list (see below)

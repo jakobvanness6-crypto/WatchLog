@@ -46,7 +46,7 @@ Line numbers refer to v2.1 of `Log Templates.ahk`. **Items 1–4 were built in v
 - **Audit reminder.** `;audit` already knows the end time (`now+20`). Offer a tray pop-up at that time: "Audit on Employee # 1234567 ends now."
 - **Hourly login reminder.** PROJECT-NOTES says one app needs a login every hour. A gentle reminder at 55 minutes beats getting kicked out mid-entry.
 - **Badge picker.** `;badge` hard-codes `17-0` + 1-9 (templates.txt). If badges ever go past 9 or the prefix changes, make the whole badge number the list.
-- **Wording check.** `;noid` says "refused one patron **entry**", `;insuf` says "refused one patron". Already on the open-items list; worth settling before a team version.
+- **Wording check.** Settled Oct 21: the four refusal templates are now one `;refuse` with one wording ("refused entry to ...").
 
 ---
 
