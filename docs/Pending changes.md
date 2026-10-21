@@ -3,12 +3,10 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.4.1 (Oct 21, 2026, check code 6BD2-8E5E).
+Current version: v3.4.2 (Oct 21, 2026).
 
 ## Waiting to be built
 
-- `;audit` Location box (found in the Oct 21 review): add `caps`, so typing m3 gives M3 like the machine boxes do. Today it keeps what you type ("on m3"). templates.txt only.
-- Start of shift (Oct 21 review, small hardening): ChromeWindows() and KeepChromeFront() read window titles while Chrome is opening and closing windows. If a window closes in that instant, AutoHotkey shows an error box. Wrap those title reads in `try`. Also bring the Ctrl+Alt+L and CitrixTab comments up to date with the v3.4.0 order. No behaviour change, so it can wait for the next script version.
 - Wording review sheet: swap the four old refusal rows for one `;refuse` row once Jakob has finished his own edits.
 
 ## Done Oct 21 (no version change)
@@ -16,6 +14,11 @@ Current version: v3.4.1 (Oct 21, 2026, check code 6BD2-8E5E).
 - Overview: the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt. Overview easier to follow, screenshots version, time saved section, SDS logout line and Ctrl+Alt+K are all done too. Both say v3.4.1 now.
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
+
+## Built in v3.4.2 (Oct 21)
+
+- `;audit` Location box has `caps`, so m3 gives M3.
+- Start-of-shift Chrome code reads window titles through SafeTitle(), so a window closing mid-read can't show an error box. Ctrl+Alt+L header comment brought up to the v3.4.0 order.
 
 ## Built in v3.4.1 (Oct 21)
 

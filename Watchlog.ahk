@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.4.1"
+VERSION := "3.4.2"
 VERSION_DATE := "Oct 21, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
@@ -2241,16 +2241,16 @@ VersionOf(name) {
 BrowserOpen() {
     for exe, name in Map("chrome.exe", "Chrome", "msedge.exe", "Edge")
         for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe " exe)
-            if WinGetTitle(id) != ""
+            if SafeTitle(id) != ""
                 return name
     return ""
 }
 
 ; =====================================================================
 ;  START OF SHIFT  -  Ctrl+Alt+L
-;  Opens the programs in [StartOfShift] (any version), runs
-;  LaunchWork.bat for the websites, waits for the apps' windows, then
-;  switches Chrome to the Citrix Receiver tab.
+;  Opens the programs in [StartOfShift] (any version) first, waits for
+;  their windows, then runs LaunchWork.bat for the websites and switches
+;  Chrome to the Citrix Receiver tab last.
 ;  If Chrome or Edge is already open, it asks before opening the websites
 ;  again, so you don't end up with every tab twice.
 ; =====================================================================
@@ -2344,9 +2344,9 @@ CitrixTab(wait) {
     Loop {
         ; the Citrix tab may already be showing in one of the Chrome windows
         for id in ChromeWindows() {
-            if TabHas(WinGetTitle("ahk_id " id), want) {
+            if TabHas(SafeTitle(id), want) {
                 WinActivate "ahk_id " id
-                Activity("Citrix tab: already showing in a Chrome window (" WinGetTitle("ahk_id " id) ")")
+                Activity("Citrix tab: already showing in a Chrome window (" SafeTitle(id) ")")
                 return
             }
         }
@@ -2357,11 +2357,11 @@ CitrixTab(wait) {
                 return
             }
             ; Ctrl+Tab through the tabs until it's back where it started
-            first := WinGetTitle("ahk_id " hwnd)
+            first := SafeTitle(hwnd)
             seen := first
             Loop 30 {
-                if TabHas(WinGetTitle("ahk_id " hwnd), want) {
-                    Activity("Citrix tab: found it (" WinGetTitle("ahk_id " hwnd) ")")
+                if TabHas(SafeTitle(hwnd), want) {
+                    Activity("Citrix tab: found it (" SafeTitle(hwnd) ")")
                     return
                 }
                 if !WinActive("ahk_id " hwnd) {
@@ -2376,8 +2376,8 @@ CitrixTab(wait) {
                 }
                 SendInput "^{Tab}"
                 Sleep 150
-                seen .= " | " WinGetTitle("ahk_id " hwnd)
-                if WinGetTitle("ahk_id " hwnd) = first
+                seen .= " | " SafeTitle(hwnd)
+                if SafeTitle(hwnd) = first
                     break
             }
             if --rounds <= 0 {
@@ -2401,11 +2401,18 @@ ChromeWindow() {
     return 0
 }
 
+; A window's title, or "" if the window closed while Chrome was opening
+; or closing tabs
+SafeTitle(id) {
+    try return WinGetTitle("ahk_id " id)
+    return ""
+}
+
 ; Every Chrome window that has a title, front-most first
 ChromeWindows() {
     list := []
     for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe chrome.exe")
-        if WinGetTitle(id) != ""
+        if SafeTitle(id) != ""
             list.Push(id)
     return list
 }
@@ -2427,7 +2434,7 @@ KeepChromeFront(started) {
                 continue
             target := 0
             for id in ChromeWindows()
-                if TabHas(WinGetTitle("ahk_id " id), Cfg["CitrixTab"] "|apps.gcgaming.com") {
+                if TabHas(SafeTitle(id), Cfg["CitrixTab"] "|apps.gcgaming.com") {
                     target := id
                     break
                 }
