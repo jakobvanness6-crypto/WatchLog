@@ -48,8 +48,6 @@ CONTENTS
 These sit in the program folder (Documents\AutoHotkey on OneDrive):
 
   Watchlog.ahk        The program. You shouldn't need to edit it.
-  Log Templates.ahk   Only starts Watchlog, so old shortcuts still
-                      work (see MOVING FROM LOG TEMPLATES below).
   Watchlog.ico        The icon. Without it the tray shows a green H.
   templates.txt       The wording of every template. Edit freely. (If
                       the team's shared copy is set up, that one is
@@ -74,8 +72,7 @@ Elsewhere:
 
 MOVING FROM LOG TEMPLATES
   Watchlog was called Log Templates before v3.0.1. Put Watchlog.ahk,
-  Watchlog.ico and the new Log Templates.ahk in the folder (replacing
-  the old Log Templates.ahk), then double-click Watchlog.ahk. The first
+  Watchlog.ico in the folder, then double-click Watchlog.ahk. The first
   time it runs on each PC it moves everything over by itself:
     - closes the old Log Templates if it's still running
     - saved passwords: each one moves to the new name ("Watchlog:
@@ -84,9 +81,8 @@ MOVING FROM LOG TEMPLATES
     - the Startup shortcut now starts Watchlog
   settings.ini, templates.txt, my-templates.txt, Quick Notes.md and the
   Shift Journal keep their names. Tray menu > Activity log lists what
-  was moved. The small Log Templates.ahk only starts Watchlog, so a PC
-  whose shortcut still points at it keeps working; delete it once every
-  PC has run Watchlog.
+  was moved. The old Log Templates.ahk isn't needed any more and can be
+  deleted.
 
 Save templates.txt, my-templates.txt or settings.ini (or have the team
 file change on SharePoint) and the script reloads by itself within a
