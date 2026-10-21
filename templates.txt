@@ -12,7 +12,7 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 18, 2026 (3)
+# Wording version: Oct 21, 2026
 # Program version: 3.4.0
 #
 #  HOW A LINE WORKS
@@ -104,6 +104,7 @@
 ;insuf (Refused - insufficient ID) = Security Officer refused one patron entry due to insufficient ID.
 ;expired (Refused - expired ID) = Security Officer refused one patron entry due to expired ID.
 ;intox (Refused - signs of intox) = Security Officer refused one patron entry due to showing signs of intox ({Signs observed}).
+;refuse (Refused entry) = Security Officer refused entry to {Patrons: one patron | 2 patrons | 3 patrons | 4 patrons | 5 patrons} due to {Reason: no ID | insufficient ID | expired ID | showing signs of intox}.
 ;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
 
 ;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
