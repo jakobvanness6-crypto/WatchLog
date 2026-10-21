@@ -281,16 +281,14 @@ Forms (open a form):
   ;countpull    Soft count: emergency pull
   ;badge        Visitor badge 17-01 to 17-09: who, reason, location
   ;account      Account review: account # (the # stays if left empty)
-  ;intox        Refused one patron entry due to signs of intox:
-                signs observed (in brackets)
+  ;refuse       Refused entry: how many patrons (one to 5, or type
+                it) and the reason (no ID, insufficient ID, expired
+                ID, signs of intox, or type your own)
 
 Quick (paste straight away):
   ;interior     Interior door check
   ;exterior     Exterior door check
   ;parking      Parking lot patrol
-  ;noid         Refused one patron entry due to no ID
-  ;insuf        Refused one patron entry due to insufficient ID
-  ;expired      Refused one patron entry due to expired ID
   ;selfex       Self-exclusion: patron taken into PlaySmart
   ;inventory    Inventory transfer, Delta Podium to Main Bank
   ;drop         Table drop
