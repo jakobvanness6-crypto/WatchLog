@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.3.1"
+VERSION := "3.3.2"
 VERSION_DATE := "Oct 21, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
@@ -291,7 +291,7 @@ LoadSettings() {
     ; A LaunchWork.bat that came in the program folder (a shared copy) works too
     if !FileExist(Cfg["LaunchWork"]) && FileExist(A_ScriptDir "\LaunchWork.bat")
         Cfg["LaunchWork"] := A_ScriptDir "\LaunchWork.bat"
-    Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix"))
+    Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
     Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "5"))
     Cfg["ChromeAccount"] := Trim(IniRead(SettingsFile, "Paths", "ChromeAccount", ""))
     ; The team's shared templates file (blank = templates.txt in this folder)
@@ -655,7 +655,7 @@ KeepDays=30
 [Paths]
 LaunchWork=LAUNCHPATH
 LaunchWait=5
-CitrixTab=Citrix
+CitrixTab=Citrix|apps.gcgaming.com
 ; Optional: the Google account the start-of-shift websites open in
 ; (blank = Chrome's last used one)
 ChromeAccount=
@@ -2328,13 +2328,16 @@ CitrixTab(wait) {
     want := Cfg["CitrixTab"]
     if want = ""
         return
+    ; a tab that is still opening is named after its address, not "Citrix Workspace"
+    if !InStr(want, "apps.gcgaming.com")
+        want .= "|apps.gcgaming.com"
     stopAt := A_TickCount + (wait ? 15000 : 0)
     rounds := wait ? 3 : 1
     drift := 0
     Loop {
         ; the Citrix tab may already be showing in one of the Chrome windows
         for id in ChromeWindows() {
-            if InStr(WinGetTitle("ahk_id " id), want) {
+            if TabHas(WinGetTitle("ahk_id " id), want) {
                 WinActivate "ahk_id " id
                 Activity("Citrix tab: already showing in a Chrome window (" WinGetTitle("ahk_id " id) ")")
                 return
@@ -2350,7 +2353,7 @@ CitrixTab(wait) {
             first := WinGetTitle("ahk_id " hwnd)
             seen := first
             Loop 30 {
-                if InStr(WinGetTitle("ahk_id " hwnd), want) {
+                if TabHas(WinGetTitle("ahk_id " hwnd), want) {
                     Activity("Citrix tab: found it (" WinGetTitle("ahk_id " hwnd) ")")
                     return
                 }
@@ -2398,6 +2401,14 @@ ChromeWindows() {
         if WinGetTitle(id) != ""
             list.Push(id)
     return list
+}
+
+; True when the title has any of the "|"-separated words in it
+TabHas(title, words) {
+    for w in StrSplit(words, "|")
+        if w != "" && InStr(title, w)
+            return true
+    return false
 }
 
 
