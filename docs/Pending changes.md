@@ -8,6 +8,7 @@ Current version: v3.3.0 (Oct 20, 2026).
 ## Waiting to be built
 
 - Overview (wait for Jakob's own edited copy, so his edits aren't overwritten): easier to follow, screenshots version, a short time saved tracker section, and a plain line that end of shift logs out of SDS properly before closing it (the room worries about lockouts), plus the Ctrl+Alt+K shortcut.
+- Overview (Oct 21): the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt.
 
 ## Built in v3.3.0 (Oct 20)
 
