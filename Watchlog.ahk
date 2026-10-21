@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.3.3"
+VERSION := "3.4.0"
 VERSION_DATE := "Oct 21, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
@@ -292,7 +292,7 @@ LoadSettings() {
     if !FileExist(Cfg["LaunchWork"]) && FileExist(A_ScriptDir "\LaunchWork.bat")
         Cfg["LaunchWork"] := A_ScriptDir "\LaunchWork.bat"
     Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
-    Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "5"))
+    Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "20"))
     Cfg["ChromeAccount"] := Trim(IniRead(SettingsFile, "Paths", "ChromeAccount", ""))
     ; The team's shared templates file (blank = templates.txt in this folder)
     Cfg["SharedTemplates"] := Trim(IniRead(SettingsFile, "Templates", "Shared", ""), " `t`"")
@@ -654,7 +654,7 @@ KeepDays=30
 
 [Paths]
 LaunchWork=LAUNCHPATH
-LaunchWait=5
+LaunchWait=20
 CitrixTab=Citrix|apps.gcgaming.com
 ; Optional: the Google account the start-of-shift websites open in
 ; (blank = Chrome's last used one)
@@ -2257,25 +2257,9 @@ BrowserOpen() {
             . "Open them again?", "Start of shift", "YesNo Icon? Default2") = "Yes"
     CoordMode "ToolTip", "Screen"
     began := A_TickCount
-    secs := IsNumber(Cfg["LaunchWait"]) ? Cfg["LaunchWait"] : 5
+    secs := IsNumber(Cfg["LaunchWait"]) ? Max(Cfg["LaunchWait"], 20) : 20   ; the apps get at least 20 s
     Tip("Opening work apps...", 0, true)
     missing := ""
-
-    ; Websites first - they load in the background while the apps start
-    path := Cfg["LaunchWork"]
-    if !sites {
-        ; skipped - the browser was already open
-    } else if FileExist(path) {
-        ; Tell LaunchWork which Chrome profile has the ChromeAccount signed in
-        prof := ChromeProfileFor(Cfg["ChromeAccount"])
-        if Cfg["ChromeAccount"] != "" && prof = ""
-            missing .= "   Chrome profile for " Cfg["ChromeAccount"] "   (sign in to it in Chrome on this PC once)`n"
-        SplitPath path, , &dir
-        ; cmd /c strips the outer pair of quotes, so the whole line gets an extra pair
-        Run A_ComSpec ' /c ""' path '"' (prof != "" ? ' "' prof '"' : "") '"', dir, "Hide"
-    } else {
-        missing .= "   " path "   (LaunchWork in settings.ini)`n"
-    }
 
     SetTitleMatchMode 2
     started := []       ; how to spot each app it opened
@@ -2310,6 +2294,24 @@ BrowserOpen() {
         while !WinExist(w) && A_TickCount < deadline
             Sleep 200
     }
+    Sleep 1500          ; let the apps finish drawing
+    Tip("Opening websites...", 0, true)
+    ; Websites next, once the apps are up, so the Citrix tab is the last thing to take the screen
+    path := Cfg["LaunchWork"]
+    if !sites {
+        ; skipped - the browser was already open
+    } else if FileExist(path) {
+        ; Tell LaunchWork which Chrome profile has the ChromeAccount signed in
+        prof := ChromeProfileFor(Cfg["ChromeAccount"])
+        if Cfg["ChromeAccount"] != "" && prof = ""
+            missing .= "   Chrome profile for " Cfg["ChromeAccount"] "   (sign in to it in Chrome on this PC once)`n"
+        SplitPath path, , &dir
+        ; cmd /c strips the outer pair of quotes, so the whole line gets an extra pair
+        Run A_ComSpec ' /c ""' path '"' (prof != "" ? ' "' prof '"' : "") '"', dir, "Hide"
+    } else {
+        missing .= "   " path "   (LaunchWork in settings.ini)`n"
+    }
+
     Tip("")
     CitrixTab(sites)
     KeepChromeFront(started)

@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.3.3  -  README
+  WATCHLOG  v3.4.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -101,9 +101,10 @@ couple of seconds. No need to press anything.
   Ctrl+Alt+H        Cheat sheet: every template, login, app and hotkey
                     on this PC.
 
-  Ctrl+Alt+L        Start of shift. Opens the websites and the Bally
-                    apps (AlertGrid, SDS, CMP), skips any already open,
-                    then switches Chrome to the Citrix tab. See section 8.
+  Ctrl+Alt+L        Start of shift. Opens the Bally apps (AlertGrid,
+                    SDS, CMP) first, skips any already open, then the
+                    websites, then brings the Citrix tab to the front.
+                    See section 8.
   Ctrl+Alt+Shift+L  End of shift. Asks first (default No), logs you out
                     of SDS properly, then closes all work apps. See
                     section 9.
@@ -367,9 +368,15 @@ so saving templates.txt doesn't reset it.
 -----------------------------------------------------------------------
  8. START OF SHIFT  (Ctrl+Alt+L)
 -----------------------------------------------------------------------
-What happens, in order (about 5 seconds):
+What happens, in order (about 20 seconds):
   1. A "Opening work apps..." message shows in the middle of the screen.
-  2. LaunchWork.bat runs in the background and opens the websites
+  2. The programs in [StartOfShift] open one second apart (AlertGrid,
+     SDS, CMP). Any it can see are already open are skipped, so pressing
+     it twice normally won't give you two copies. (It spots them by
+     window title, so an app still starting up can be missed.)
+  3. It waits until those programs have their windows up (LaunchWait
+     seconds at most, never less than 20).
+  4. LaunchWork.bat runs in the background and opens the websites
      (if Chrome or Edge is already open, it asks first whether to open
      them again; No is the default, so you don't get every tab twice):
      facial rec (OLG iTrak) in Edge, then the Citrix Receiver page,
@@ -377,14 +384,10 @@ What happens, in order (about 5 seconds):
      learning in Chrome.
      Chrome opens them in the profile signed in to ChromeAccount from
      settings.ini, whichever profile that is on this PC.
-  3. The programs in [StartOfShift] open one second apart (AlertGrid,
-     SDS, CMP). Any it can see are already open are skipped, so pressing
-     it twice normally won't give you two copies. (It spots them by
-     window title, so an app still starting up can be missed.)
-  4. It waits until those programs have their windows up (LaunchWait
-     seconds at most, 5 by default), then switches Chrome to the
-     Citrix Receiver tab, so you can launch iTrak from there.
-  5. If anything couldn't be found, a message lists it.
+  5. It switches Chrome to the Citrix Receiver tab, so you can launch
+     iTrak from there, and keeps Chrome on top for 25 seconds if an
+     app jumps to the front.
+  6. If anything couldn't be found, a message lists it.
 
 Still manual: launching iTrak itself from the Citrix page (its launch
 file only works once, so it can't be automated).
@@ -481,7 +484,7 @@ notice says so once.
 -----------------------------------------------------------------------
  11. TRAY MENU  (right-click the Watchlog icon near the clock)
 -----------------------------------------------------------------------
-  Watchlog v3.3.3 (date)        Which version is running, whether
+  Watchlog v3.4.0 (date)        Which version is running, whether
                                 it's up to date, the program check
                                 code, and where the templates come from
   Find a template               Same as Ctrl+Alt+Space
@@ -506,11 +509,11 @@ hotkey. "Change a login password" moved into Settings in v3.0.
 
 WHICH VERSION AM I RUNNING?  AM I UP TO DATE?
   Hover over the icon, or look at the top of the tray menu. Every time
-  the script loads it also shows "Watchlog v3.3.3 running" in the
+  the script loads it also shows "Watchlog v3.4.0 running" in the
   bottom-right corner for a few seconds.
 
   The templates file has a line near the top, "# Program version:
-  3.3.3", saying which version everyone should be on. With a team
+  3.4.0", saying which version everyone should be on. With a team
   templates file on SharePoint, whoever hands out a new
   Watchlog.ahk changes that line too, and then any PC still on an
   older version:
@@ -672,7 +675,7 @@ Save it and it reloads itself.
   LaunchWork=     full path to LaunchWork.bat (if it isn't there, a
                   LaunchWork.bat in the program folder is used)
   LaunchWait=     the most seconds Ctrl+Alt+L waits for the programs'
-                  windows before switching to Chrome (default 5)
+                  windows before opening the websites (default 20, never less)
   CitrixTab=      words from the Citrix Receiver tab's title, split with |,
                   so Ctrl+Alt+L can switch Chrome to it. A tab still opening
                   is named after its address, so apps.gcgaming.com is
@@ -786,7 +789,7 @@ YOUR OWN OTHER BAY PCs
 
 A NEW OPERATOR
   1. Tray menu > Make a copy to share. Pick a folder (a SharePoint or
-     Teams folder works). It makes a "Watchlog v3.3.3" folder with
+     Teams folder works). It makes a "Watchlog v3.4.0" folder with
      only: the program, the icon, the templates (the team's, if that's in use),
      QUICK START.txt, README.txt, settings.example.ini and
      LaunchWork.bat. It never copies your settings.ini, my-templates.txt,
