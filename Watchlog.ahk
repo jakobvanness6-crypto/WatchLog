@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.3.2"
+VERSION := "3.3.3"
 VERSION_DATE := "Oct 21, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
@@ -2312,6 +2312,7 @@ BrowserOpen() {
     }
     Tip("")
     CitrixTab(sites)
+    KeepChromeFront(started)
     if missing != ""
         MsgBox "These weren't found, so they didn't open:`n`n" missing "`nCheck [StartOfShift] and LaunchWork in settings.ini", "Watchlog", "Icon!"
 }
@@ -2401,6 +2402,40 @@ ChromeWindows() {
         if WinGetTitle(id) != ""
             list.Push(id)
     return list
+}
+
+; The Java apps sometimes open their windows late and jump to the front over
+; Chrome. For 25 seconds after the start-of-shift tabs are done, whenever one
+; of the apps it opened takes the front, Chrome goes back on top (at most 6
+; times), so the Citrix tab is what you see first.
+KeepChromeFront(started) {
+    stopAt := A_TickCount + 25000
+    st := {tries: 0}
+    Guard() {
+        if A_TickCount > stopAt || st.tries >= 6 {
+            SetTimer Guard, 0
+            return
+        }
+        for w in started {
+            if w = "" || !WinActive(w)
+                continue
+            target := 0
+            for id in ChromeWindows()
+                if TabHas(WinGetTitle("ahk_id " id), Cfg["CitrixTab"] "|apps.gcgaming.com") {
+                    target := id
+                    break
+                }
+            if !target
+                target := ChromeWindow()
+            if target {
+                st.tries += 1
+                WinActivate "ahk_id " target
+                Activity("Citrix tab: " w " came to the front, Chrome put back on top")
+            }
+            break
+        }
+    }
+    SetTimer Guard, 500
 }
 
 ; True when the title has any of the "|"-separated words in it
