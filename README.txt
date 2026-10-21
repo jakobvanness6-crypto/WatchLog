@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.4.0  -  README
+  WATCHLOG  v3.4.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -282,8 +282,9 @@ Forms (open a form):
   ;badge        Visitor badge 17-01 to 17-09: who, reason, location
   ;account      Account review: account # (the # stays if left empty)
   ;refuse       Refused entry: how many patrons (one to 5, or type
-                it) and the reason (no ID, insufficient ID, expired
-                ID, signs of intox, or type your own)
+                it), the reason (no ID, insufficient ID, expired ID,
+                signs of intox) and, if you fill it in, what you
+                observed, put in brackets after the reason
 
 Quick (paste straight away):
   ;interior     Interior door check
@@ -482,7 +483,7 @@ notice says so once.
 -----------------------------------------------------------------------
  11. TRAY MENU  (right-click the Watchlog icon near the clock)
 -----------------------------------------------------------------------
-  Watchlog v3.4.0 (date)        Which version is running, whether
+  Watchlog v3.4.1 (date)        Which version is running, whether
                                 it's up to date, the program check
                                 code, and where the templates come from
   Find a template               Same as Ctrl+Alt+Space
@@ -507,11 +508,11 @@ hotkey. "Change a login password" moved into Settings in v3.0.
 
 WHICH VERSION AM I RUNNING?  AM I UP TO DATE?
   Hover over the icon, or look at the top of the tray menu. Every time
-  the script loads it also shows "Watchlog v3.4.0 running" in the
+  the script loads it also shows "Watchlog v3.4.1 running" in the
   bottom-right corner for a few seconds.
 
   The templates file has a line near the top, "# Program version:
-  3.4.0", saying which version everyone should be on. With a team
+  3.4.1", saying which version everyone should be on. With a team
   templates file on SharePoint, whoever hands out a new
   Watchlog.ahk changes that line too, and then any PC still on an
   older version:
@@ -787,7 +788,7 @@ YOUR OWN OTHER BAY PCs
 
 A NEW OPERATOR
   1. Tray menu > Make a copy to share. Pick a folder (a SharePoint or
-     Teams folder works). It makes a "Watchlog v3.4.0" folder with
+     Teams folder works). It makes a "Watchlog v3.4.1" folder with
      only: the program, the icon, the templates (the team's, if that's in use),
      QUICK START.txt, README.txt, settings.example.ini and
      LaunchWork.bat. It never copies your settings.ini, my-templates.txt,

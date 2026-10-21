@@ -12,8 +12,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 21, 2026
-# Program version: 3.4.0
+# Wording version: Oct 21, 2026 (2)
+# Program version: 3.4.1
 #
 #  HOW A LINE WORKS
 #    ;trigger (Name) = the text that gets pasted
@@ -49,6 +49,8 @@
 #                                     (otherwise it leaves XX)
 #      {Asset #: prefix=# | blank=}   adds # in front only if you fill it
 #                                     in; blank= leaves nothing if empty
+#      {Signs: prefix=( | suffix=) | blank=}
+#                                     adds ( ) around it only if you fill it in
 #      {Player #: numberprefix=#}    adds # only in front of a number
 #                                     (12345 becomes #12345, RN stays RN)
 #      {Player #: upper}              all capitals (rn becomes RN)
@@ -100,7 +102,7 @@
 ;exterior (Exterior door check) = Security Officer performed exterior door check
 ;parking (Parking lot patrol) = Security Officer performed parking lot patrol
 
-;refuse (Refused entry) = Security Officer refused entry to {Patrons: one patron | 2 patrons | 3 patrons | 4 patrons | 5 patrons} due to {Reason: no ID | insufficient ID | expired ID | showing signs of intox}.
+;refuse (Refused entry) = Security Officer refused entry to {Patrons: one patron | 2 patrons | 3 patrons | 4 patrons | 5 patrons} due to {Reason: no ID | insufficient ID | expired ID | showing signs of intox} {Signs observed: prefix=( | suffix=) | blank=}.
 ;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
 
 ;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.

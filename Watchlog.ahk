@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.4.0"
+VERSION := "3.4.1"
 VERSION_DATE := "Oct 21, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
@@ -1067,6 +1067,8 @@ ParseField(spec, last := Map()) {
             f.ph := SubStr(opt, 7)
         } else if SubStr(low, 1, 7) = "prefix=" {
             f.prefix := SubStr(opt, 8)
+        } else if SubStr(low, 1, 7) = "suffix=" {
+            f.suffix := SubStr(opt, 8)       ; added after what you type, only if you type something
         } else if SubStr(low, 1, 13) = "numberprefix=" {
             ; added only in front of a number: 12345 -> #12345, RN stays RN
             f.numPrefix := SubStr(opt, 14)
@@ -1329,6 +1331,8 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
                     v := RegExReplace(v, "(\w*\d\w*)", "$U1")
                 if f.HasOwnProp("prefix")
                     v := f.prefix v
+                if f.HasOwnProp("suffix")
+                    v := v f.suffix
                 if f.HasOwnProp("upper")
                     v := StrUpper(v)
                 if f.HasOwnProp("numPrefix") && RegExMatch(v, "^\d")
