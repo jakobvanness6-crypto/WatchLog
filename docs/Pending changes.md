@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.4.2 (Oct 21, 2026).
+Current version: v3.4.3 (Oct 22, 2026).
 
 ## Waiting to be built
 
@@ -14,6 +14,13 @@ Current version: v3.4.2 (Oct 21, 2026).
 - Overview: the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt. Overview easier to follow, screenshots version, time saved section, SDS logout line and Ctrl+Alt+K are all done too. Both say v3.4.1 now.
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
+
+## Built in v3.4.3 (Oct 22)
+
+- Login window lock takes several programs separated by `|`; checked again just before the password is typed (blocked tries go in the activity log).
+- Settings > Add/Edit login has a Pick window button: click the program and its name is filled in. Browsers/Java programs also get the title (to be trimmed); Citrix gets `ahk_exe wfica32.exe`.
+- Settings list and Security report say "(any program)" for logins with no lock.
+- Jakob's own shortcuts: `;prd` = CMP, SDS, AlertGrid; `;jv` = facial rec iTrak, OLG RTMS; his third = daily log iTrak (Citrix) and Windows sign-in (the real lock screen can't be typed into).
 
 ## Built in v3.4.2 (Oct 21)
 

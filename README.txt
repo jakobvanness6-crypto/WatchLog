@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.4.2  -  README
+  WATCHLOG  v3.4.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -275,7 +275,7 @@ Forms (open a form):
   ;counttables  Soft count: table totals
   ;countslots   Soft count: slots total
   ;countpull    Soft count: emergency pull
-  ;badge        Visitor badge 17-01 to 17-09: who, reason, location
+  ;badge        Pass 17-01 to 17-09: contractor employee (type the company over XXXXX) or interview
   ;account      Account review: account # (the # stays if left empty)
   ;refuse       Refused entry: how many patrons (one to 5, or type
                 it), the reason (no ID, insufficient ID, expired ID,
@@ -326,11 +326,17 @@ what you type).
 To see or delete saved passwords yourself: Control Panel > Credential
 Manager > Windows Credentials, entries starting "Watchlog:".
 
-The window lock ("only works in a window whose title has...", like
-iTrak) keeps a login from firing anywhere else. Logins without one work
-in any program, so the ; at the start is their only protection. The
-Settings window won't save a shortcut without a ; unless it has a
-window lock.
+The window lock keeps a login from firing anywhere else. A login can be
+locked to one program or to several, separated by | (for example
+"SDS ahk_exe javaw.exe | ahk_exe CMPDesktop.exe | AlertGrid"). It types
+only while one of them is in front, and checks again just before it
+types. In Settings, Add or Edit a login and press Pick window: click the
+program you want and its name is filled in (press it again to add
+another). Logins without a lock work in any program, so the ; at the
+start is their only protection; the Settings list shows "(any program)"
+for them and Security and status says so. The Settings window won't save
+a shortcut without a ; unless it has a window lock. (Windows' own lock
+screen can't be typed into by any program like this.)
 
 Login shortcuts never fire in the template finder or the Settings
 window, so typing one there can't type a password. Each time a login is
@@ -479,7 +485,7 @@ notice says so once.
 -----------------------------------------------------------------------
  11. TRAY MENU  (right-click the Watchlog icon near the clock)
 -----------------------------------------------------------------------
-  Watchlog v3.4.2 (date)        Which version is running, whether
+  Watchlog v3.4.3 (date)        Which version is running, whether
                                 it's up to date, the program check
                                 code, and where the templates come from
   Find a template               Same as Ctrl+Alt+Space
@@ -504,7 +510,7 @@ hotkey. "Change a login password" moved into Settings in v3.0.
 
 WHICH VERSION AM I RUNNING?  AM I UP TO DATE?
   Hover over the icon, or look at the top of the tray menu. Every time
-  the script loads it also shows "Watchlog v3.4.2 running" in the
+  the script loads it also shows "Watchlog v3.4.3 running" in the
   bottom-right corner for a few seconds.
 
   The templates file has a line near the top, "# Program version:
@@ -664,7 +670,9 @@ Save it and it reloads itself.
 [Login1] ... [Login9]
   Trigger=   what you type, starting with ;
   User=      the username it types
-  Window=    optional: only works while this program is in front
+  Window=    optional: only works while this program is in front. Several
+             programs: separate them with |  (Settings > Pick window
+             fills this in for you)
   Remind=    optional: minutes until the login reminder pops up
   (No password here. See section 6.)
 
@@ -786,7 +794,7 @@ YOUR OWN OTHER BAY PCs
 
 A NEW OPERATOR
   1. Tray menu > Make a copy to share. Pick a folder (a SharePoint or
-     Teams folder works). It makes a "Watchlog v3.4.2" folder with
+     Teams folder works). It makes a "Watchlog v3.4.3" folder with
      only: the program, the icon, the templates (the team's, if that's in use),
      QUICK START.txt, README.txt, settings.example.ini and
      LaunchWork.bat. It never copies your settings.ini, my-templates.txt,
