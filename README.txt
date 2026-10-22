@@ -275,7 +275,7 @@ Forms (open a form):
   ;counttables  Soft count: table totals
   ;countslots   Soft count: slots total
   ;countpull    Soft count: emergency pull
-  ;badge        Contractor pass 17-01 to 17-09: which pass, company
+  ;badge        Pass 17-01 to 17-09: contractor employee (type the company over XXXXX) or interview
   ;account      Account review: account # (the # stays if left empty)
   ;refuse       Refused entry: how many patrons (one to 5, or type
                 it), the reason (no ID, insufficient ID, expired ID,
