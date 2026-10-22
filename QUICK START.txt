@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.4.3  -  QUICK START  (one page)
+  WATCHLOG  v3.5.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 
@@ -11,26 +11,25 @@ WHAT IT DOES
   shift, and keep a count of your logs for the End of Shift entry.
 
 
-SET IT UP  (about 5 minutes, once per PC)
-  1. AutoHotkey v2 must be installed on the PC (IT installs it if you
-     can't). Check: the Start menu has "AutoHotkey".
-  2. Copy this whole folder to your own Documents (OneDrive), for
-     example  Documents\Watchlog.  Don't run it from the shared
-     folder: your settings would end up where others can see them.
-  3. Double-click  Watchlog.ahk.  The Watchlog icon (a white
-     page with an eye, on teal) appears near the clock, and a Welcome
-     window opens:
-       - Add your logins (optional): the shortcut you'll type, your
-         username, and your password. The password goes into Windows
-         Credential Manager on this PC only, never into a file.
-       - Templates: press Browse and pick the team's templates.txt in
-         the SharePoint folder (your supervisor will say where). Then
-         everyone uses the same wording and gets updates automatically.
-       - Tick "Start Watchlog when I sign in to Windows".
-       - Press Save.
+SET IT UP  (about 2 minutes, once per PC)
+  1. Double-click  Watchlog.exe.  It asks "Install Watchlog on this
+     PC?"  Press Yes. (It needs no administrator rights and no other
+     software. It adds Watchlog to the Start menu and Settings > Apps,
+     and starts it when Windows starts.)
+  2. A short tutorial opens: it adds your logins (optional) and lets
+     you try a quick entry and a form. Your settings and templates are
+     kept in Documents\Watchlog.
+  3. Later, tray icon (the white page with an eye, on teal) > Settings >
+     Templates > Browse to pick the team's templates.txt in the
+     SharePoint folder (your supervisor will say where). Then everyone
+     uses the same wording and gets updates automatically.
   4. In File Explorer, right-click the synced SharePoint folder and
      choose "Always keep on this device", so the team templates are
      there even when the network is slow.
+  To see the tutorial again: tray icon > Tutorial.  To remove Watchlog:
+  Settings > Apps > Watchlog > Uninstall (your settings are kept).
+  (The script version, Watchlog.ahk in the "Script version" folder,
+  still works if AutoHotkey v2 is installed. IT may prefer it.)
 
 
 USE IT

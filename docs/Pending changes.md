@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.4.3 (Oct 22, 2026).
+Current version: v3.5.0 (Oct 22, 2026).
 
 ## Waiting to be built
 
@@ -14,6 +14,15 @@ Current version: v3.4.3 (Oct 22, 2026).
 - Overview: the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt. Overview easier to follow, screenshots version, time saved section, SDS logout line and Ctrl+Alt+K are all done too. Both say v3.4.1 now.
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
+
+## Built in v3.5.0 (Oct 22)
+
+- Watchlog.exe: one file, no AutoHotkey needed. It installs itself (Start menu, Start with Windows, Settings > Apps, uninstall) and keeps settings in Documents\Watchlog. First run offers to copy settings from the script version.
+- Guided tutorial on first run (tray > Tutorial any time): logins, a quick entry, a form, finding a code, handy keys. Nothing from it goes in the journal or time saved.
+- Team-folder updates work with Watchlog.exe too (backup kept, restarts by itself).
+- build/ has the two files that make the exe.
+
+Ideas for later: visual template editor, Help/About window, code signing if IT asks, build the exe with a GitHub Action.
 
 ## Built in v3.4.3 (Oct 22)
 
