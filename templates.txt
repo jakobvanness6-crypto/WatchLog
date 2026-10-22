@@ -12,7 +12,7 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 21, 2026 (3)
+# Wording version: Oct 22, 2026 (1)
 # Program version: 3.4.3
 #
 #  HOW A LINE WORKS
@@ -141,4 +141,4 @@
 # ----- OTHER ---------------------------------------------------------
 
 ;destroy (Card destruction) = Security Officers entered Card Destruction Room for Card Destruction.
-;badge (Visitor badge) = Visitor Badge #17-0{Badge # (1-9): pick | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9} issued to {To: employee} for {Reason: training} in {Location: Kitchen}.
+;badge (Visitor badge) = Visitor Badge #17-0{Badge # (1-9): pick | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9} issued to an outside contractor from {Company: blank=XXXXX} for {Reason: work} in {Location: Kitchen}.
