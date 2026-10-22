@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.4.3  -  README
+  WATCHLOG  v3.5.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -37,7 +37,7 @@ CONTENTS
  13. Team templates and your own templates
  14. Settings window and settings.ini reference
  15. Security, privacy and the activity log
- 16. Setting it up on another PC, or for a new operator
+ 16. Setting it up on another PC, or for a new operator (the exe)
  17. Troubleshooting
  18. Rules worth keeping
 
@@ -45,9 +45,13 @@ CONTENTS
 -----------------------------------------------------------------------
  1. FILES
 -----------------------------------------------------------------------
-These sit in the program folder (Documents\AutoHotkey on OneDrive):
+Watchlog.exe installs itself to %LOCALAPPDATA%\Programs\Watchlog and
+keeps these files in Documents\Watchlog (on OneDrive). The script
+version keeps them next to Watchlog.ahk (for example
+Documents\AutoHotkey). Either way:
 
-  Watchlog.ahk        The program. You shouldn't need to edit it.
+  Watchlog.exe        The program (or Watchlog.ahk, the script version).
+                      You shouldn't need to edit it.
   Watchlog.ico        The icon. Without it the tray shows a green H.
   templates.txt       The wording of every template. Edit freely. (If
                       the team's shared copy is set up, that one is
@@ -485,7 +489,7 @@ notice says so once.
 -----------------------------------------------------------------------
  11. TRAY MENU  (right-click the Watchlog icon near the clock)
 -----------------------------------------------------------------------
-  Watchlog v3.4.3 (date)        Which version is running, whether
+  Watchlog v3.5.0 (date)        Which version is running, whether
                                 it's up to date, the program check
                                 code, and where the templates come from
   Find a template               Same as Ctrl+Alt+Space
@@ -502,15 +506,17 @@ notice says so once.
   Edit templates                Opens templates.txt ("Edit team
                                 templates" when the shared file is set)
   Edit settings file (advanced) Opens settings.ini in Notepad
-  Open script folder            Opens the program folder
+  Open Watchlog folder          Opens the folder with your settings and
+                                templates
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
+  Tutorial                      The guided tour again (how to use Watchlog)
 
 The tray menu is the backup if another program ever grabs a Ctrl+Alt
 hotkey. "Change a login password" moved into Settings in v3.0.
 
 WHICH VERSION AM I RUNNING?  AM I UP TO DATE?
   Hover over the icon, or look at the top of the tray menu. Every time
-  the script loads it also shows "Watchlog v3.4.3 running" in the
+  the script loads it also shows "Watchlog v3.5.0 running" in the
   bottom-right corner for a few seconds.
 
   The templates file has a line near the top, "# Program version:
@@ -782,7 +788,25 @@ THE ACTIVITY LOG  (tray menu > Activity log)
 -----------------------------------------------------------------------
  16. SETTING IT UP ON ANOTHER PC, OR FOR A NEW OPERATOR
 -----------------------------------------------------------------------
-YOUR OWN OTHER BAY PCs
+THE EXE (Watchlog.exe, v3.5.0 and later)
+  Double-click Watchlog.exe on any PC. It asks "Install Watchlog on this
+  PC?". Yes copies it to %LOCALAPPDATA%\Programs\Watchlog (no
+  administrator rights), adds a Start menu entry and the Start with
+  Windows shortcut, and lists it under Settings > Apps. A tutorial opens
+  the first time. Your settings, templates and journal go in
+  Documents\Watchlog, which OneDrive syncs between your bays. If the
+  script version ran on that PC before (settings in Documents\AutoHotkey),
+  it offers to copy your logins and your own templates across.
+  Running a newer Watchlog.exe later offers to update the installed one.
+  With a team folder set up, put the new Watchlog.exe next to the team
+  templates.txt: each PC asks "Update now?", checks the new file starts,
+  keeps the old one as a backup in %LOCALAPPDATA%\Watchlog, and restarts.
+  To remove it: Settings > Apps > Watchlog > Uninstall. It asks whether
+  to delete the saved passwords too, and keeps your settings and journal.
+  It isn't code-signed, so Windows may say "Windows protected your PC"
+  the first time: More info > Run anyway (or ask IT to allow it).
+
+YOUR OWN OTHER BAY PCs (script version)
   1. AutoHotkey v2 must be installed on that PC.
   2. Make sure OneDrive has synced the AutoHotkey folder (and
      LaunchWork.bat).
@@ -794,16 +818,19 @@ YOUR OWN OTHER BAY PCs
 
 A NEW OPERATOR
   1. Tray menu > Make a copy to share. Pick a folder (a SharePoint or
-     Teams folder works). It makes a "Watchlog v3.4.3" folder with
-     only: the program, the icon, the templates (the team's, if that's in use),
-     QUICK START.txt, README.txt, settings.example.ini and
-     LaunchWork.bat. It never copies your settings.ini, my-templates.txt,
-     shift journal, notes, activity log or passwords, and it lists what
-     it left out. The activity log records the copy.
-  2. The new operator copies that folder to their own Documents and
-     double-clicks Watchlog.ahk. The Welcome window asks only for
-     their logins and where the team templates are. QUICK START.txt
-     walks them through it.
+     Teams folder works). It makes a "Watchlog v3.5.0" folder with
+     only: the program (Watchlog.exe, or Watchlog.ahk for the script
+     version), the templates (the team's, if that's in use),
+     QUICK START.txt, README.txt and LaunchWork.bat (the script version
+     also gets the icon and settings.example.ini). It never copies your
+     settings.ini, my-templates.txt, shift journal, notes, activity log
+     or passwords, and it lists what it left out. The activity log
+     records the copy.
+  2. The new operator double-clicks Watchlog.exe and presses Yes. The
+     tutorial asks only for their logins; the team templates are set in
+     Settings. QUICK START.txt walks them through it. (With the script
+     version they copy the folder to their own Documents and
+     double-click Watchlog.ahk instead.)
 
 
 -----------------------------------------------------------------------

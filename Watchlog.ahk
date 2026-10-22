@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.3.0   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.5.0   (called Log Templates before v3.0.1)
 ;  This is the program. You shouldn't need to edit it.
 ;  The first time it runs on a PC that had Log Templates, it moves
 ;  everything over to the new name by itself (see MOVING FROM LOG
@@ -26,12 +26,23 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.4.3"
+VERSION := "3.5.0"
 VERSION_DATE := "Oct 22, 2026"
-TemplatesFile := A_ScriptDir "\templates.txt"
-IconFile := A_ScriptDir "\Watchlog.ico"
-MyTemplatesFile := A_ScriptDir "\my-templates.txt"
-SettingsFile := A_ScriptDir "\settings.ini"
+; The exe installs itself here (no administrator rights needed)
+INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
+INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
+UNINSTALL_KEY := "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Watchlog"
+; Where settings.ini, templates.txt and my-templates.txt live. Run as a
+; script it's the script's own folder, as always. The exe keeps them in
+; Documents\Watchlog (which OneDrive syncs between bays), unless the exe
+; sits next to a settings.ini (a portable copy).
+HomeDir := A_ScriptDir
+if A_IsCompiled && !FileExist(A_ScriptDir "\settings.ini")
+    HomeDir := A_MyDocuments "\Watchlog"
+TemplatesFile := HomeDir "\templates.txt"
+IconFile := A_IsCompiled ? "" : A_ScriptDir "\Watchlog.ico"   ; the exe carries its own icon
+MyTemplatesFile := HomeDir "\my-templates.txt"
+SettingsFile := HomeDir "\settings.ini"
 NotesFile := A_MyDocuments "\Quick Notes.md"
 ; Kept on this PC only (not synced): the activity log and the last good
 ; copy of the team templates
@@ -60,6 +71,23 @@ FirstRun := false       ; true when this PC had no settings.ini yet
 ReloadAt := 0           ; when an automatic reload was asked for
 UpdateOffered := ""     ; the update already offered this run (Later = don't ask again)
 Tpl := {src: "", file: "", count: 0, version: "", code: "", note: "", mine: 0, program: ""}   ; where the templates came from
+
+TutorialWin := ""       ; the tutorial window while it's open
+if A_IsCompiled {
+    ; "Watchlog.exe /selftest" only proves the exe starts (used before an update is swapped in)
+    if A_Args.Length && A_Args[1] = "/selftest"
+        ExitApp 0
+    try DirCreate DataDir
+    if A_Args.Length && A_Args[1] = "/uninstall" {
+        Uninstall()
+        ExitApp
+    }
+    if CheckInstall()
+        ExitApp
+    ; only one Watchlog at a time, even if an older copy or the script runs from elsewhere
+    CloseOtherCopies()
+    InstallBuiltIns()
+}
 
 MoveFromOldName()
 
@@ -100,16 +128,17 @@ A_TrayMenu.Insert("12&")
 A_TrayMenu.Insert("13&", "Edit my templates", (*) => EditMine())
 A_TrayMenu.Insert("14&", Cfg["SharedTemplates"] != "" ? "Edit team templates" : "Edit templates", (*) => EditFile(Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile))
 A_TrayMenu.Insert("15&", "Edit settings file (advanced)", (*) => EditFile(SettingsFile))
-A_TrayMenu.Insert("16&", "Open script folder", (*) => Run(A_ScriptDir))
+A_TrayMenu.Insert("16&", "Open Watchlog folder", (*) => Run(HomeDir))
 A_TrayMenu.Insert("17&", "End of shift (close apps)", (*) => EndOfShift())
-A_TrayMenu.Insert("18&")
+A_TrayMenu.Insert("18&", "Tutorial", (*) => ShowTutorial())
+A_TrayMenu.Insert("19&")
 
 ; A newer Watchlog in the team folder: offer it before anything else
 CheckForUpdate()
 AnnounceVersion()
 ; First time on this PC: the setup window (it's the Settings window)
 if FirstRun
-    ShowSettings(true)
+    ShowTutorial(true)
 
 
 ; =====================================================================
@@ -122,7 +151,7 @@ if FirstRun
 ;  same code means exactly the same Watchlog.ahk.
 ; =====================================================================
 OneDriveMissing() {
-    return InStr(A_ScriptDir, "OneDrive") && !ProcessExist("OneDrive.exe")
+    return InStr(HomeDir, "OneDrive") && !ProcessExist("OneDrive.exe")
 }
 
 ; True when the templates file names a newer program version than this one
@@ -142,7 +171,7 @@ VersionStatus() {
 ProgramCode() {
     static code := ""
     if code = ""
-        try code := CheckCode(FileRead(A_ScriptFullPath, "UTF-8"))
+        try code := A_IsCompiled ? CheckCode(VERSION "|" FileGetSize(A_ScriptFullPath)) : CheckCode(FileRead(A_ScriptFullPath, "UTF-8"))
     return code
 }
 
@@ -154,7 +183,7 @@ AnnounceVersion() {
     if OutOfDate() && !UpdateWaiting() {
         Activity("Out of date: running v" VERSION ", the templates say v" Tpl.program)
         MsgBox "This PC is running Watchlog v" VERSION ", but the team is on v" Tpl.program ".`n`n"
-            . "Get the new Watchlog.ahk from whoever looks after the tool, put it in place of this one:`n" A_ScriptFullPath "`n`nthen press Ctrl+Alt+R.", "Watchlog - update needed", "Icon!"
+            . "Get the new " (A_IsCompiled ? "Watchlog.exe" : "Watchlog.ahk") " from whoever looks after the tool, put it in place of this one:`n" A_ScriptFullPath (A_IsCompiled ? "" : "`n`nthen press Ctrl+Alt+R."), "Watchlog - update needed", "Icon!"
     }
 }
 
@@ -291,8 +320,8 @@ LoadSettings() {
     Cfg["LoginPassword"] := IniRead(SettingsFile, "User", "LoginPassword", "")
     Cfg["LaunchWork"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWork", A_MyDocuments "\LaunchWork.bat"))
     ; A LaunchWork.bat that came in the program folder (a shared copy) works too
-    if !FileExist(Cfg["LaunchWork"]) && FileExist(A_ScriptDir "\LaunchWork.bat")
-        Cfg["LaunchWork"] := A_ScriptDir "\LaunchWork.bat"
+    if !FileExist(Cfg["LaunchWork"]) && FileExist(HomeDir "\LaunchWork.bat")
+        Cfg["LaunchWork"] := HomeDir "\LaunchWork.bat"
     Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
     Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "20"))
     Cfg["ChromeAccount"] := Trim(IniRead(SettingsFile, "Paths", "ChromeAccount", ""))
@@ -665,7 +694,7 @@ PasswordInSettings() {
 FirstRunSetup() {
     global FirstRun
     while !FileExist(SettingsFile) && (OneDriveMissing() || RanBefore) {
-        if MsgBox("There's no settings.ini in this folder:`n" A_ScriptDir "`n`n"
+        if MsgBox("There's no settings.ini in this folder:`n" HomeDir "`n`n"
             . (RanBefore ? "Watchlog has run on this PC before, so OneDrive may still be bringing it back.`n`n" : "")
             . (OneDriveMissing() ? "OneDrive isn't running. Start it from the Start menu and let it sync.`n`n" : "")
             . "Yes = check again`nNo = set up new settings", "Watchlog v" VERSION, "YesNo Icon! Default1") != "Yes"
@@ -677,7 +706,7 @@ FirstRunSetup() {
 
     ; A copy OneDrive renamed, like settings-BAY2.ini
     copy := "", newest := ""
-    Loop Files A_ScriptDir "\settings-*.ini" {
+    Loop Files HomeDir "\settings-*.ini" {
         if StrCompare(A_LoopFileTimeModified, newest) > 0
             copy := A_LoopFileFullPath, newest := A_LoopFileTimeModified
     }
@@ -692,6 +721,23 @@ FirstRunSetup() {
                 return
             } catch as e {
                 MsgBox "Couldn't rename it (" e.Message "), so new settings will be set up.", "Watchlog", "Icon!"
+            }
+        }
+    }
+
+    ; The exe on a PC that ran the script version: offer to bring its settings over
+    oldDir := A_MyDocuments "\AutoHotkey"
+    if A_IsCompiled && StrLower(oldDir) != StrLower(HomeDir) && FileExist(oldDir "\settings.ini") {
+        if MsgBox("Found settings from the script version of Watchlog:`n" oldDir "`n`n"
+            . "Copy your logins and your own templates over to this one? (Saved passwords stay safe in Windows.)", "Watchlog v" VERSION, "YesNo Icon? Default1") = "Yes" {
+            try {
+                FileCopy oldDir "\settings.ini", SettingsFile
+                if FileExist(oldDir "\my-templates.txt") && !FileExist(MyTemplatesFile)
+                    FileCopy oldDir "\my-templates.txt", MyTemplatesFile
+                Activity("First run of the exe: settings copied from " oldDir)
+                return
+            } catch as e {
+                MsgBox "Couldn't copy them (" e.Message "), so new settings will be set up.", "Watchlog", "Icon!"
             }
         }
     }
@@ -764,7 +810,7 @@ Window=ahk_exe CMPDesktop.exe
     text := StrReplace(text, "LAUNCHPATH", A_MyDocuments "\LaunchWork.bat")
     FileAppend text "`n", SettingsFile, "UTF-16"
     FirstRun := true
-    Activity("First run on this PC: new settings.ini made in " A_ScriptDir)
+    Activity("First run on this PC: new settings.ini made in " HomeDir)
 }
 
 
@@ -801,7 +847,7 @@ LoadTemplates() {
     Tpl.mine := AddTemplates(mine, "mine", "my-templates.txt", trigs, &problems)
     Activity("Templates: " TemplateSummary())
     if main.text = "" && main.note = ""
-        problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" A_ScriptDir "`n`n"
+        problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" HomeDir "`n`n"
     if problems != "" {
         Activity("Template problems: " StrReplace(Trim(problems, "`n"), "`n", " / "))
         MsgBox "Some templates weren't loaded:`n`n" problems, "Watchlog", "Icon!"
@@ -928,7 +974,7 @@ TemplateSummary() {
     switch Tpl.src {
         case "team": s := "team file " Tpl.file
         case "team-copy": s := "the saved copy of the team file (the shared one couldn't be read)"
-        default: s := "templates.txt in " A_ScriptDir
+        default: s := "templates.txt in " HomeDir
     }
     s .= " (" Tpl.count " templates" (Tpl.version != "" ? ", wording version " Tpl.version : "") (Tpl.code != "" ? ", check code " Tpl.code : "") ")"
     if Tpl.mine
@@ -1704,6 +1750,8 @@ Journal(title, text) {
 ; Adds an entry to this shift's file, starting a new shift if needed.
 ; Returns false if the folder can't be used.
 JournalWrite(dir, entry) {
+    if IsObject(TutorialWin)
+        return
     try {
         if !DirExist(dir)
             DirCreate dir
@@ -1943,8 +1991,8 @@ TeamProgramFile() {
     if Cfg["SharedTemplates"] = ""
         return ""
     SplitPath Cfg["SharedTemplates"], , &dir
-    f := dir "\Watchlog.ahk"
-    return f = A_ScriptFullPath ? "" : f
+    f := dir (A_IsCompiled ? "\Watchlog.exe" : "\Watchlog.ahk")
+    return StrLower(f) = StrLower(A_ScriptFullPath) ? "" : f
 }
 
 ; The version of the team folder's Watchlog.ahk, or "" if there isn't one
@@ -1952,6 +2000,10 @@ TeamProgramVersion() {
     f := TeamProgramFile()
     if f = "" || !FileExist(f)
         return ""
+    if A_IsCompiled {
+        try return RegExMatch(FileGetVersion(f), "^\d+\.\d+\.\d+", &v) ? v[0] : ""
+        return ""
+    }
     try text := FileRead(f, "UTF-8")
     catch
         return ""
@@ -1982,6 +2034,10 @@ CheckForUpdate() {
 }
 
 UpdateFrom(f, v) {
+    if A_IsCompiled {
+        UpdateExeFrom(f, v)
+        return
+    }
     ; Make sure the new file loads before swapping it in
     tmp := A_Temp "\Watchlog update check.ahk"
     ok := false
@@ -2026,6 +2082,8 @@ UpdateFrom(f, v) {
 ;  hours with nothing counted.
 ; =====================================================================
 CountSaved(kind, keys) {
+    if IsObject(TutorialWin)
+        return
     try {
         day := FormatTime(, "yyyy-MM-dd")
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
@@ -3422,7 +3480,7 @@ SecurityReport() {
     r .= "Checked " FormatTime(, "yyyy-MM-dd HH:mm") " on " A_ComputerName ", Windows user " A_UserName nl
     r .= "Program:   " A_ScriptFullPath nl
     r .= "Version:   v" VERSION ", program check code " ProgramCode() ". " VersionStatus() nl
-    r .= "OneDrive:  " (!InStr(A_ScriptDir, "OneDrive") ? "the program folder isn't in OneDrive"
+    r .= "OneDrive:  " (!InStr(HomeDir, "OneDrive") ? "the Watchlog folder isn't in OneDrive"
         : ProcessExist("OneDrive.exe") ? "running, so this PC gets changes as they sync" : "NOT running, so this PC may have older files") nl
 
     r .= nl "PASSWORDS" nl
@@ -3484,7 +3542,7 @@ SecurityReport() {
     r .= "  finder or the Settings window." nl
 
     conflicts := ""
-    Loop Files A_ScriptDir "\settings-*.ini"
+    Loop Files HomeDir "\settings-*.ini"
         conflicts .= (conflicts = "" ? "" : ", ") A_LoopFileName
     if conflicts != ""
         r .= nl "TO CHECK" nl "  OneDrive made copies of settings.ini: " conflicts ". Compare them with settings.ini, then delete them." nl
@@ -3529,10 +3587,11 @@ CopyForSharing(out) {
     res := {copied: "", notCopied: "", warn: "", error: ""}
     ; The team's wording when it's in use, so a new operator starts with the same templates
     tplFrom := Tpl.src != "local" && FileExist(Tpl.file) ? Tpl.file : TemplatesFile
-    files := [[A_ScriptFullPath, "Watchlog.ahk"], [tplFrom, "templates.txt"]
-        , [A_ScriptDir "\QUICK START.txt", "QUICK START.txt"], [A_ScriptDir "\README.txt", "README.txt"]
-        , [A_ScriptDir "\settings.example.ini", "settings.example.ini"], [Cfg["LaunchWork"], "LaunchWork.bat"]
-        , [IconFile, "Watchlog.ico"]]
+    files := [[A_ScriptFullPath, A_IsCompiled ? "Watchlog.exe" : "Watchlog.ahk"], [tplFrom, "templates.txt"]
+        , [HomeDir "\QUICK START.txt", "QUICK START.txt"], [HomeDir "\README.txt", "README.txt"]
+        , [Cfg["LaunchWork"], "LaunchWork.bat"]]
+    if !A_IsCompiled
+        files.Push([A_ScriptDir "\settings.example.ini", "settings.example.ini"], [IconFile, "Watchlog.ico"])
     try DirCreate out
     catch as e {
         res.error := e.Message
@@ -3591,7 +3650,7 @@ ShowCheatSheet() {
         . "`nRight-click the tray icon (the teal Watchlog one) for Settings and Security and status.`n"
         . "`nv" VERSION " (" VERSION_DATE ")   Templates: " (Tpl.src = "local" ? "templates.txt in this folder" : "the team file")
         . (Tpl.version != "" ? ", wording version " Tpl.version : "") (Tpl.mine ? ", plus " Tpl.mine " of yours" : "")
-        . "`nSettings are in:  " A_ScriptDir
+        . "`nSettings are in:  " HomeDir
 
     g := Gui("+AlwaysOnTop", "Shortcut Cheat Sheet  -  v" VERSION)
     ; Fixed-width font so the shortcut columns line up
@@ -3619,3 +3678,301 @@ ShowCheatSheet() {
 
 ^!r:: Reload
 #SuspendExempt False
+
+
+; =====================================================================
+;  THE EXE: INSTALLING ON THIS PC  (v3.5.0)
+;  Watchlog.exe copies itself to %LOCALAPPDATA%\Programs\Watchlog (no
+;  administrator rights), adds a Start menu entry and the Start with
+;  Windows shortcut, and registers itself under Settings > Apps so it
+;  can be removed like any program. Running a newer Watchlog.exe later
+;  offers to update the installed copy. Settings, templates and the
+;  journal stay where they are (Documents), so uninstalling never
+;  deletes anyone's work.
+; =====================================================================
+#HotIf
+IsInstalledCopy() {
+    return A_IsCompiled && StrLower(A_ScriptFullPath) = StrLower(INSTALL_EXE)
+}
+
+StartupLink() => A_Startup "\Watchlog.lnk"
+MenuLink() => A_Programs "\Watchlog.lnk"
+
+; Returns true when this copy installed itself or handed over to the
+; installed one, and should exit
+CheckInstall() {
+    if IsInstalledCopy()
+        return false
+    if FileExist(INSTALL_EXE) {
+        have := RegRead(UNINSTALL_KEY, "DisplayVersion", "")
+        if have = "" || VerCompare(VERSION, have) > 0 {
+            if MsgBox("Watchlog " (have != "" ? "v" have " " : "") "is installed on this PC. Update it to v" VERSION "?", "Watchlog setup", "YesNo Iconi Default1") = "Yes"
+                return InstallSelf(false)
+        }
+        try Run '"' INSTALL_EXE '"'
+        return true
+    }
+    askedFile := DataDir "\install.ini"
+    if IniRead(askedFile, "Install", "Asked", "") = VERSION
+        return false
+    try IniWrite VERSION, askedFile, "Install", "Asked"
+    if MsgBox("Install Watchlog on this PC?`n`n"
+        . "It adds Watchlog to the Start menu, starts it when Windows starts, and can be removed in Settings > Apps. It doesn't need administrator rights.`n`n"
+        . "Your settings and templates go in:`n" HomeDir "`n`n"
+        . "No = just run it from where it is this time.", "Watchlog setup", "YesNo Iconi Default1") = "Yes"
+        return InstallSelf(true)
+    return false
+}
+
+InstallSelf(fresh) {
+    CloseOtherCopies()
+    try DirCreate INSTALL_DIR
+    copied := false
+    Loop 10 {
+        try {
+            FileCopy A_ScriptFullPath, INSTALL_EXE, 1
+            copied := true
+            break
+        }
+        Sleep 300
+    }
+    if !copied {
+        MsgBox "Watchlog couldn't install itself to:`n" INSTALL_EXE "`n`nIt will keep running from where it is.", "Watchlog setup", "Icon!"
+        return false
+    }
+    try {
+        RegWrite "Watchlog", "REG_SZ", UNINSTALL_KEY, "DisplayName"
+        RegWrite VERSION, "REG_SZ", UNINSTALL_KEY, "DisplayVersion"
+        RegWrite INSTALL_EXE, "REG_SZ", UNINSTALL_KEY, "DisplayIcon"
+        RegWrite INSTALL_DIR, "REG_SZ", UNINSTALL_KEY, "InstallLocation"
+        RegWrite '"' INSTALL_EXE '" /uninstall', "REG_SZ", UNINSTALL_KEY, "UninstallString"
+        RegWrite 1, "REG_DWORD", UNINSTALL_KEY, "NoModify"
+        RegWrite 1, "REG_DWORD", UNINSTALL_KEY, "NoRepair"
+        RegWrite Integer(FileGetSize(INSTALL_EXE) / 1024), "REG_DWORD", UNINSTALL_KEY, "EstimatedSize"
+    }
+    SetShortcut(StartupLink(), fresh || FileExist(StartupLink()) != "")
+    SetShortcut(MenuLink(), true)
+    ; (a fresh install writes no log line yet: the activity log existing would make the new copy think Watchlog ran here before)
+    if !fresh
+        Activity("Updated the installed copy to v" VERSION " in " INSTALL_DIR)
+    try Run '"' INSTALL_EXE '"'
+    return true
+}
+
+; Closes any other running Watchlog (an older exe being replaced, or the
+; script version this exe takes over from)
+CloseOtherCopies() {
+    hidden := A_DetectHiddenWindows
+    DetectHiddenWindows true
+    me := ProcessExist()
+    for hwnd in WinGetList("ahk_class AutoHotkey") {
+        try {
+            pid := WinGetPID("ahk_id " hwnd)
+            if pid = me
+                continue
+            if StrLower(WinGetProcessName("ahk_id " hwnd)) = "watchlog.exe" || InStr(WinGetTitle("ahk_id " hwnd), "\Watchlog.ahk") {
+                ProcessClose pid
+                ProcessWaitClose pid, 3
+            }
+        }
+    }
+    DetectHiddenWindows hidden
+}
+
+Uninstall() {
+    if MsgBox("Remove Watchlog from this PC?`n`nYour settings, templates and shift journal stay in:`n" HomeDir, "Watchlog uninstall", "YesNo Icon? Default2") != "Yes"
+        return false
+    if MsgBox("Also delete the passwords Watchlog saved on this PC (in Windows Credential Manager)?`n`n"
+        . "Yes = delete them`nNo = keep them, in case you install Watchlog again", "Watchlog uninstall", "YesNo Icon? Default2") = "Yes" {
+        Loop 9 {
+            u := Trim(IniRead(SettingsFile, "Login" A_Index, "User", ""))
+            if u != ""
+                try CredRemove(u)
+        }
+    }
+    CloseOtherCopies()
+    SetShortcut(StartupLink(), false)
+    SetShortcut(MenuLink(), false)
+    try RegDeleteKey UNINSTALL_KEY
+    MsgBox "Watchlog has been removed from this PC.", "Watchlog uninstall", "Iconi"
+    if IsInstalledCopy()
+        ; run from Temp: Windows won't delete a folder something is working in
+        Run A_ComSpec ' /c ping -n 3 127.0.0.1 >nul & rmdir /s /q "' INSTALL_DIR '"', A_Temp, "Hide"
+    else if DirExist(INSTALL_DIR)
+        try DirDelete INSTALL_DIR, true
+    return true
+}
+
+SetShortcut(lnk, want) {
+    try {
+        if !want {
+            if FileExist(lnk)
+                FileDelete lnk
+            return
+        }
+        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, , "Watchlog - log templates"
+    } catch as err {
+        MsgBox "Watchlog couldn't update the shortcut:`n" lnk "`n`n" err.Message, "Watchlog", "Icon!"
+    }
+}
+
+; Puts the files built into the exe in the Watchlog folder: templates.txt
+; and LaunchWork.bat only when they're missing (they may have been edited),
+; the guides every time (so they match the version)
+InstallBuiltIns() {
+    try DirCreate HomeDir
+    try {
+        if !FileExist(TemplatesFile)
+            FileInstall "templates.txt", TemplatesFile, 0
+        if !FileExist(HomeDir "\LaunchWork.bat")
+            FileInstall "LaunchWork.bat", HomeDir "\LaunchWork.bat", 0
+        FileInstall "README.txt", HomeDir "\README.txt", 1
+        FileInstall "QUICK START.txt", HomeDir "\QUICK START.txt", 1
+    } catch as e {
+        Activity("Couldn't put the built-in files in " HomeDir ": " e.Message)
+    }
+}
+
+; An exe in the team folder (next to the team templates) replaces this one.
+; A running exe can be renamed but not overwritten, so this one is moved
+; aside as the backup, the new one is copied into its place, and started.
+UpdateExeFrom(f, v) {
+    tmp := A_Temp "\Watchlog update check.exe"
+    ok := false
+    try {
+        FileCopy f, tmp, true
+        ok := RunWait('"' tmp '" /selftest', , "Hide") = 0
+    }
+    try FileDelete tmp
+    if !ok {
+        Activity("Update to v" v " stopped: the team folder's Watchlog.exe didn't start")
+        MsgBox "The new Watchlog.exe in the team folder didn't start, so this PC stays on v" VERSION ".`n`nTell whoever looks after the tool.", "Watchlog update", "Icon!"
+        return
+    }
+    backup := DataDir "\Watchlog v" VERSION " (backup).exe"
+    moved := false
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        try FileDelete backup
+        FileMove A_ScriptFullPath, backup, 1
+        moved := true
+        FileCopy f, A_ScriptFullPath, 1
+    } catch as err {
+        if moved
+            try FileMove backup, A_ScriptFullPath, 1
+        Activity("Update to v" v " failed: " err.Message)
+        MsgBox "Couldn't update: " err.Message "`n`nThis PC stays on v" VERSION ".", "Watchlog update", "Icon!"
+        return
+    }
+    if IsInstalledCopy()
+        try RegWrite v, "REG_SZ", UNINSTALL_KEY, "DisplayVersion"
+    Activity("Updated from v" VERSION " to v" v " from " f " (old copy kept: " backup ")")
+    Run '"' A_ScriptFullPath '"'
+    ExitApp
+}
+
+
+; =====================================================================
+;  TUTORIAL  (first run on a new PC, and tray > Tutorial)
+;  A short guided tour with two practice boxes. Nothing typed here goes
+;  in the shift journal or the time saved numbers.
+; =====================================================================
+ShowTutorial(first := false) {
+    global TutorialWin
+    if IsObject(TutorialWin) {
+        try WinActivate "ahk_id " TutorialWin.Hwnd
+        return
+    }
+    steps := [
+        {head: "Welcome to Watchlog"
+            , body: "Watchlog types your standard log entries for you.`n`nYou type a short code that starts with a semicolon, like `;interior, and the whole entry appears. Codes that need details open a small form first.`n`nThis takes about two minutes. Nothing you do here is saved to your shift journal."
+            , practice: false, logins: false, start: false, check: "", done: ""}
+        , {head: "Your logins"
+            , body: "Watchlog can also type your usernames and passwords. Each login has its own code, like `;me, and can be locked to the program it belongs to, so it never types a password anywhere else.`n`nPasswords are kept in Windows Credential Manager on this PC, never in a file.`n`nAdd your logins now, or skip this and do it later from the tray icon > Settings."
+            , practice: false, logins: true, start: false, check: "", done: ""}
+        , {head: "Try a quick entry"
+            , body: "Click in the box below and type:   `;interior`n`nThe whole line appears the moment you finish typing the code. There's no Enter to press."
+            , practice: true, logins: false, start: false, check: "interior door check", done: "That's a quick entry. Most codes work like that."}
+        , {head: "Try a form"
+            , body: "Some entries need details. Click in the box and type:   `;evict`n`nA form opens. Tab moves between the boxes, Enter inserts the entry, Esc cancels. The preview at the bottom shows how it will look."
+            , practice: true, logins: false, start: false, check: "Trespass", done: "That's a form. The log is ready to paste into iTrak."}
+        , {head: "Finding a code"
+            , body: "Can't remember a code? Press Ctrl+Alt+Space, type any word (like jackpot or audit) and pick the template from the list. Enter inserts it.`n`nTry it in the box below.`n`nCtrl+Alt+H shows every code on one page."
+            , practice: true, logins: false, start: false, check: "", done: ""}
+        , {head: "Handy keys, and you're set"
+            , body: "Ctrl+Alt+Space   find a template`nCtrl+Alt+H   cheat sheet of every code`nCtrl+Alt+L   start of shift (opens your work programs)`nCtrl+Alt+J   this shift's journal`n`nThe teal Watchlog icon by the clock has Settings, Time saved, and this tutorial again. Right-click it any time."
+            , practice: false, logins: false, start: true, check: "", done: ""}
+    ]
+    st := {i: 1}
+    g := Gui(, "Watchlog tutorial")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 20, g.MarginY := 16
+    g.SetFont("s15 bold")
+    hd := g.AddText("w560 h34", "")
+    g.SetFont("s10 norm")
+    bd := g.AddText("w560 h150 y+6", "")
+    pr := g.AddEdit("w560 r6 Multi y+4")
+    stt := g.AddText("w560 h24 y+6 cGreen", "")
+    sw := g.AddCheckbox("w560 y+8", "Start Watchlog when Windows starts")
+    sw.Value := StartupShortcuts().Length ? 1 : 0
+    bBack := g.AddButton("xm y+14 w90", "Back")
+    bNext := g.AddButton("x+8 w110 Default", "Next")
+    bAdd := g.AddButton("x+8 w150", "Add logins...")
+    bClose := g.AddButton("x+8 w120", "Close")
+    bBack.OnEvent("Click", (*) => Go(-1))
+    bNext.OnEvent("Click", (*) => Go(1))
+    bAdd.OnEvent("Click", (*) => ShowSettings())
+    bClose.OnEvent("Click", Done)
+    g.OnEvent("Close", Done)
+    g.OnEvent("Escape", Done)
+    pr.OnEvent("Change", Check)
+    TutorialWin := g
+    Render()
+    g.Show()
+
+    Render() {
+        s := steps[st.i]
+        hd.Text := s.head
+        bd.Text := s.body
+        stt.Text := ""
+        pr.Visible := s.practice
+        sw.Visible := s.start
+        bAdd.Visible := s.logins
+        bBack.Enabled := st.i > 1
+        bNext.Text := st.i = steps.Length ? "Finish" : "Next"
+        g.Title := "Watchlog tutorial  (" st.i " of " steps.Length ")"
+        if s.practice {
+            pr.Value := ""
+            pr.Focus()
+        } else
+            bNext.Focus()
+    }
+
+    Check(*) {
+        s := steps[st.i]
+        if s.check != "" && InStr(pr.Value, s.check)
+            stt.Text := "✓  " s.done
+    }
+
+    Go(d) {
+        if d > 0 && st.i = steps.Length {
+            Done()
+            return
+        }
+        if st.i + d < 1
+            return
+        st.i += d
+        Render()
+    }
+
+    Done(*) {
+        global TutorialWin
+        if sw.Visible
+            SetStartup(sw.Value)
+        TutorialWin := ""
+        try g.Destroy()
+        if first
+            Activity("Tutorial finished on this PC")
+    }
+}
