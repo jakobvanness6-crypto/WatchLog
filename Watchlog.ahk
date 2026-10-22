@@ -26,8 +26,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.4.2"
-VERSION_DATE := "Oct 21, 2026"
+VERSION := "3.4.3"
+VERSION_DATE := "Oct 22, 2026"
 TemplatesFile := A_ScriptDir "\templates.txt"
 IconFile := A_ScriptDir "\Watchlog.ico"
 MyTemplatesFile := A_ScriptDir "\my-templates.txt"
@@ -47,6 +47,8 @@ Lists := Map()          ; @lists from templates.txt, e.g. @tables
 Lists.CaseSense := false
 AppList := []
 LoginList := []
+PickMode := false        ; true while Pick window waits for a click
+PickHwnd := 0
 CurForm := ""
 JustFired := 0
 ReminderGui := ""
@@ -407,9 +409,70 @@ MakeWindowCheck(win) {
     return (*) => LoginWindowActive(win)
 }
 
+; win can name several windows, separated by | (the login works in any of them)
 LoginWindowActive(win) {
     SetTitleMatchMode 2
-    return WinActive(win) && !SettingsActive()
+    if SettingsActive()
+        return false
+    for part in StrSplit(win, "|") {
+        part := Trim(part)
+        if part != "" && WinActive(part)
+            return true
+    }
+    return false
+}
+
+; ---- "Pick window": click a program and its name is filled in for you ----
+#HotIf PickMode
+LButton:: {
+    global PickMode, PickHwnd
+    MouseGetPos(, , &h)
+    PickHwnd := h
+    PickMode := false
+}
+Esc:: {
+    global PickMode
+    PickMode := false
+}
+#HotIf
+
+; Waits for one click on any window (the click is swallowed, so it presses
+; nothing there) and returns text for the Window box, or "" if cancelled.
+PickWindow() {
+    global PickMode, PickHwnd
+    PickHwnd := 0
+    PickMode := true
+    ToolTip "Click the program this login should work in.`nEsc cancels.", , , 7
+    stop := A_TickCount + 30000
+    while PickMode && A_TickCount < stop
+        Sleep 50
+    PickMode := false
+    ToolTip , , , 7
+    hwnd := PickHwnd
+    if !hwnd
+        return ""
+    try {
+        pid := WinGetPID("ahk_id " hwnd)
+        exe := WinGetProcessName("ahk_id " hwnd)
+        title := WinGetTitle("ahk_id " hwnd)
+    } catch {
+        MsgBox "Couldn't read that window. Try again, or type it in.", "Watchlog", "Icon!"
+        return ""
+    }
+    if pid = DllCall("GetCurrentProcessId") {
+        MsgBox "That was Watchlog itself. Press Pick window again and click the other program.", "Watchlog"
+        return ""
+    }
+    ; Browsers, Java programs and Citrix host many different things, so they
+    ; get the title as well (Citrix sessions are all wfica32.exe)
+    if RegExMatch(exe, "i)^(wfica32)\.exe$")
+        guess := "ahk_exe " exe
+    else if RegExMatch(exe, "i)^(chrome|msedge|firefox|javaw|java)\.exe$") && title != ""
+        guess := title " ahk_exe " exe
+    else
+        guess := "ahk_exe " exe
+    ib := InputBox("This is what I found:`n`n   Program: " exe "`n   Title: " title "`n`nThe login will only type in a window matching the text below. For a web page or Java program, cut the title down to the part that never changes (like iTrak).", "Watchlog - Pick window", "w480 h260", guess)
+    return ib.Result = "OK" ? Trim(ib.Value) : ""
 }
 
 ; Shortcuts don't fire in the Settings window, so typing ;me into its
@@ -441,6 +504,11 @@ DoLogin(trig, user, fallbackPw, rec) {
             try WinActivate "ahk_id " target
             WinWaitActive "ahk_id " target, , 1
         }
+    }
+    ; Last check before typing: the right window must still be in front
+    if rec.win != "" && !LoginWindowActive(rec.win) {
+        Activity("Login " trig " NOT typed: " "the window it is locked to wasn't in front")
+        return
     }
     SendInput "{Text}" user
     SendInput "{Tab}"
@@ -3000,7 +3068,7 @@ ShowSettings(welcome := false) {
     Refresh(sel := 0) {
         lv.Delete()
         for x in st.logins
-            lv.Add(, x.trig, x.user, x.win, x.remind ? x.remind " min" : ""
+            lv.Add(, x.trig, x.user, x.win != "" ? x.win : "(any program)", x.remind ? x.remind " min" : ""
                 , x.pw != "" ? "new one, saved on Save" : CredExists(x.user) ? "saved" : "not yet (asks once)")
         if sel
             lv.Modify(sel, "Select Focus Vis")
@@ -3054,8 +3122,9 @@ ShowSettings(welcome := false) {
         ub := d.AddEdit("w420", cur.user)
         d.AddText("w420", row ? "New password (leave it blank to keep the one saved on this PC):" : "Password (or leave it blank and it asks the first time you use it):")
         pb := d.AddEdit("w420 Password")
-        d.AddText("w420", "Optional: only works when the window's title has this in it (like iTrak):")
+        d.AddText("w420", "Only works in these windows (use | between several). Pick window fills it in for you:")
         wb := d.AddEdit("w420", cur.win)
+        d.AddButton("xm w140", "Pick window...").OnEvent("Click", PickIt)
         d.AddText("w420", "Optional: remind me to log in again after this many minutes:")
         rb := d.AddEdit("w80 Number", cur.remind ? cur.remind : "")
         d.AddButton("xm y+14 w120 Default", "OK").OnEvent("Click", OK)
@@ -3069,6 +3138,15 @@ ShowSettings(welcome := false) {
         } else {
             tb.Focus()
             SendMessage 0xB1, StrLen(cur.trig), StrLen(cur.trig), tb      ; cursor at the end
+        }
+
+        PickIt(*) {
+            d.Opt("+OwnDialogs")
+            got := PickWindow()
+            if got = ""
+                return
+            have := Trim(wb.Value)
+            wb.Value := have != "" ? have " | " got : got
         }
 
         Done(*) {
@@ -3355,7 +3433,7 @@ SecurityReport() {
         for l in LoginList
             r .= "    " Format("{:-10}", l.trig) " " Format("{:-22}", l.user)
                 . (CredExists(l.user) ? "saved on this PC" : "not saved yet (asks the first time)")
-                . (l.win != "" ? ", only works in " l.win : "") nl
+                . (l.win != "" ? ", only works in " l.win : ", works in ANY program (no window set)") nl
     } else {
         r .= "    No logins set up." nl
     }
