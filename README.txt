@@ -275,7 +275,7 @@ Forms (open a form):
   ;counttables  Soft count: table totals
   ;countslots   Soft count: slots total
   ;countpull    Soft count: emergency pull
-  ;badge        Visitor badge 17-01 to 17-09: who, reason, location
+  ;badge        Contractor pass 17-01 to 17-09: which pass, company
   ;account      Account review: account # (the # stays if left empty)
   ;refuse       Refused entry: how many patrons (one to 5, or type
                 it), the reason (no ID, insufficient ID, expired ID,
