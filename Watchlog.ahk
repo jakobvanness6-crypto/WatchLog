@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.3.0   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.10.0   (called Log Templates before v3.0.1)
 ;  This is the program. You shouldn't need to edit it.
 ;  The first time it runs on a PC that had Log Templates, it moves
 ;  everything over to the new name by itself (see MOVING FROM LOG
@@ -26,12 +26,25 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.4.3"
-VERSION_DATE := "Oct 22, 2026"
-TemplatesFile := A_ScriptDir "\templates.txt"
-IconFile := A_ScriptDir "\Watchlog.ico"
-MyTemplatesFile := A_ScriptDir "\my-templates.txt"
-SettingsFile := A_ScriptDir "\settings.ini"
+VERSION := "3.10.1"
+VERSION_DATE := "Oct 25, 2026"
+; The exe installs itself here (no administrator rights needed)
+CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
+HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
+INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
+INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
+UNINSTALL_KEY := "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Watchlog"
+; Where settings.ini, templates.txt and my-templates.txt live. Run as a
+; script it's the script's own folder, as always. The exe keeps them in
+; Documents\Watchlog (which OneDrive syncs between bays), unless the exe
+; sits next to a settings.ini (a portable copy).
+HomeDir := A_ScriptDir
+if A_IsCompiled && !FileExist(A_ScriptDir "\settings.ini")
+    HomeDir := A_MyDocuments "\Watchlog"
+TemplatesFile := HomeDir "\templates.txt"
+IconFile := A_IsCompiled ? "" : A_ScriptDir "\Watchlog.ico"   ; the exe carries its own icon
+MyTemplatesFile := HomeDir "\my-templates.txt"
+SettingsFile := HomeDir "\settings.ini"
 NotesFile := A_MyDocuments "\Quick Notes.md"
 ; Kept on this PC only (not synced): the activity log and the last good
 ; copy of the team templates
@@ -41,6 +54,12 @@ ActivityFile := DataDir "\activity.log"
 TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
+AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
+LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
+CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
+CapsWasOn := false
+CapsGui := ""
+CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
 TemplateList := []
 Lists := Map()          ; @lists from templates.txt, e.g. @tables
@@ -49,9 +68,12 @@ AppList := []
 LoginList := []
 PickMode := false        ; true while Pick window waits for a click
 PickHwnd := 0
+TeachBusy := false       ; true while the Alert Grid teach step runs
+NotesWin := ""           ; the quick notes window while it's open
 CurForm := ""
 JustFired := 0
 ReminderGui := ""
+SdsTries := 0
 WatchTimes := Map()
 JournalNotified := false
 Picker := ""            ; the template finder (Ctrl+Alt+Space) while it's open
@@ -61,7 +83,28 @@ ReloadAt := 0           ; when an automatic reload was asked for
 UpdateOffered := ""     ; the update already offered this run (Later = don't ask again)
 Tpl := {src: "", file: "", count: 0, version: "", code: "", note: "", mine: 0, program: ""}   ; where the templates came from
 
+TutorialWin := ""       ; the tutorial window while it's open
+HomeWin := ""           ; the home window while it's open
+EditorWin := ""         ; the template editor while it's open
+WinMenu := ""           ; the tray's Windows sub-menu (has the Caps Lock guard tick)
+if A_IsCompiled {
+    ; "Watchlog.exe /selftest" only proves the exe starts (used before an update is swapped in)
+    if A_Args.Length && A_Args[1] = "/selftest"
+        ExitApp 0
+    try DirCreate DataDir
+    if A_Args.Length && A_Args[1] = "/uninstall" {
+        Uninstall()
+        ExitApp
+    }
+    if CheckInstall()
+        ExitApp
+    ; only one Watchlog at a time, even if an older copy or the script runs from elsewhere
+    CloseOtherCopies()
+    InstallBuiltIns()
+}
+
 MoveFromOldName()
+OnClipboardChange(NoteCopy)
 
 ; Signs this PC has run Watchlog before (used if settings.ini goes missing)
 RanBefore := FileExist(ActivityFile) != ""
@@ -75,6 +118,7 @@ OnError(LogError)
 LoadSettings()
 LoadTemplates()
 LoadApps()
+ResumeSdsResign()
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000
@@ -83,33 +127,21 @@ SetTimer CleanJournal, 6 * 3600000
 if FileExist(IconFile)
     try TraySetIcon IconFile
 
-; Right-click the tray icon for these
+; Click the tray icon for the home window, right-click it for the menu
+; (see TRAY MENU below)
 A_IconTip := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
-A_TrayMenu.Insert("1&", "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - update needed" : ""), (*) => ShowVersion())
-A_TrayMenu.Insert("2&")
-A_TrayMenu.Insert("3&", "Find a template", (*) => ShowPicker())
-A_TrayMenu.Insert("4&", "Cheat sheet", (*) => ShowCheatSheet())
-A_TrayMenu.Insert("5&", "Shift journal", (*) => ShowJournal())
-A_TrayMenu.Insert("6&", "Time saved", (*) => ShowTimeSaved())
-A_TrayMenu.Insert("7&")
-A_TrayMenu.Insert("8&", "Settings (logins, templates, journal)", (*) => ShowSettings())
-A_TrayMenu.Insert("9&", "Security and status", (*) => ShowSecurity())
-A_TrayMenu.Insert("10&", "Activity log", (*) => OpenActivity())
-A_TrayMenu.Insert("11&", "Make a copy to share", (*) => MakeShareCopy())
-A_TrayMenu.Insert("12&")
-A_TrayMenu.Insert("13&", "Edit my templates", (*) => EditMine())
-A_TrayMenu.Insert("14&", Cfg["SharedTemplates"] != "" ? "Edit team templates" : "Edit templates", (*) => EditFile(Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile))
-A_TrayMenu.Insert("15&", "Edit settings file (advanced)", (*) => EditFile(SettingsFile))
-A_TrayMenu.Insert("16&", "Open script folder", (*) => Run(A_ScriptDir))
-A_TrayMenu.Insert("17&", "End of shift (close apps)", (*) => EndOfShift())
-A_TrayMenu.Insert("18&")
+BuildTrayMenu()
+
+; The red Caps Lock tag (see CAPS LOCK below)
+BuildCapsTag()
+SetTimer CheckCaps, 150
 
 ; A newer Watchlog in the team folder: offer it before anything else
 CheckForUpdate()
 AnnounceVersion()
 ; First time on this PC: the setup window (it's the Settings window)
 if FirstRun
-    ShowSettings(true)
+    ShowTutorial(true)
 
 
 ; =====================================================================
@@ -122,7 +154,7 @@ if FirstRun
 ;  same code means exactly the same Watchlog.ahk.
 ; =====================================================================
 OneDriveMissing() {
-    return InStr(A_ScriptDir, "OneDrive") && !ProcessExist("OneDrive.exe")
+    return InStr(HomeDir, "OneDrive") && !ProcessExist("OneDrive.exe")
 }
 
 ; True when the templates file names a newer program version than this one
@@ -142,7 +174,7 @@ VersionStatus() {
 ProgramCode() {
     static code := ""
     if code = ""
-        try code := CheckCode(FileRead(A_ScriptFullPath, "UTF-8"))
+        try code := A_IsCompiled ? CheckCode(VERSION "|" FileGetSize(A_ScriptFullPath)) : CheckCode(FileRead(A_ScriptFullPath, "UTF-8"))
     return code
 }
 
@@ -154,7 +186,7 @@ AnnounceVersion() {
     if OutOfDate() && !UpdateWaiting() {
         Activity("Out of date: running v" VERSION ", the templates say v" Tpl.program)
         MsgBox "This PC is running Watchlog v" VERSION ", but the team is on v" Tpl.program ".`n`n"
-            . "Get the new Watchlog.ahk from whoever looks after the tool, put it in place of this one:`n" A_ScriptFullPath "`n`nthen press Ctrl+Alt+R.", "Watchlog - update needed", "Icon!"
+            . "Get the new " (A_IsCompiled ? "Watchlog.exe" : "Watchlog.ahk") " from whoever looks after the tool, put it in place of this one:`n" A_ScriptFullPath (A_IsCompiled ? "" : "`n`nthen press Ctrl+Alt+R."), "Watchlog - update needed", "Icon!"
     }
 }
 
@@ -291,8 +323,8 @@ LoadSettings() {
     Cfg["LoginPassword"] := IniRead(SettingsFile, "User", "LoginPassword", "")
     Cfg["LaunchWork"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWork", A_MyDocuments "\LaunchWork.bat"))
     ; A LaunchWork.bat that came in the program folder (a shared copy) works too
-    if !FileExist(Cfg["LaunchWork"]) && FileExist(A_ScriptDir "\LaunchWork.bat")
-        Cfg["LaunchWork"] := A_ScriptDir "\LaunchWork.bat"
+    if !FileExist(Cfg["LaunchWork"]) && FileExist(HomeDir "\LaunchWork.bat")
+        Cfg["LaunchWork"] := HomeDir "\LaunchWork.bat"
     Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
     Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "20"))
     Cfg["ChromeAccount"] := Trim(IniRead(SettingsFile, "Paths", "ChromeAccount", ""))
@@ -306,6 +338,19 @@ LoadSettings() {
         Cfg["JournalSave"] := "full"
     keep := Trim(IniRead(SettingsFile, "Journal", "KeepDays", "30"))
     Cfg["KeepDays"] := IsInteger(keep) && keep >= 0 ? Integer(keep) : 30
+    ; Ctrl+Alt+L puts the saved window layout back at the end (only if one was saved)
+    Cfg["LayoutAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Layout", "AfterStart", "yes"))), "^(no|off|0|false)$")
+    ; Ctrl+Alt+L signs into the Bally programs it just opened (after asking)
+    Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
+    ; The plain Caps Lock key (which does nothing with the guard on) clears the Alert Grid alerts
+    Cfg["CapsClearsAlerts"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "AlertGrid", "CapsLockClears", "yes"))), "^(no|off|0|false)$")
+    ; Minutes after an SDS login to sign back into SDS by itself (0 = off)
+    sr := Trim(IniRead(SettingsFile, "SDS", "ResignMinutes", "62"))
+    Cfg["SdsResign"] := IsInteger(sr) && sr >= 0 && sr <= 600 ? Integer(sr) : 62
+    ; Beep with the login reminder pop-up (off unless asked for in Settings)
+    Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
+    ; A folder of your own to take updates from, instead of the team folder
+    Cfg["UpdateFolder"] := Trim(IniRead(SettingsFile, "Updates", "Folder", ""), " `t`"")
     Cfg["CloseApps"] := Trim(IniRead(SettingsFile, "EndOfShift", "Close", "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, chrome.exe, msedge.exe, explorer.exe"))
 
     ; Programs Ctrl+Alt+L opens before LaunchWork.bat: [StartOfShift] Run1 ... Run9
@@ -313,7 +358,8 @@ LoadSettings() {
     ; WindowN (optional) = how to spot it already open, so it isn't opened twice.
     Cfg["StartApps"] := []
     hasSection := false
-    try hasSection := IniRead(SettingsFile, "StartOfShift") != ""
+    ; (a [StartOfShift] with only SignIn= in it, from Settings, still means the usual three)
+    try hasSection := RegExMatch(IniRead(SettingsFile, "StartOfShift"), "im)^\s*Run\d\s*=") > 0
     if hasSection {
         Loop 9 {
             p := Trim(IniRead(SettingsFile, "StartOfShift", "Run" A_Index, ""))
@@ -392,7 +438,7 @@ MovePassword(sec, key, user, pw, &moved, &failed) {
 ; remind = optional minutes after using it to pop up "time to log in again".
 ; Returns a warning if the trigger could fire while typing normally.
 AddLogin(trig, user, fallbackPw, win, remind := 0) {
-    rec := {trig: trig, user: user, win: win, remind: remind}
+    rec := {trig: trig, user: user, win: win, remind: remind, pw: fallbackPw}
     rec.timer := ShowLoginReminder.Bind(rec)
     HotIf(win != "" ? MakeWindowCheck(win) : NotInSettings)
     Hotstring(":*C:" trig, (*) => DoLogin(trig, user, fallbackPw, rec))
@@ -475,9 +521,9 @@ PickWindow() {
     return ib.Result = "OK" ? Trim(ib.Value) : ""
 }
 
-; Shortcuts don't fire in the Settings window, so typing ;me into its
-; Shortcut box doesn't type a password there
-SettingsActive() => IsObject(SettingsWin) && WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
+; Shortcuts don't fire in the Settings window or the template editor, so
+; typing ;me into a Shortcut box doesn't type a password there
+SettingsActive() => (IsObject(SettingsWin) || IsObject(EditorWin)) && WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
 NotInSettings(*) => !SettingsActive()
 
 ; Types the username, Tab, the password, Enter.
@@ -517,10 +563,101 @@ DoLogin(trig, user, fallbackPw, rec) {
     CountSaved("login", StrLen(user) + StrLen(pw) + 2 - StrLen(trig))
     pw := ""
     StartReminder(rec)
+    if RegExMatch(WinGetTitle("A"), "i)^SDS\b")
+        StartSdsResign()
     ; The activity log notes where a password was typed (never the password)
     exe := ""
     try exe := WinGetProcessName("A")
     Activity("Login typed: " trig " (" user ") into " (exe != "" ? exe : "an unknown window"))
+}
+
+
+; =====================================================================
+;  SDS SIGNS BACK IN BY ITSELF  ([SDS] ResignMinutes=62, 0 = off)
+;  SDS logs you out an hour after you sign in. Typing the SDS login starts
+;  a countdown; when it runs out and SDS is back on its login screen, SDS
+;  comes to the front, the saved login is typed, and the window you were in
+;  is put back. If SDS still says Welcome it looks again every minute (up
+;  to 6 times). The time is kept on this PC, so a reload doesn't reset it.
+; =====================================================================
+StartSdsResign() {
+    global SdsTries
+    SdsTries := 0
+    if !Cfg["SdsResign"]
+        return
+    try RegWrite A_Now, "REG_SZ", RegKey, "LastSDSLogin"
+    SetTimer SdsResignDue, -Cfg["SdsResign"] * 60000
+}
+
+ResumeSdsResign() {
+    global SdsTries
+    SdsTries := 0
+    if !Cfg["SdsResign"]
+        return
+    try {
+        last := RegRead(RegKey, "LastSDSLogin")
+        secsLeft := Cfg["SdsResign"] * 60 - DateDiff(A_Now, last, "Seconds")
+    } catch {
+        return
+    }
+    if secsLeft > 0
+        SetTimer SdsResignDue, -secsLeft * 1000
+    else if secsLeft > -600
+        SetTimer SdsResignDue, -1000
+}
+
+; The SDS window on its login screen (not "SDS | Welcome, ..."), or 0
+SdsLoginScreen() {
+    SetTitleMatchMode 2
+    for id in WinGetList("SDS ahk_exe javaw.exe") {
+        t := SafeTitle(id)
+        if RegExMatch(t, "i)^SDS\b") && !InStr(t, "Welcome")
+            return id
+    }
+    return 0
+}
+
+SdsResignDue() {
+    global SdsTries
+    if !Cfg["SdsResign"]
+        return
+    ; Not while you're in Settings or the editor, or in the middle of typing
+    if SettingsActive() || PickerActive() {
+        SetTimer SdsResignDue, -30000
+        return
+    }
+    sds := SdsLoginScreen()
+    if !sds {
+        if SDSWindow() && ++SdsTries <= 6 {
+            SetTimer SdsResignDue, -60000     ; still signed in; look again in a minute
+            return
+        }
+        Activity("SDS sign-in: " (SDSWindow() ? "SDS still said Welcome after 6 looks" : "no SDS login screen found") ", nothing typed")
+        return
+    }
+    waited := 0
+    while A_TimeIdlePhysical < 1500 && waited < 15000 {
+        Sleep 300
+        waited += 300
+    }
+    prev := WinExist("A")
+    Tip("Signing back into SDS...", 4000, true)
+    WinActivate "ahk_id " sds
+    if !WinWaitActive("ahk_id " sds, , 3) {
+        Activity("SDS sign-in: couldn't bring SDS to the front")
+        return
+    }
+    Sleep 1000
+    rec := LoginForWindow()
+    if !rec {
+        Activity("SDS sign-in: no saved login is locked to SDS")
+        return
+    }
+    Activity("SDS sign-in: signing back in by itself")
+    DoLogin(rec.trig, rec.user, rec.pw, rec)
+    Sleep 3000
+    if prev && prev != sds && WinExist("ahk_id " prev)
+        try WinActivate "ahk_id " prev
 }
 
 
@@ -554,6 +691,9 @@ ResumeReminder(rec) {
 
 ShowLoginReminder(rec) {
     global ReminderGui
+    ; SDS signs itself back in, so its "log in again" warning isn't needed
+    if Cfg["SdsResign"] && InStr(rec.win, "SDS")
+        return
     CloseReminder()
     g := Gui("+AlwaysOnTop +ToolWindow", "Login reminder")
     g.SetFont("s11", "Segoe UI")
@@ -571,7 +711,8 @@ ShowLoginReminder(rec) {
     g.GetPos(, , &w, &h)
     MonitorGetWorkArea(MonitorGetPrimary(), , , &right, &bottom)
     g.Show("NoActivate x" (right - w - 12) " y" (bottom - h - 12))
-    SoundBeep 750, 250
+    if Cfg["ReminderBeep"]
+        SoundBeep 750, 250
 }
 
 CloseReminder() {
@@ -665,7 +806,7 @@ PasswordInSettings() {
 FirstRunSetup() {
     global FirstRun
     while !FileExist(SettingsFile) && (OneDriveMissing() || RanBefore) {
-        if MsgBox("There's no settings.ini in this folder:`n" A_ScriptDir "`n`n"
+        if MsgBox("There's no settings.ini in this folder:`n" HomeDir "`n`n"
             . (RanBefore ? "Watchlog has run on this PC before, so OneDrive may still be bringing it back.`n`n" : "")
             . (OneDriveMissing() ? "OneDrive isn't running. Start it from the Start menu and let it sync.`n`n" : "")
             . "Yes = check again`nNo = set up new settings", "Watchlog v" VERSION, "YesNo Icon! Default1") != "Yes"
@@ -677,7 +818,7 @@ FirstRunSetup() {
 
     ; A copy OneDrive renamed, like settings-BAY2.ini
     copy := "", newest := ""
-    Loop Files A_ScriptDir "\settings-*.ini" {
+    Loop Files HomeDir "\settings-*.ini" {
         if StrCompare(A_LoopFileTimeModified, newest) > 0
             copy := A_LoopFileFullPath, newest := A_LoopFileTimeModified
     }
@@ -692,6 +833,23 @@ FirstRunSetup() {
                 return
             } catch as e {
                 MsgBox "Couldn't rename it (" e.Message "), so new settings will be set up.", "Watchlog", "Icon!"
+            }
+        }
+    }
+
+    ; The exe on a PC that ran the script version: offer to bring its settings over
+    oldDir := A_MyDocuments "\AutoHotkey"
+    if A_IsCompiled && StrLower(oldDir) != StrLower(HomeDir) && FileExist(oldDir "\settings.ini") {
+        if MsgBox("Found settings from the script version of Watchlog:`n" oldDir "`n`n"
+            . "Copy your logins and your own templates over to this one? (Saved passwords stay safe in Windows.)", "Watchlog v" VERSION, "YesNo Icon? Default1") = "Yes" {
+            try {
+                FileCopy oldDir "\settings.ini", SettingsFile
+                if FileExist(oldDir "\my-templates.txt") && !FileExist(MyTemplatesFile)
+                    FileCopy oldDir "\my-templates.txt", MyTemplatesFile
+                Activity("First run of the exe: settings copied from " oldDir)
+                return
+            } catch as e {
+                MsgBox "Couldn't copy them (" e.Message "), so new settings will be set up.", "Watchlog", "Icon!"
             }
         }
     }
@@ -741,7 +899,7 @@ Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, 
 
 ; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
 ; Add more as [App3], [App4] ... up to [App9].
-; Taken keys: Q O I H P X R L E J K
+; Taken keys: Q O I H P X R L E J K W A M
 ; Built in already: T Teams, U Outlook, Y Spotify, G Chrome. To change one,
 ; add an [AppN] with the same Name and a new Key (Key=none turns it off).
 [App1]
@@ -764,7 +922,7 @@ Window=ahk_exe CMPDesktop.exe
     text := StrReplace(text, "LAUNCHPATH", A_MyDocuments "\LaunchWork.bat")
     FileAppend text "`n", SettingsFile, "UTF-16"
     FirstRun := true
-    Activity("First run on this PC: new settings.ini made in " A_ScriptDir)
+    Activity("First run on this PC: new settings.ini made in " HomeDir)
 }
 
 
@@ -801,7 +959,7 @@ LoadTemplates() {
     Tpl.mine := AddTemplates(mine, "mine", "my-templates.txt", trigs, &problems)
     Activity("Templates: " TemplateSummary())
     if main.text = "" && main.note = ""
-        problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" A_ScriptDir "`n`n"
+        problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" HomeDir "`n`n"
     if problems != "" {
         Activity("Template problems: " StrReplace(Trim(problems, "`n"), "`n", " / "))
         MsgBox "Some templates weren't loaded:`n`n" problems, "Watchlog", "Icon!"
@@ -864,7 +1022,7 @@ ReadTemplateSource() {
 
 ; While the saved copy is in use: reload as soon as the shared file can be read
 RetryTeamFile() {
-    if IsObject(CurForm) || IsObject(SettingsWin)
+    if IsObject(CurForm) || IsObject(SettingsWin) || IsObject(EditorWin)
         return
     try {
         if CountTemplates(FileRead(Cfg["SharedTemplates"], "UTF-8"))
@@ -928,7 +1086,7 @@ TemplateSummary() {
     switch Tpl.src {
         case "team": s := "team file " Tpl.file
         case "team-copy": s := "the saved copy of the team file (the shared one couldn't be read)"
-        default: s := "templates.txt in " A_ScriptDir
+        default: s := "templates.txt in " HomeDir
     }
     s .= " (" Tpl.count " templates" (Tpl.version != "" ? ", wording version " Tpl.version : "") (Tpl.code != "" ? ", check code " Tpl.code : "") ")"
     if Tpl.mine
@@ -1052,6 +1210,66 @@ RunTemplate(text, title, repeat := false, trig := "") {
     FormPaste(title, fields, vals => FillTemplate(text, fields, vals), repeat, StrLen(trig))
 }
 
+; ---- Facial rec copies (v3.6.0) ---------------------------------------
+; The facial rec page won't copy the alert # and the match % together, so
+; the last copy of each is kept in memory only (never written to disk,
+; forgotten after 2 minutes or once used). Only an 8-digit number or a
+; percentage is kept, and only when copied in Edge, so Citrix's clipboard
+; is never touched.
+NoteCopy(type) {
+    global CopyMemory
+    if type != 1 || !WinActive("ahk_exe msedge.exe")
+        return
+    text := ""
+    try text := Trim(A_Clipboard)
+    if RegExMatch(text, "^\d{8}$")
+        CopyMemory["alert"] := {text: text, at: A_TickCount}
+    else if RegExMatch(text, "^\d{1,3}(\.\d+)?\s*%$")
+        CopyMemory["match"] := {text: RegExReplace(text, "\s*%$"), at: A_TickCount}
+}
+
+RecentCopy(kind) {
+    if CopyMemory.Has(kind) && A_TickCount - CopyMemory[kind].at < 120000
+        return CopyMemory[kind].text
+    return ""
+}
+
+ForgetCopy(kind) {
+    if CopyMemory.Has(kind)
+        CopyMemory.Delete(kind)
+}
+
+; A plain number (4 to 8 digits) from a copy. A longer copy, like a whole
+; iTrak line, works if it has exactly one such number in it.
+NumberFromCopy(text) {
+    text := Trim(text)
+    if RegExMatch(text, "^\d{4,8}$")
+        return text
+    if StrLen(text) > 500
+        return ""
+    pos := 1, found := ""
+    while p := RegExMatch(text, "(?<!\d)\d{4,8}(?!\d)", &m, pos) {
+        if found != ""
+            return ""
+        found := m[0], pos := p + m.Len
+    }
+    return found
+}
+
+; Which list item (a job title) appears in the copied text; the longest
+; match wins ("Security Supervisor" over "Supervisor"). 0 = none.
+TitleFromCopy(items, text) {
+    if StrLen(text) > 2000
+        return 0
+    best := 0, bestLen := 0
+    for i, it in items {
+        if StrLen(it) > bestLen && RegExMatch(text, "i)(?<![\w])" RegExReplace(it, "[\\.*?+\[\](){}|^$]", "\$0") "(?![\w])") {
+            best := i, bestLen := StrLen(it)
+        }
+    }
+    return best
+}
+
 ; Finds every {blank} in the text and turns it into a form box (once per name)
 ParseFields(text) {
     fields := [], seen := Map()
@@ -1060,7 +1278,7 @@ ParseFields(text) {
     ; syncs); before v3.3 they were in settings.ini, so that's the fallback.
     last := Map()
     last.CaseSense := false
-    if InStr(text, "last") || InStr(text, "next") {
+    if InStr(text, "last") || InStr(text, "next") || InStr(text, "alertcopy") {
         section := ""
         try section := IniRead(LastUsedFile, "LastUsed")
         if section = ""
@@ -1108,9 +1326,34 @@ ParseField(spec, last := Map()) {
         } else if low = "percent" {
             f.kind := "percent", f.ph := "XX%", hint := "  (e.g. 67)"
         } else if low = "clip" {
-            clip := Trim(A_Clipboard)
-            f.def := RegExMatch(clip, "^\d{4,8}$") ? clip : ""
+            f.def := NumberFromCopy(A_Clipboard)
             hint := "  (copy it first to auto-fill)"
+        } else if low = "alertcopy" {
+            ; facial rec alert #: the 8-digit number copied in the last two
+            ; minutes, and the last one logged on this PC (alerts count up)
+            f.remember := true, f.alertCopy := true
+            lastA := last.Has(key) ? last[key] : ""
+            copied := RecentCopy("alert")
+            if copied != "" {
+                f.def := copied
+                if lastA != "" && copied = lastA
+                    hint := "  (SAME as the last one logged: " lastA ")"
+                else if lastA != "" && copied < lastA
+                    hint := "  (LOWER than the last one logged: " lastA ")"
+                else
+                    hint := "  (copied)"
+            } else {
+                hint := lastA != "" ? "  (last logged: " lastA "; copy the new one first)" : "  (copy it first to auto-fill)"
+            }
+        } else if low = "matchcopy" {
+            ; facial rec match %: the percentage copied in the last two minutes
+            f.kind := "percent", f.ph := "XX%", f.matchCopy := true
+            copied := RecentCopy("match")
+            f.def := copied
+            hint := copied != "" ? "  (copied)" : "  (copy it first to auto-fill, e.g. 65)"
+        } else if low = "fromcopy" {
+            f.fromCopy := true
+
         } else if low = "last" {
             f.remember := true
             f.def := last.Has(key) ? last[key] : ""
@@ -1150,6 +1393,14 @@ ParseField(spec, last := Map()) {
             f.kind := "list"
         else
             hint := "  (pick or type)"
+        ; "fromcopy": open the list on the job title found in what was copied
+        if f.HasOwnProp("fromCopy") {
+            at := TitleFromCopy(items, A_Clipboard)
+            if at {
+                f.choose := at
+                hint := "  (from the copied text)"
+            }
+        }
         ; "next" opens the list on the item after the one used last time
         if f.HasOwnProp("nextStep") {
             lastVal := last.Has(key) ? last[key] : ""
@@ -1289,8 +1540,12 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
     preview := g.AddEdit("w420 r5 ReadOnly -TabStop VScroll BackgroundF1F5F5")
     lastPreview := ""
     g.SetFont("s10")
-    for c in ctrls
+    prevLen := Map()
+    for i, c in ctrls {
+        if fields[i].HasOwnProp("items") && !(fields[i].HasOwnProp("kind") && fields[i].kind = "list")
+            c.OnEvent("Change", Complete.Bind(i))
         c.OnEvent("Change", Changed)
+    }
     Changed()
     ; Buttons along the bottom-right; Insert is the one Enter presses
     if repeat
@@ -1348,6 +1603,27 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
                 if c.Text != want
                     c.Value := want
                 autoVals[i] := want
+            }
+        }
+    }
+
+    ; Pick-or-type lists: typing the start of an item fills in the rest
+    ; (selected, so the next key replaces it and Backspace removes it).
+    ; Only when text was added, so deleting never fights you.
+    Complete(i, *) {
+        c := ctrls[i]
+        txt := c.Text
+        was := prevLen.Has(i) ? prevLen[i] : 0
+        prevLen[i] := StrLen(txt)
+        if StrLen(txt) <= was || txt = ""
+            return
+        for it in fields[i].items {
+            if StrLen(it) > StrLen(txt) && SubStr(it, 1, StrLen(txt)) = txt {
+                prevLen[i] := StrLen(it)
+                c.Text := it
+                ; CB_SETEDITSEL: select the part that was filled in
+                SendMessage(0x142, 0, StrLen(txt) | (StrLen(it) << 16), c.Hwnd)
+                return
             }
         }
     }
@@ -1413,6 +1689,10 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
                     IniWrite v, LastUsedFile, "LastUsed", f.key
                 }
             }
+            if save && f.HasOwnProp("alertCopy")
+                ForgetCopy("alert")
+            if save && f.HasOwnProp("matchCopy")
+                ForgetCopy("match")
             vals.Push(v)
         }
         return vals
@@ -1591,7 +1871,7 @@ NoteOwnWrite() {
 }
 
 CheckForEdits() {
-    if IsObject(CurForm) || IsObject(SettingsWin) || IsObject(Picker)
+    if IsObject(CurForm) || IsObject(SettingsWin) || IsObject(Picker) || IsObject(EditorWin)
         return
     ; settings.ini missing for a moment: wait for it to come back, since
     ; reloading without it would start over with no settings
@@ -1627,13 +1907,18 @@ ReloadOnce() {
 ;  Ctrl+Alt+Q = add a note
 ;  Ctrl+Alt+O = open all notes
 ; =====================================================================
-^!q:: {
+^!q:: QuickNote()
+
+QuickNote() {
     ib := InputBox("Type your note. Start with a tag like #todo, #incident or #idea:", "Quick Note", "w450 h120")
     if ib.Result != "OK" || Trim(ib.Value) = ""
         return
     note := Trim(ib.Value)
     if SaveNote(NotesFile, note) {
         Tip("Note saved", 1000)
+        RefreshNotes()
+        if WinExist("Quick Notes ahk_exe Notepad.exe")
+            MsgBox "Quick Notes.md is open in Notepad. Your note IS saved, but that Notepad window still shows the old text.`n`nClose it and choose Don't save (saving it would write over your new note). Ctrl+Alt+O shows your notes without this problem.", "Quick Note", "Icon! 4096"
         return
     }
     ; Quick Notes.md is in OneDrive. If OneDrive isn't running, Windows can't
@@ -1665,7 +1950,68 @@ SaveNote(file, note) {
     return false
 }
 
-^!o:: Run 'notepad.exe "' NotesFile '"'
+^!o:: ShowNotes()
+
+; Ctrl+Alt+O: a window that reads the notes file fresh every time, so it
+; can't show an old copy the way a Notepad tab left open does. Notes saved
+; on this PC while OneDrive was off are moved into Quick Notes.md first.
+ShowNotes() {
+    global NotesWin
+    MergeNotesBackup()
+    if IsObject(NotesWin) {
+        RefreshNotes()
+        NotesWin.Show()
+        return
+    }
+    g := Gui("+Resize", "Quick notes  -  v" VERSION)
+    g.SetFont("s10", "Consolas")
+    g.AddEdit("vText w560 r20 ReadOnly -WantReturn")
+    g.SetFont("s10", "Segoe UI")
+    g.AddButton("vNp w140 Default", "Open in Notepad").OnEvent("Click", OpenNp)
+    g.AddButton("vCl x+4 w112", "Close").OnEvent("Click", CloseIt)
+    g.OnEvent("Escape", CloseIt)
+    g.OnEvent("Close", CloseIt)
+    g.OnEvent("Size", (gui, mm, w, h) => mm = -1 ? 0 : (gui["Text"].Move(, , w - 20, h - 62), gui["Np"].Move(, h - 40), gui["Cl"].Move(, h - 40)))
+    NotesWin := g
+    RefreshNotes()
+    g.Show()
+
+    OpenNp(*) {
+        CloseIt()
+        Run 'notepad.exe "' NotesFile '"'
+    }
+    CloseIt(*) {
+        global NotesWin
+        NotesWin := ""
+        g.Destroy()
+    }
+}
+
+; Reloads the text in the notes window (if it's open) and shows the end
+RefreshNotes() {
+    if !IsObject(NotesWin)
+        return
+    text := ""
+    try text := FileRead(NotesFile, "UTF-8")
+    catch
+        text := "(No notes yet. Ctrl+Alt+Q adds one.)"
+    NotesWin["Text"].Value := StrReplace(StrReplace(text, "`r`n", "`n"), "`n", "`r`n")
+    SendMessage 0x115, 7, 0, NotesWin["Text"].Hwnd   ; WM_VSCROLL, SB_BOTTOM
+}
+
+; Moves notes saved to the this-PC backup file into Quick Notes.md
+MergeNotesBackup() {
+    backup := DataDir "\Quick Notes (this PC).md"
+    if !FileExist(backup)
+        return
+    try {
+        text := FileRead(backup, "UTF-8")
+        if Trim(text, " `r`n") != ""
+            FileAppend "`n" Trim(text, "`r`n") "`n", NotesFile, "UTF-8"
+        FileDelete backup
+        Activity("Quick notes: moved the notes saved on this PC into Quick Notes.md")
+    }
+}
 
 
 ; =====================================================================
@@ -1704,6 +2050,8 @@ Journal(title, text) {
 ; Adds an entry to this shift's file, starting a new shift if needed.
 ; Returns false if the folder can't be used.
 JournalWrite(dir, entry) {
+    if IsObject(TutorialWin)
+        return
     try {
         if !DirExist(dir)
             DirCreate dir
@@ -1929,6 +2277,243 @@ ShowJournal() {
 }
 
 ; =====================================================================
+;  ALERT GRID - clear all   Ctrl+Alt+A
+;  Does what you do by hand: Ctrl+A on the alert list, right-click,
+;  "Acknowledge as received", Submit, OK. Works from any window: it brings
+;  Alert Grid to the front, then puts you back where you were. It never
+;  types a password (the Acknowledge box already has your login filled in).
+;  It clears EVERYTHING in the list, so look at the list first.
+;  Ctrl+Alt+Shift+A teaches it where to click, once per PC: you clear
+;  alerts by hand and press F8 over three spots. Only numbers are kept
+;  (%LOCALAPPDATA%\Watchlog\alertgrid.ini), positions inside each window.
+; =====================================================================
+^!a:: ClearAlerts()
+^!+a:: TeachAlerts()
+
+AlertGridWin() {
+    SetTitleMatchMode "RegEx"
+    return WinExist("^Alert Grid \( ahk_exe javaw.exe")
+}
+
+; Waits for F8 or Ctrl+Alt+Shift+A (true), or Ctrl+Alt+Esc / 3 minutes (false).
+; It reads the keys itself instead of using hotkeys, so it works whatever
+; window is in front (a hotkey can't see keys typed into some Java windows).
+TeachWait(msg) {
+    Tip(msg, 0, true)
+    KeyWait "F8"
+    KeyWait "a"
+    stop := A_TickCount + 180000
+    ok := false, cancelled := false
+    while A_TickCount < stop {
+        if GetKeyState("F8", "P")
+            || (GetKeyState("a", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P") && GetKeyState("Shift", "P")) {
+            ok := true
+            break
+        }
+        if GetKeyState("Esc", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P") {
+            cancelled := true
+            break
+        }
+        Sleep 30
+    }
+    Tip("")
+    KeyWait "F8", "T2"
+    KeyWait "a", "T2"
+    if !ok {
+        Tip(cancelled ? "Teach Alert Grid cancelled. Nothing saved." : "Teach Alert Grid timed out. Nothing saved.", 3000, true)
+        Activity("Alert Grid teach: " (cancelled ? "cancelled" : "timed out"))
+    } else
+        Activity("Alert Grid teach: captured a spot")
+    return ok
+}
+
+TeachAlerts() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachRun()
+    catch as err
+        MsgBox "Teach Alert Grid stopped: " err.Message, "Teach Alert Grid", "Icon!"
+    TeachBusy := false
+}
+
+TeachRun() {
+    global AlertFile
+    if !AlertGridWin() {
+        MsgBox "Open Alert Grid first, with at least one alert in the list.", "Teach Alert Grid", "Icon!"
+        return
+    }
+    if MsgBox("This takes about a minute and you do it once on each PC.`n`nYou will clear the alerts by hand, and at five points hover the mouse over the right spot and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels).`n`nAlert Grid needs at least one alert in the list. Start?", "Teach Alert Grid", "YesNo Icon?") != "Yes"
+        return
+    CoordMode "Mouse", "Screen"
+    SetTitleMatchMode "RegEx"
+    if !TeachWait("1 of 5`nHover over an alert row in Alert Grid and press F8 (or Ctrl+Alt+Shift+A)   (Ctrl+Alt+Esc cancels)")
+        return
+    MouseGetPos &sx, &sy, &hwnd
+    grid := AlertGridWin()
+    if !grid {
+        MsgBox "Alert Grid isn't open any more. Nothing saved.", "Teach Alert Grid", "Icon!"
+        return
+    }
+    WinGetPos &gx, &gy, , , "ahk_id " grid
+    rowx := sx - gx, rowy := sy - gy
+    if !TeachWait("2 of 5`nNow press Ctrl+A, right-click the row, hover over 'Acknowledge as received' and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+        return
+    MouseGetPos &mx, &my
+    dx := mx - sx, dy := my - sy
+    if !TeachWait("3 of 5`nClick 'Acknowledge as received'. When the Acknowledge box shows, hover over Submit and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+        return
+    MouseGetPos &bx, &by
+    dlg := WinExist("^Acknowledge$ ahk_exe javaw.exe")
+    if !dlg {
+        MsgBox "The Acknowledge box wasn't open. Nothing saved. Try again.", "Teach Alert Grid", "Icon!"
+        return
+    }
+    WinGetPos &ax, &ay, , , "ahk_id " dlg
+    try {
+        IniWrite rowx, AlertFile, "Clicks", "RowX"
+        IniWrite rowy, AlertFile, "Clicks", "RowY"
+        IniWrite dx, AlertFile, "Clicks", "MenuDX"
+        IniWrite dy, AlertFile, "Clicks", "MenuDY"
+        IniWrite bx - ax, AlertFile, "Clicks", "SubmitX"
+        IniWrite by - ay, AlertFile, "Clicks", "SubmitY"
+    } catch {
+        MsgBox "Couldn't save the clicks to " AlertFile, "Teach Alert Grid", "Icon!"
+        return
+    }
+    Activity("Alert Grid: clicks taught (row " rowx "," rowy "  menu " dx "," dy "  submit " bx - ax "," by - ay ")")
+    if !TeachWait("4 of 5`nNow click Submit. When the 'Acknowledgement Successful' box shows, hover over its OK button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+        return
+    MouseGetPos &kx, &ky
+    ok := WinExist("^Alert Grid$ ahk_exe javaw.exe")
+    if !ok {
+        MsgBox "The 'Acknowledgement Successful' box wasn't open. The first three clicks are saved, and Enter will be used for OK.`n`nClick OK now.", "Teach Alert Grid", "Icon!"
+        return
+    }
+    WinGetPos &ox, &oy, , , "ahk_id " ok
+    try {
+        IniWrite kx - ox, AlertFile, "Clicks", "OkX"
+        IniWrite ky - oy, AlertFile, "Clicks", "OkY"
+    }
+    Activity("Alert Grid: OK button taught (" kx - ox "," ky - oy ")")
+    if !TeachWait("5 of 5`nClick OK. Then hover over the little button that clears the acknowledged alerts and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+        return
+    MouseGetPos &cx, &cy
+    grid := AlertGridWin()
+    if !grid {
+        MsgBox "Alert Grid isn't open any more. The first four clicks are saved.", "Teach Alert Grid", "Icon!"
+        return
+    }
+    WinGetPos &gx, &gy, , , "ahk_id " grid
+    try {
+        IniWrite cx - gx, AlertFile, "Clicks", "ClearX"
+        IniWrite cy - gy, AlertFile, "Clicks", "ClearY"
+    }
+    Activity("Alert Grid: clear-acknowledged button taught (" cx - gx "," cy - gy ")")
+    MsgBox "Saved. Now click that button yourself to finish.`n`nFrom now on Ctrl+Alt+A does all of it.", "Teach Alert Grid"
+}
+
+ClearAlerts() {
+    global AlertFile
+    if !FileExist(AlertFile) {
+        MsgBox "Alert Grid clicks haven't been taught on this PC yet.`n`nPress Ctrl+Alt+Shift+A once and follow the steps.", "Clear alerts", "Icon!"
+        return
+    }
+    grid := AlertGridWin()
+    if !grid {
+        Tip("Alert Grid isn't open.", 2000, true)
+        return
+    }
+    rowx := Integer(IniRead(AlertFile, "Clicks", "RowX")), rowy := Integer(IniRead(AlertFile, "Clicks", "RowY"))
+    dx := Integer(IniRead(AlertFile, "Clicks", "MenuDX")), dy := Integer(IniRead(AlertFile, "Clicks", "MenuDY"))
+    subx := Integer(IniRead(AlertFile, "Clicks", "SubmitX")), suby := Integer(IniRead(AlertFile, "Clicks", "SubmitY"))
+    okx := IniRead(AlertFile, "Clicks", "OkX", ""), oky := IniRead(AlertFile, "Clicks", "OkY", "")
+    clrx := IniRead(AlertFile, "Clicks", "ClearX", ""), clry := IniRead(AlertFile, "Clicks", "ClearY", "")
+    prev := WinExist("A")
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    if WinGetMinMax("ahk_id " grid) = -1
+        WinRestore "ahk_id " grid
+    WinActivate "ahk_id " grid
+    if !WinWaitActive("ahk_id " grid, , 2) {
+        Tip("Couldn't bring Alert Grid to the front.", 2500, true)
+        return
+    }
+    WinGetPos &gx, &gy, , , "ahk_id " grid
+    px := gx + rowx, py := gy + rowy
+    done := false
+    ; A new alert arriving while this runs re-draws the list and drops the
+    ; selection, so everything here is fast, and if the Acknowledge box or
+    ; the "Successful" box doesn't turn up it starts again (up to 3 tries).
+    ; [AlertGrid] Pause= in settings.ini is the wait between clicks in ms
+    ; (default 40; raise it if a click lands before the menu is up).
+    gap := Integer(IniRead(SettingsFile, "AlertGrid", "Pause", "40"))
+    SetMouseDelay 0
+    SetKeyDelay 0
+    attempts := 0
+    while !done && attempts < 3 {
+        attempts += 1
+        try {
+            Click px, py
+            Sleep gap
+            Send "^a"
+            Sleep gap
+            Click px, py, "Right"
+            Sleep gap * 2
+            Click px + dx, py + dy
+            dlg := WinWait("^Acknowledge$ ahk_exe javaw.exe", , 1.5)
+            if !dlg {
+                Send "{Escape}"
+                if attempts = 3
+                    Tip("Nothing to clear (or the menu didn't open).", 2500, true)
+                continue
+            }
+            WinGetPos &ax, &ay, , , "ahk_id " dlg
+            Click ax + subx, ay + suby
+            ok := WinWait("^Alert Grid$ ahk_exe javaw.exe", , 3)
+            if !ok {
+                ; the box is still open (Submit didn't take): close it and go again
+                if WinExist("ahk_id " dlg) {
+                    WinActivate "ahk_id " dlg
+                    Send "{Escape}"
+                    WinWaitClose "ahk_id " dlg, , 1
+                }
+                if attempts = 3
+                    Tip("The 'Acknowledgement Successful' box didn't show. Check Alert Grid.", 3500, true)
+                continue
+            }
+            WinActivate "ahk_id " ok
+            if okx != "" && oky != "" {
+                WinGetPos &kx, &ky, , , "ahk_id " ok
+                Click kx + Integer(okx), ky + Integer(oky)
+            } else
+                Send "{Enter}"
+            WinWaitClose "ahk_id " ok, , 2
+            done := true
+            ; the little button that clears the acknowledged alerts
+            if clrx != "" && clry != "" && WinExist("ahk_id " grid) {
+                WinActivate "ahk_id " grid
+                WinWaitActive "ahk_id " grid, , 2
+                WinGetPos &gx, &gy, , , "ahk_id " grid
+                Click gx + Integer(clrx), gy + Integer(clry)
+                Sleep gap
+            }
+        }
+    }
+    if done {
+        Tip("Alerts cleared", 1000)
+        Activity("Alert Grid: cleared all alerts")
+        CountSaved("", 3)   ; keystrokes only: a clear isn't a log, a login or a stamp
+    } else {
+        Activity("Alert Grid: clear all didn't finish")
+    }
+    MouseMove ox, oy, 0
+    if prev && prev != grid && WinExist("ahk_id " prev)
+        try WinActivate "ahk_id " prev
+}
+
+; =====================================================================
 ;  UPDATES FROM THE TEAM FOLDER
 ;  Whoever looks after the tool puts the new Watchlog.ahk (and
 ;  Watchlog.ico) in the same SharePoint folder as the team templates.
@@ -1940,18 +2525,27 @@ ShowJournal() {
 ; Watchlog.ahk next to the team templates file, or "" when there's no team
 ; file (or this copy is the one in the team folder)
 TeamProgramFile() {
-    if Cfg["SharedTemplates"] = ""
-        return ""
-    SplitPath Cfg["SharedTemplates"], , &dir
-    f := dir "\Watchlog.ahk"
-    return f = A_ScriptFullPath ? "" : f
+    dir := Cfg["UpdateFolder"]
+    if dir = "" {
+        if Cfg["SharedTemplates"] = ""
+            return ""
+        SplitPath Cfg["SharedTemplates"], , &dir
+    }
+    f := dir (A_IsCompiled ? "\Watchlog.exe" : "\Watchlog.ahk")
+    return StrLower(f) = StrLower(A_ScriptFullPath) ? "" : f
 }
 
 ; The version of the team folder's Watchlog.ahk, or "" if there isn't one
-TeamProgramVersion() {
-    f := TeamProgramFile()
+TeamProgramVersion() => ProgramVersionOf(TeamProgramFile())
+
+; The version of a Watchlog.exe or Watchlog.ahk ("" if there isn't one)
+ProgramVersionOf(f) {
     if f = "" || !FileExist(f)
         return ""
+    if A_IsCompiled {
+        try return RegExMatch(FileGetVersion(f), "^\d+\.\d+\.\d+", &v) ? v[0] : ""
+        return ""
+    }
     try text := FileRead(f, "UTF-8")
     catch
         return ""
@@ -1982,6 +2576,10 @@ CheckForUpdate() {
 }
 
 UpdateFrom(f, v) {
+    if A_IsCompiled {
+        UpdateExeFrom(f, v)
+        return
+    }
     ; Make sure the new file loads before swapping it in
     tmp := A_Temp "\Watchlog update check.ahk"
     ok := false
@@ -2026,10 +2624,14 @@ UpdateFrom(f, v) {
 ;  hours with nothing counted.
 ; =====================================================================
 CountSaved(kind, keys) {
+    if IsObject(TutorialWin)
+        return
     try {
         day := FormatTime(, "yyyy-MM-dd")
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
-        d.%kind% += 1, d.keys += keys
+        if kind != ""
+            d.%kind% += 1
+        d.keys += keys
         IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
         if IniRead(SavedFile, "Info", "First", "") = ""
             IniWrite day, SavedFile, "Info", "First"
@@ -2041,7 +2643,9 @@ CountSaved(kind, keys) {
             IniWrite A_Now, SavedFile, "Shift", "Start"
             IniWrite 0, SavedFile, "Shift", "Ended"
         }
-        sh.%kind% += 1, sh.keys += keys
+        if kind != ""
+            sh.%kind% += 1
+        sh.keys += keys
         IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
         IniWrite A_Now, SavedFile, "Shift", "Last"
     }
@@ -2164,7 +2768,7 @@ ShowTimeSaved() {
 ;  Ctrl+Alt+I = show the current window's title and program name
 ; =====================================================================
 LoadApps() {
-    taken := "QOIHPXRLEJK"
+    taken := "QOIHPXRLEJKWAM"
     problems := "", named := ""
     Loop 9 {
         sec := "App" A_Index
@@ -2203,6 +2807,28 @@ LoadApps() {
         MsgBox "Some apps in settings.ini were skipped:`n`n" problems, "Watchlog", "Icon!"
 }
 
+IsBallyPath(path) => InStr(path, "SDSUI") || InStr(path, "CMPDesktop") || InStr(path, "AlertGridUI")
+
+; The saved login that belongs to the program in front: one locked to
+; its window (Window= in settings.ini, e.g. ;prd for SDS, CMP, Alert Grid)
+LoginForWindow() {
+    for rec in LoginList
+        if rec.win != "" && SubStr(rec.trig, 1, 1) = ";" && LoginWindowActive(rec.win)
+            return rec
+    return ""
+}
+
+; After a Bally program comes to the front: asks, and types its login on a yes.
+; Closes itself after 6 seconds (counts as no).
+OfferLogin(name) {
+    rec := LoginForWindow()
+    if !rec
+        return
+    r := MsgBox("Log in to " name " as " rec.user "?`n`nEnter = yes, Esc = no. Only say yes on the login screen.", "Watchlog", "YesNo Icon? T6")
+    if r = "Yes"
+        DoLogin(rec.trig, rec.user, rec.pw, rec)
+}
+
 MakeSwitchHandler(name, win, path) {
     return (*) => SwitchTo(name, win, path)
 }
@@ -2213,8 +2839,11 @@ SwitchTo(name, match, runTarget := "") {
     if match != "" && WinExist(match) {
         if WinActive(match)
             WinMinimize
-        else
+        else {
             WinActivate
+            if IsBallyPath(runTarget) && WinWaitActive(match, , 2)
+                OfferLogin(name)
+        }
         return
     }
     if runTarget = ""
@@ -2234,6 +2863,16 @@ SwitchTo(name, match, runTarget := "") {
     }
     SplitPath path, , &dir
     Run path, dir
+    ; A Bally program just opened: once its window is up, offer to log in
+    if IsBallyPath(runTarget) {
+        w := match != "" ? match : DefaultStartWindow(path)
+        if w != "" && WinWait(w, , 30) {
+            Sleep 2000
+            WinActivate "ahk_id " WinExist(w)
+            if WinWaitActive(w, , 3)
+                OfferLogin(name)
+        }
+    }
 }
 
 ; The window each Bally app shows, so Ctrl+Alt+L can skip it if it's already open
@@ -2322,7 +2961,9 @@ BrowserOpen() {
 ;  If Chrome or Edge is already open, it asks before opening the websites
 ;  again, so you don't end up with every tab twice.
 ; =====================================================================
-^!l:: {
+^!l:: StartOfShift()
+
+StartOfShift() {
     sites := true
     if (browser := BrowserOpen()) != ""
         sites := MsgBox(browser " is already open, so the work websites are probably open too.`n`n"
@@ -2335,6 +2976,7 @@ BrowserOpen() {
 
     SetTitleMatchMode 2
     started := []       ; how to spot each app it opened
+    startedApps := []   ; the same apps, with their paths
     for app in Cfg["StartApps"] {
         target := app.path
         if app.win != "" && WinExist(app.win)    ; already open - don't open a second one
@@ -2354,6 +2996,7 @@ BrowserOpen() {
             continue
         }
         started.Push(app.win)
+        startedApps.Push(app)
     }
 
     ; Wait until the apps it opened have their windows up, so they don't
@@ -2367,6 +3010,8 @@ BrowserOpen() {
             Sleep 200
     }
     Sleep 1500          ; let the apps finish drawing
+    if Cfg["SignInAfterStart"]
+        SignInStarted(startedApps)
     Tip("Opening websites...", 0, true)
     ; Websites next, once the apps are up, so the Citrix tab is the last thing to take the screen
     path := Cfg["LaunchWork"]
@@ -2386,9 +3031,72 @@ BrowserOpen() {
 
     Tip("")
     CitrixTab(sites)
+    if Cfg["LayoutAfterStart"]
+        RestoreLayout(true)
     KeepChromeFront(started)
     if missing != ""
         MsgBox "These weren't found, so they didn't open:`n`n" missing "`nCheck [StartOfShift] and LaunchWork in settings.ini", "Watchlog", "Icon!"
+}
+
+
+; Start of shift: the Bally programs this run just opened are on their
+; login screens, so (after one question) each is brought to the front and
+; its saved login is typed. Programs that were already open are left alone.
+SignInStarted(apps) {
+    list := [], names := ""
+    for app in apps {
+        w := app.win != "" ? app.win : DefaultStartWindow(app.path)
+        if w = "" || !IsBallyPath(app.path)
+            continue
+        n := InStr(app.path, "SDSUI") ? "SDS" : InStr(app.path, "CMPDesktop") ? "CMP" : "Alert Grid"
+        list.Push({win: w, name: n})
+        names .= (names != "" ? ", " : "") n
+    }
+    if !list.Length
+        return
+    Tip("")
+    if MsgBox("Sign in to " names " now with your saved logins?`n`nEach program comes to the front and its login is typed.", "Start of shift", "YesNo Icon? T20") != "Yes" {
+        Activity("Start of shift: sign-in skipped")
+        return
+    }
+    SetTitleMatchMode 2
+    for item in list {
+        if !WinWait(item.win, , 10) {
+            Activity("Start of shift sign-in: " item.name " window not found")
+            continue
+        }
+        WinActivate "ahk_id " WinExist(item.win)
+        if !WinWaitActive(item.win, , 3) {
+            Activity("Start of shift sign-in: couldn't bring " item.name " to the front")
+            continue
+        }
+        Sleep 1500
+        rec := LoginForWindow()
+        if !rec {
+            Activity("Start of shift sign-in: no saved login is locked to " item.name)
+            continue
+        }
+        DoLogin(rec.trig, rec.user, rec.pw, rec)
+        Sleep 3000
+    }
+}
+
+; Tray: pick a folder of your own for Watchlog.exe updates (settings.ini [Updates] Folder=)
+ChooseUpdateFolder() {
+    start := Cfg["UpdateFolder"] != "" ? Cfg["UpdateFolder"] : A_MyDocuments
+    dir := DirSelect("*" start, 3, "Pick the folder where you put new Watchlog builds (leave it empty and press Cancel to keep things as they are)")
+    if dir = "" {
+        if Cfg["UpdateFolder"] != "" && MsgBox("Stop using your own update folder (" Cfg["UpdateFolder"] ") and go back to the team folder?", "Watchlog", "YesNo Icon?") = "Yes" {
+            IniWrite "", SettingsFile, "Updates", "Folder"
+            Activity("Update folder cleared (back to the team folder)")
+            Reload
+        }
+        return
+    }
+    IniWrite dir, SettingsFile, "Updates", "Folder"
+    Activity("Update folder set to " dir)
+    MsgBox "Done. Watchlog will now offer updates from:`n" dir "`n`nPut Watchlog.exe in that folder.", "Watchlog"
+    Reload
 }
 
 
@@ -2624,7 +3332,9 @@ EndOfShift() {
 
 ; Ctrl+Alt+K: log out of SDS properly (same as end of shift does), leaving
 ; SDS open at its login screen
-^!k:: {
+^!k:: SDSLogout()
+
+SDSLogout() {
     if !SDSWindow() {
         Tip("SDS isn't logged in on this PC.")
         return
@@ -2743,42 +3453,13 @@ CloseTarget(exe) {
 
 ; =====================================================================
 ;  EDIT TEMPLATES  -  Ctrl+Alt+E   (save it and the script reloads)
-;  Opens templates.txt, or your own my-templates.txt when the team's
-;  shared file is in use (the team file is changed by whoever keeps it:
-;  tray menu > Edit team templates, if SharePoint lets you save it).
+;  (v3.10.0: Ctrl+Alt+E opens the template editor instead, see TEMPLATE
+;  EDITOR. These Notepad ones are under tray menu > Advanced.)
 ; =====================================================================
-$^!e:: {
-    if Cfg["SharedTemplates"] != ""
-        EditMine()
-    else
-        EditFile(TemplatesFile)
-}
-
-; Tray menu > Edit my templates (makes the file the first time)
+; Tray menu > Advanced > Edit my templates in Notepad (makes the file the first time)
 EditMine() {
-    if !FileExist(MyTemplatesFile) {
-        text := "
-        (
-# =====================================================================
-#  MY TEMPLATES - your own extra templates
-#  These go on top of the team's templates, for you only. Same format
-#  as templates.txt (the notes at the top of it explain it all).
-#  If the team file already uses a trigger, yours is skipped, so the
-#  team wording always wins. Save this file and the script reloads.
-#
-#  Example (take the # off the start of the line to use it):
-#  ;mynote (My note) = Operator note at {Time: now}: {Note}
-# =====================================================================
-
-        )"
-        try FileAppend text, MyTemplatesFile, "UTF-8"
-        catch as e {
-            MsgBox "Couldn't make my-templates.txt:`n" e.Message, "Watchlog", "Icon!"
-            return
-        }
-        WatchTimes[MyTemplatesFile] := FileTimeOf(MyTemplatesFile)
-    }
-    EditFile(MyTemplatesFile)
+    if MakeMineFile()
+        EditFile(MyTemplatesFile)
 }
 
 EditFile(path) {
@@ -2983,8 +3664,9 @@ NumpadEnter:: Picker.go()
 
 ; =====================================================================
 ;  SETTINGS  -  tray menu > Settings  (it's also the first-run setup)
-;  Logins, where the templates come from, the shift journal and starting
-;  with Windows, without editing settings.ini. Nothing changes until
+;  Tabs: logins, where the templates come from, start and end of shift,
+;  Alert Grid, updates, the shift journal, the Caps Lock guard and
+;  starting with Windows, without editing settings.ini. Nothing changes until
 ;  Save. Passwords typed here go straight into Windows Credential Manager
 ;  on this PC, and removing a login deletes its saved password too.
 ; =====================================================================
@@ -2992,7 +3674,10 @@ SetSettingsWin(v) {
     global SettingsWin := v
 }
 
-ShowSettings(welcome := false) {
+; startTab: 1 Logins, 2 Templates, 3 Start / end of shift, 4 Alert Grid,
+; 5 Updates, 6 General   (v3.10.0: tabs, and the settings that used to be
+; only in settings.ini are here as boxes and ticks)
+ShowSettings(welcome := false, startTab := 1) {
     if IsObject(SettingsWin) {
         try WinActivate "ahk_id " SettingsWin.Hwnd
         return
@@ -3003,67 +3688,120 @@ ShowSettings(welcome := false) {
     }
     ClosePicker()
     ; Working copies: nothing changes until Save
-    st := {logins: CopyLogins(), shared: Cfg["SharedTemplates"]}
+    st := {logins: CopyLogins(), shared: Cfg["SharedTemplates"], upd: Cfg["UpdateFolder"]}
     keepDays := [7, 14, 30, 60, 90, 365, 0]
     keepNames := ["7 days", "14 days", "30 days", "60 days", "90 days", "1 year", "Never"]
     if !IndexOf(keepDays, Cfg["KeepDays"])
         keepDays.InsertAt(1, Cfg["KeepDays"]), keepNames.InsertAt(1, Cfg["KeepDays"] " days")
     modes := ["full", "counts", "off"]
+    clickGap := IniRead(SettingsFile, "AlertGrid", "Pause", "40")
+    W := 640
 
     g := Gui("+AlwaysOnTop", (welcome ? "Welcome to Watchlog" : "Watchlog settings") "  -  v" VERSION)
     SetSettingsWin(g)
+    g.BackColor := "FFFFFF"     ; the same white as the tab pages
     g.SetFont("s10", "Segoe UI")
     if welcome {
         g.SetFont("s12 bold")
-        g.AddText("w620", "Welcome! Two quick things and you're set.")
+        g.AddText("w" W, "Welcome! Two quick things and you're set.")
         g.SetFont("s10 norm")
-        g.AddText("w620", "1.   Add the logins you'd like typed for you (or skip this).`n"
-            . "2.   If your team keeps its templates on SharePoint, pick that file under Templates.`n"
-            . "Then press Save. You can change any of this later: right-click the H icon near the clock > Settings.")
+        g.AddText("w" W, "1.   Add the logins you'd like typed for you (or skip this).`n"
+            . "2.   If your team keeps its templates on SharePoint, pick that file on the Templates tab.`n"
+            . "Then press Save. You can change any of this later: click the teal icon near the clock > Settings.")
     }
-    Heading("Logins")
-    g.AddText("xm w620", "Type a login's shortcut and it types the username, Tab, the password and Enter. Passwords are kept in Windows Credential Manager on this PC only, never in a file.")
-    lv := g.AddListView("xm w620 r5 -Multi NoSortHdr", ["Shortcut", "Username", "Only in", "Reminder", "Password on this PC"])
-    lv.ModifyCol(1, 95), lv.ModifyCol(2, 165), lv.ModifyCol(3, 100), lv.ModifyCol(4, 80), lv.ModifyCol(5, 176)
-    g.AddButton("xm w120", "Add...").OnEvent("Click", (*) => LoginBox(0))
+    tabs := g.AddTab2("xm w" (W + 36) " h350 Choose" startTab, ["Logins", "Templates", "Start / end of shift", "Alert Grid", "Updates", "General"])
+
+    ; ---- Logins
+    tabs.UseTab(1)
+    g.AddText("Section w" W, "Type a login's shortcut and it types the username, Tab, the password and Enter. Passwords are kept in Windows Credential Manager on this PC only, never in a file.")
+    lv := g.AddListView("xs w" W " r7 -Multi NoSortHdr", ["Shortcut", "Username", "Only in", "Reminder", "Password on this PC"])
+    lv.ModifyCol(1, 95), lv.ModifyCol(2, 165), lv.ModifyCol(3, 120), lv.ModifyCol(4, 80), lv.ModifyCol(5, 176)
+    g.AddButton("xs w120", "Add...").OnEvent("Click", (*) => LoginBox(0))
     g.AddButton("x+6 w120", "Edit...").OnEvent("Click", (*) => LoginBox(Picked()))
     g.AddButton("x+6 w160", "Change password...").OnEvent("Click", (*) => LoginBox(Picked(), true))
     g.AddButton("x+6 w120", "Remove").OnEvent("Click", RemoveLogin)
     lv.OnEvent("DoubleClick", (ctl, row) => row ? LoginBox(row) : 0)
+    sdsCB := g.AddCheckbox("xs y+16" (Cfg["SdsResign"] ? " Checked" : ""), "Sign back into SDS by itself this many minutes after I sign in (replaces its reminder):")
+    sdsE := g.AddEdit("xs+18 y+4 w60 Number", Cfg["SdsResign"] ? Cfg["SdsResign"] : 62)
+    g.AddText("x+6 yp+3", "minutes (SDS logs out after an hour, so 62)")
+    beepCB := g.AddCheckbox("xs y+12" (Cfg["ReminderBeep"] ? " Checked" : ""), "Beep when a log-in-again reminder pops up")
 
-    Heading("Templates")
-    g.AddText("xm w620", "The team's shared templates file (in SharePoint, synced by OneDrive). Leave it blank to use templates.txt in this folder.")
-    pathBox := g.AddEdit("xm w408 r1 ReadOnly", st.shared)
+    ; ---- Templates
+    tabs.UseTab(2)
+    g.AddText("Section w" W, "The team's shared templates file (in SharePoint, synced by OneDrive). Leave it blank to use templates.txt in the Watchlog folder.")
+    pathBox := g.AddEdit("xs w420 r1 ReadOnly", st.shared)
     g.AddButton("x+6 w100", "Browse...").OnEvent("Click", Browse)
     g.AddButton("x+6 w100", "Clear").OnEvent("Click", ClearShared)
-    info := g.AddText("xm w620 r2", "")
-    g.AddText("xm w620", "Your own extra templates go in my-templates.txt (tray menu > Edit my templates).")
+    info := g.AddText("xs w" W " r2", "")
+    g.AddText("xs y+18 w" W, "To change the wording of a template, add one, or change a list like @tables, use the template editor. Your own extra templates (my-templates.txt, just for you) are in there too.")
+    g.AddButton("xs w240", "Open the template editor").OnEvent("Click", (*) => (Close(), ShowEditor()))
 
-    Heading("Shift journal")
-    modeDD := g.AddDropDownList("xm w330 Choose" Max(1, IndexOf(modes, Cfg["JournalSave"]))
+    ; ---- Start / end of shift
+    tabs.UseTab(3)
+    g.AddText("Section w" W, "Start of shift (Ctrl+Alt+L) opens your work programs (Alert Grid, SDS, CMP), waits for them, then opens the work websites and ends on the Citrix page.")
+    signCB := g.AddCheckbox("xs y+10" (Cfg["SignInAfterStart"] ? " Checked" : ""), "Then sign in to the Bally programs it opened with my saved logins (asks first)")
+    layCB := g.AddCheckbox("xs" (Cfg["LayoutAfterStart"] ? " Checked" : ""), "Then put my windows back where I saved them (Ctrl+Alt+Shift+S saves)")
+    g.AddText("xs y+12", "Wait for the programs for up to")
+    waitE := g.AddEdit("x+6 yp-3 w60 Number", Cfg["LaunchWait"])
+    g.AddText("x+6 yp+3", "seconds (20 or more)")
+    g.AddText("xs y+12 w" W, "The websites file (LaunchWork.bat):")
+    lwE := g.AddEdit("xs w526 r1", Cfg["LaunchWork"])
+    g.AddButton("x+6 w100", "Browse...").OnEvent("Click", BrowseLaunch)
+    g.AddText("xs y+10 w" W, "Google account the websites open in (blank = Chrome's last used one):")
+    acctE := g.AddEdit("xs w420 r1", Cfg["ChromeAccount"])
+    g.AddText("xs y+14 w" W, "End of shift (Ctrl+Alt+Shift+L) logs out of SDS, then closes these programs (separate them with commas):")
+    closeE := g.AddEdit("xs w" W " r3", Cfg["CloseApps"])
+
+    ; ---- Alert Grid
+    tabs.UseTab(4)
+    taught := FileExist(AlertFile) != ""
+    g.AddText("Section w" W, "Ctrl+Alt+A acknowledges every alert in Alert Grid in one go (it never types your password). Each PC has to be shown where to click, once.")
+    g.SetFont("s10 c" (taught ? "2E7D32" : "B86E00"))
+    g.AddText("xs y+12 w" W, taught ? "●  The clicks are taught on this PC." : "●  The clicks aren't taught on this PC yet.")
+    g.SetFont("s10 c000000")
+    g.AddButton("xs y+8 w240", taught ? "Teach the clicks again..." : "Teach the clicks now...").OnEvent("Click", TeachNow)
+    capsClearCB := g.AddCheckbox("xs y+16" (Cfg["CapsClearsAlerts"] ? " Checked" : ""), "Plain Caps Lock clears the alerts too (needs the Caps Lock guard on, General tab)")
+    g.AddText("xs y+14", "Wait between clicks:")
+    pauseE := g.AddEdit("x+6 yp-3 w60 Number", clickGap)
+    g.AddText("x+6 yp+3", "milliseconds (40 is normal; raise it if a clear misses a step)")
+
+    ; ---- Updates
+    tabs.UseTab(5)
+    g.AddText("Section w" W, "When a newer Watchlog is put in the team folder (the folder the team templates file is in), every PC offers to update. You can pick a folder of your own instead, for trying a new version before the team gets it.")
+    g.AddText("xs y+12 w" W, "My own update folder (blank = the team folder):")
+    updE := g.AddEdit("xs w420 r1 ReadOnly", st.upd)
+    g.AddButton("x+6 w100", "Browse...").OnEvent("Click", BrowseUpd)
+    g.AddButton("x+6 w100", "Clear").OnEvent("Click", (*) => (st.upd := "", updE.Value := "", ShowUpd()))
+    updInfo := g.AddText("xs y+10 w" W " r3 c505050", "")
+
+    ; ---- General
+    tabs.UseTab(6)
+    g.SetFont("s10 bold")
+    g.AddText("Section", "Shift journal")
+    g.SetFont("s10 norm")
+    modeDD := g.AddDropDownList("xs w330 Choose" Max(1, IndexOf(modes, Cfg["JournalSave"]))
         , ["Save each log's time, name and text", "Save only the time and template name", "Don't keep a shift journal"])
     g.AddText("x+14 yp+4", "Delete shift files after")
     keepDD := g.AddDropDownList("x+6 yp-4 w100 Choose" IndexOf(keepDays, Cfg["KeepDays"]), keepNames)
+    g.SetFont("s10 bold")
+    g.AddText("xs y+18", "This PC")
+    g.SetFont("s10 norm")
+    capsCB := g.AddCheckbox("xs y+6" (CapsGuard ? " Checked" : ""), "Caps Lock guard: plain Caps Lock can't turn it on by accident (Shift+Caps Lock does), red tag while it's on")
+    startCB := g.AddCheckbox("xs y+6" (StartupShortcuts().Length ? " Checked" : ""), "Start Watchlog when I sign in to Windows")
+    tabs.UseTab()
 
-    Heading("Windows")
-    startCB := g.AddCheckbox("xm" (StartupShortcuts().Length ? " Checked" : ""), "Start Watchlog when I sign in to Windows")
-
-    g.AddButton("xm y+18 w120 Default", "Save").OnEvent("Click", Save)
+    tabs.GetPos(&tx, &ty, &tw, &th)
+    g.AddButton("x" tx " y" (ty + th + 12) " w120 Default", "Save").OnEvent("Click", Save)
     g.AddButton("x+6 w120", "Cancel").OnEvent("Click", Close)
     if welcome
-        g.AddText("x+14 yp+4 w360", "Then: type a shortcut like `;jack in iTrak, or press Ctrl+Alt+Space to find one by name.")
+        g.AddText("x+14 yp+4 w380", "Then: type a shortcut like `;jack in iTrak, or click the teal icon by the clock.")
     g.OnEvent("Escape", Close)
     g.OnEvent("Close", Close)
     Refresh()
     ShowInfo()
+    ShowUpd()
     g.Show()
     WinActivate "ahk_id " g.Hwnd
-
-    Heading(text) {
-        g.SetFont("s10 bold")
-        g.AddText("xm y+16", text)
-        g.SetFont("s10 norm")
-    }
 
     Refresh(sel := 0) {
         lv.Delete()
@@ -3078,7 +3816,7 @@ ShowSettings(welcome := false) {
         if st.shared = "" {
             cnt := 0
             try cnt := CountTemplates(FileRead(TemplatesFile, "UTF-8"))
-            info.Text := "Using templates.txt in this folder (" cnt " templates)."
+            info.Text := "Using templates.txt in the Watchlog folder (" cnt " templates)."
             return
         }
         try {
@@ -3089,6 +3827,21 @@ ShowSettings(welcome := false) {
         } catch {
             info.Text := "Can't open that file right now (is OneDrive running and synced?). The last good copy on this PC is used until it can be."
         }
+    }
+
+    ; Where updates would come from with what's picked now, and what's there
+    ShowUpd() {
+        dir := st.upd
+        if dir = "" && st.shared != ""
+            SplitPath st.shared, , &dir
+        if dir = "" {
+            updInfo.Text := "There's no team folder (no team templates file is picked), so updates are only offered from a folder of your own."
+            return
+        }
+        f := dir (A_IsCompiled ? "\Watchlog.exe" : "\Watchlog.ahk")
+        v := ProgramVersionOf(f)
+        updInfo.Text := "Looking in: " dir "`n"
+            . (v = "" ? "No Watchlog there right now." : "Watchlog v" v " is there" (VerCompare(v, VERSION) > 0 ? ", newer than this one (v" VERSION "): it's offered when Watchlog next starts." : ", the same as or older than this one (v" VERSION ")."))
     }
 
     ; The login picked in the list (-1 if none)
@@ -3209,16 +3962,51 @@ ShowSettings(welcome := false) {
         st.shared := chosen
         pathBox.Value := chosen
         ShowInfo()
+        ShowUpd()
     }
 
     ClearShared(*) {
         st.shared := ""
         pathBox.Value := ""
         ShowInfo()
+        ShowUpd()
+    }
+
+    BrowseLaunch(*) {
+        g.Opt("+OwnDialogs")
+        chosen := FileSelect(3, lwE.Value, "Pick LaunchWork.bat (the file that opens the work websites)", "Batch files (*.bat; *.cmd)")
+        if chosen != ""
+            lwE.Value := chosen
+    }
+
+    BrowseUpd(*) {
+        g.Opt("+OwnDialogs")
+        dir := DirSelect("*" (st.upd != "" ? st.upd : A_MyDocuments), 3, "Pick the folder where you put new Watchlog builds")
+        if dir = ""
+            return
+        st.upd := dir
+        updE.Value := dir
+        ShowUpd()
+    }
+
+    TeachNow(*) {
+        Close()
+        SetTimer TeachAlerts, -300
     }
 
     Save(*) {
         g.Opt("+OwnDialogs")
+        wait := Trim(waitE.Value), gap := Trim(pauseE.Value)
+        if !IsInteger(wait) || wait < 1 || wait > 600 {
+            tabs.Choose(3)
+            MsgBox "Type how many seconds to wait for the programs, like 20.", "Watchlog", "Icon!"
+            return
+        }
+        if !IsInteger(gap) || gap > 2000 {
+            tabs.Choose(4)
+            MsgBox "Type the wait between Alert Grid clicks in milliseconds, like 40 (2000 at most).", "Watchlog", "Icon!"
+            return
+        }
         failed := ""
         ; New passwords go into Credential Manager first
         for x in st.logins {
@@ -3232,14 +4020,43 @@ ShowSettings(welcome := false) {
         }
         ; A removed login's password is deleted from this PC
         RemovePasswords(st.logins)
+        yn(v) => v ? "yes" : "no"
         try {
             WriteLogins(st.logins)
             IniWrite st.shared, SettingsFile, "Templates", "Shared"
             IniWrite modes[modeDD.Value], SettingsFile, "Journal", "Save"
             IniWrite keepDays[keepDD.Value], SettingsFile, "Journal", "KeepDays"
+            IniWrite yn(beepCB.Value), SettingsFile, "Reminder", "Beep"
+            sdsMin := sdsCB.Value ? Max(1, Min(600, Integer(sdsE.Value != "" ? sdsE.Value : 62))) : 0
+            if sdsMin != Cfg["SdsResign"]
+                IniWrite sdsMin, SettingsFile, "SDS", "ResignMinutes"
+            ; The rest only when changed, so settings.ini stays short
+            if signCB.Value != Cfg["SignInAfterStart"]
+                IniWrite yn(signCB.Value), SettingsFile, "StartOfShift", "SignIn"
+            if layCB.Value != Cfg["LayoutAfterStart"]
+                IniWrite yn(layCB.Value), SettingsFile, "Layout", "AfterStart"
+            if wait != Cfg["LaunchWait"]
+                IniWrite wait, SettingsFile, "Paths", "LaunchWait"
+            if Trim(lwE.Value) != Cfg["LaunchWork"]
+                IniWrite Trim(lwE.Value), SettingsFile, "Paths", "LaunchWork"
+            if Trim(acctE.Value) != Cfg["ChromeAccount"]
+                IniWrite Trim(acctE.Value), SettingsFile, "Paths", "ChromeAccount"
+            apps := Trim(RegExReplace(closeE.Value, "\s*[\r\n]+\s*", ", "), " ,")
+            if apps != Cfg["CloseApps"]
+                IniWrite apps, SettingsFile, "EndOfShift", "Close"
+            if capsClearCB.Value != Cfg["CapsClearsAlerts"]
+                IniWrite yn(capsClearCB.Value), SettingsFile, "AlertGrid", "CapsLockClears"
+            if gap != clickGap
+                IniWrite gap, SettingsFile, "AlertGrid", "Pause"
+            if st.upd != Cfg["UpdateFolder"]
+                IniWrite st.upd, SettingsFile, "Updates", "Folder"
         } catch as e {
             MsgBox "Couldn't save settings.ini:`n" e.Message "`n`nIf OneDrive is syncing, press Save again in a moment.", "Watchlog", "Icon!"
             return
+        }
+        if capsCB.Value != CapsGuard {
+            try DirCreate DataDir
+            try IniWrite capsCB.Value ? "1" : "0", LastUsedFile, "Caps", "Guard"
         }
         SetStartup(startCB.Value)
         names := ""
@@ -3248,7 +4065,10 @@ ShowSettings(welcome := false) {
         Activity("Settings saved: logins " (names = "" ? "none" : names)
             . "; team templates " (st.shared = "" ? "none (templates.txt in this folder)" : st.shared)
             . "; journal " modes[modeDD.Value] ", kept " (keepDays[keepDD.Value] ? keepDays[keepDD.Value] " days" : "forever")
-            . "; start with Windows " (startCB.Value ? "on" : "off"))
+            . "; start with Windows " (startCB.Value ? "on" : "off")
+            . "; sign in at start " yn(signCB.Value) ", windows back " yn(layCB.Value) ", wait " wait " s"
+            . "; Caps Lock clears alerts " yn(capsClearCB.Value) ", click gap " gap " ms; Caps Lock guard " (capsCB.Value ? "on" : "off")
+            . "; update folder " (st.upd = "" ? "team folder" : st.upd))
         if failed != ""
             MsgBox "These passwords couldn't be saved in Credential Manager, so each one is asked for the first time you use it:`n`n" failed, "Watchlog", "Icon!"
         SetSettingsWin("")
@@ -3422,7 +4242,7 @@ SecurityReport() {
     r .= "Checked " FormatTime(, "yyyy-MM-dd HH:mm") " on " A_ComputerName ", Windows user " A_UserName nl
     r .= "Program:   " A_ScriptFullPath nl
     r .= "Version:   v" VERSION ", program check code " ProgramCode() ". " VersionStatus() nl
-    r .= "OneDrive:  " (!InStr(A_ScriptDir, "OneDrive") ? "the program folder isn't in OneDrive"
+    r .= "OneDrive:  " (!InStr(HomeDir, "OneDrive") ? "the Watchlog folder isn't in OneDrive"
         : ProcessExist("OneDrive.exe") ? "running, so this PC gets changes as they sync" : "NOT running, so this PC may have older files") nl
 
     r .= nl "PASSWORDS" nl
@@ -3467,6 +4287,8 @@ SecurityReport() {
     r .= "                  the last value typed in boxes that remember one (like the bay), this PC only" nl
     r .= "  Quick notes     " NotesFile nl
     r .= "                  only what you type with Ctrl+Alt+Q, kept until you delete it" nl
+    r .= "  Window layout   " LayoutFile nl
+    r .= "                  where your windows were (program name, position, size), numbers only, this PC only" nl
     r .= "  Time saved      " SavedFile nl
     r .= "                  counts only (logs, logins, keystrokes saved per day), never log text" nl
     r .= "  Activity log    " ActivityFile nl
@@ -3484,7 +4306,7 @@ SecurityReport() {
     r .= "  finder or the Settings window." nl
 
     conflicts := ""
-    Loop Files A_ScriptDir "\settings-*.ini"
+    Loop Files HomeDir "\settings-*.ini"
         conflicts .= (conflicts = "" ? "" : ", ") A_LoopFileName
     if conflicts != ""
         r .= nl "TO CHECK" nl "  OneDrive made copies of settings.ini: " conflicts ". Compare them with settings.ini, then delete them." nl
@@ -3529,10 +4351,11 @@ CopyForSharing(out) {
     res := {copied: "", notCopied: "", warn: "", error: ""}
     ; The team's wording when it's in use, so a new operator starts with the same templates
     tplFrom := Tpl.src != "local" && FileExist(Tpl.file) ? Tpl.file : TemplatesFile
-    files := [[A_ScriptFullPath, "Watchlog.ahk"], [tplFrom, "templates.txt"]
-        , [A_ScriptDir "\QUICK START.txt", "QUICK START.txt"], [A_ScriptDir "\README.txt", "README.txt"]
-        , [A_ScriptDir "\settings.example.ini", "settings.example.ini"], [Cfg["LaunchWork"], "LaunchWork.bat"]
-        , [IconFile, "Watchlog.ico"]]
+    files := [[A_ScriptFullPath, A_IsCompiled ? "Watchlog.exe" : "Watchlog.ahk"], [tplFrom, "templates.txt"]
+        , [HomeDir "\QUICK START.txt", "QUICK START.txt"], [HomeDir "\README.txt", "README.txt"]
+        , [Cfg["LaunchWork"], "LaunchWork.bat"]]
+    if !A_IsCompiled
+        files.Push([A_ScriptDir "\settings.example.ini", "settings.example.ini"], [IconFile, "Watchlog.ico"])
     try DirCreate out
     catch as e {
         res.error := e.Message
@@ -3585,13 +4408,17 @@ ShowCheatSheet() {
         . "`nHOTKEYS   (Ctrl+Alt + letter)`n"
         . "   Q  add note          O  open notes        J  shift journal`n"
         . "   L  start of shift    Shift+L  end of shift (closes everything)`n"
-        . "   I  window info       E  edit templates    Space  find a template`n"
+        . "   M  Watchlog home     E  template editor   Space  find a template`n"
+        . "   I  window info`n"
+        . "   Shift+S  save window layout    W  put the windows back`n"
+        . "   Shift+Caps Lock  turns Caps Lock on (plain Caps Lock only turns it off)`n"
         . "   K  log out of SDS (properly, so the account doesn't lock)`n"
+        . "   A  clear all Alert Grid alerts    Shift+A  teach it the clicks (once per PC)`n"
         . "   P / X  pause-resume  R  reload            H  this cheat sheet`n"
-        . "`nRight-click the tray icon (the teal Watchlog one) for Settings and Security and status.`n"
+        . "`nClick the teal Watchlog icon by the clock (or Ctrl+Alt+M) for the home window. Right-click it for the menu.`n"
         . "`nv" VERSION " (" VERSION_DATE ")   Templates: " (Tpl.src = "local" ? "templates.txt in this folder" : "the team file")
         . (Tpl.version != "" ? ", wording version " Tpl.version : "") (Tpl.mine ? ", plus " Tpl.mine " of yours" : "")
-        . "`nSettings are in:  " A_ScriptDir
+        . "`nSettings are in:  " HomeDir
 
     g := Gui("+AlwaysOnTop", "Shortcut Cheat Sheet  -  v" VERSION)
     ; Fixed-width font so the shortcut columns line up
@@ -3611,7 +4438,9 @@ ShowCheatSheet() {
 ; =====================================================================
 #SuspendExempt
 ^!p::
-^!x:: {
+^!x:: TogglePause()
+
+TogglePause() {
     Suspend -1
     SoundBeep A_IsSuspended ? 400 : 900, 150
     Tip(A_IsSuspended ? "Shortcuts PAUSED" : "Shortcuts ON", 1500, true)
@@ -3619,3 +4448,2015 @@ ShowCheatSheet() {
 
 ^!r:: Reload
 #SuspendExempt False
+
+
+; =====================================================================
+;  WINDOW LAYOUT  -  Ctrl+Alt+Shift+S saves, Ctrl+Alt+W puts back
+;  Arrange your windows how you like them, press Ctrl+Alt+Shift+S, and
+;  Ctrl+Alt+W moves them back any time. Ctrl+Alt+L also puts them back
+;  by itself at the end of the start of shift (settings.ini [Layout]
+;  AfterStart=no turns that off). What's kept: the program name, the
+;  position and the size of each window, as numbers, on this PC only
+;  (each bay's screens are different, so it isn't synced). No titles,
+;  no contents. Windows are matched by program, in the order they sit
+;  on screen, so two Chrome windows go back to the first and second
+;  spots saved. Watchlog's own windows and minimised windows are left alone.
+; =====================================================================
+#HotIf
+^!+s:: SaveLayout()
+^!w:: RestoreLayout()
+
+LayoutSkip(hwnd) {
+    if !WinExist("ahk_id " hwnd)
+        return true
+    if WinGetTitle("ahk_id " hwnd) = ""
+        return true
+    cls := WinGetClass("ahk_id " hwnd)
+    if cls = "Progman" || cls = "WorkerW" || cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd"
+        return true
+    if WinGetExStyle("ahk_id " hwnd) & 0x80      ; tool windows
+        return true
+    if WinGetPID("ahk_id " hwnd) = ProcessExist()    ; Watchlog's own windows
+        return true
+    return false
+}
+
+SaveLayout() {
+    try DirCreate DataDir
+    try FileDelete LayoutFile
+    seen := Map()
+    n := 0
+    for hwnd in WinGetList() {
+        try {
+            if LayoutSkip(hwnd)
+                continue
+            exe := WinGetProcessName("ahk_id " hwnd)
+            if RegExMatch(exe, "i)^AutoHotkey")
+                continue
+            mm := WinGetMinMax("ahk_id " hwnd)
+            if mm = -1
+                continue                         ; minimised: leave alone
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+        } catch
+            continue
+        seen[exe] := seen.Has(exe) ? seen[exe] + 1 : 1
+        n += 1
+        sec := "W" n
+        try {
+            IniWrite exe, LayoutFile, sec, "exe"
+            IniWrite seen[exe], LayoutFile, sec, "nth"
+            IniWrite x, LayoutFile, sec, "x"
+            IniWrite y, LayoutFile, sec, "y"
+            IniWrite w, LayoutFile, sec, "w"
+            IniWrite h, LayoutFile, sec, "h"
+            IniWrite mm, LayoutFile, sec, "max"
+        } catch {
+            Tip("Couldn't save the layout (" LayoutFile ").", 4000, true)
+            Activity("Window layout: couldn't write " LayoutFile)
+            return
+        }
+    }
+    try IniWrite n, LayoutFile, "Layout", "count"
+    Activity("Window layout saved: " n " windows")
+    Tip("Saved where " n " windows are.", 2500, true)
+}
+
+; auto = true when Ctrl+Alt+L does it: says nothing if no layout was saved,
+; and leaves the window you were in at the front
+RestoreLayout(auto := false) {
+    if !FileExist(LayoutFile) {
+        if !auto
+            MsgBox "No layout saved yet.`n`nArrange your windows, then press Ctrl+Alt+Shift+S.", "Watchlog"
+        return
+    }
+    prev := WinExist("A")
+    count := Integer(IniRead(LayoutFile, "Layout", "count", "0"))
+    byExe := Map()
+    for hwnd in WinGetList() {
+        try {
+            if LayoutSkip(hwnd)
+                continue
+            exe := WinGetProcessName("ahk_id " hwnd)
+        } catch
+            continue
+        if !byExe.Has(exe)
+            byExe[exe] := []
+        byExe[exe].Push(hwnd)
+    }
+    moved := 0
+    loop count {
+        sec := "W" A_Index
+        exe := IniRead(LayoutFile, sec, "exe", "")
+        nth := Integer(IniRead(LayoutFile, sec, "nth", "1"))
+        if exe = "" || !byExe.Has(exe) || byExe[exe].Length < nth
+            continue
+        hwnd := byExe[exe][nth]
+        x := Integer(IniRead(LayoutFile, sec, "x", "0"))
+        y := Integer(IniRead(LayoutFile, sec, "y", "0"))
+        w := Integer(IniRead(LayoutFile, sec, "w", "800"))
+        h := Integer(IniRead(LayoutFile, sec, "h", "600"))
+        mx := Integer(IniRead(LayoutFile, sec, "max", "0"))
+        try {
+            mm := WinGetMinMax("ahk_id " hwnd)
+            if auto && mm = -1
+                continue                         ; minimised: leave it
+            if mm != 0
+                WinRestore "ahk_id " hwnd
+            WinMove x, y, w, h, "ahk_id " hwnd
+            if mx = 1
+                WinMaximize "ahk_id " hwnd
+            moved += 1
+        }
+    }
+    if auto && prev && WinExist("ahk_id " prev)
+        try WinActivate "ahk_id " prev
+    Activity("Window layout put back: " moved " of " count " windows" (auto ? " (after start of shift)" : ""))
+    if !auto
+        Tip("Put " moved " windows back.", 2500, true)
+}
+
+
+; =====================================================================
+;  CAPS LOCK GUARD  (tray menu > Windows, the home window or Settings > General turn it off)
+;  Plain Caps Lock can't turn Caps Lock ON by accident: Shift+Caps Lock
+;  does. Plain Caps Lock still turns it OFF. While it's on, a red
+;  "CAPS LOCK ON" tag sits at the top right of the screen. No sounds.
+;  Ctrl+Alt+P (pause) switches the guard off with everything else.
+; =====================================================================
+#HotIf CapsGuard
+$CapsLock:: {
+    if GetKeyState("CapsLock", "T")
+        SetCapsLockState "Off"
+    else if Cfg["CapsClearsAlerts"] && FileExist(AlertFile) && AlertGridWin()
+        ClearAlerts()    ; Caps Lock was doing nothing, so it clears the Alert Grid alerts
+    else
+        Tip("Hold Shift and press Caps Lock to turn it on", 1500)
+}
+$+CapsLock:: SetCapsLockState "On"
+#HotIf
+
+BuildCapsTag() {
+    global CapsGui
+    CapsGui := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20", "Caps Lock")
+    CapsGui.BackColor := "C00000"
+    CapsGui.SetFont("s14 bold cWhite", "Segoe UI")
+    CapsGui.Add("Text", "x12 y6", "CAPS LOCK ON")
+}
+
+CheckCaps() {
+    global CapsWasOn
+    on := CapsGuard && GetKeyState("CapsLock", "T")
+    if on && !CapsWasOn
+        CapsGui.Show("NoActivate x" (A_ScreenWidth - 220) " y8 w200 h40")
+    else if !on && CapsWasOn
+        CapsGui.Hide()
+    CapsWasOn := on
+}
+
+ToggleCapsGuard(*) {
+    global CapsGuard
+    CapsGuard := !CapsGuard
+    try WinMenu.ToggleCheck(CAPS_MENU)
+    try DirCreate DataDir
+    try IniWrite CapsGuard ? "1" : "0", LastUsedFile, "Caps", "Guard"
+    Activity("Caps Lock guard " (CapsGuard ? "on" : "off"))
+    Tip("Caps Lock guard " (CapsGuard ? "ON" : "OFF"), 1500, true)
+}
+
+
+; =====================================================================
+;  THE EXE: INSTALLING ON THIS PC  (v3.5.0)
+;  Watchlog.exe copies itself to %LOCALAPPDATA%\Programs\Watchlog (no
+;  administrator rights), adds a Start menu entry and the Start with
+;  Windows shortcut, and registers itself under Settings > Apps so it
+;  can be removed like any program. Running a newer Watchlog.exe later
+;  offers to update the installed copy. Settings, templates and the
+;  journal stay where they are (Documents), so uninstalling never
+;  deletes anyone's work.
+; =====================================================================
+#HotIf
+IsInstalledCopy() {
+    return A_IsCompiled && StrLower(A_ScriptFullPath) = StrLower(INSTALL_EXE)
+}
+
+StartupLink() => A_Startup "\Watchlog.lnk"
+MenuLink() => A_Programs "\Watchlog.lnk"
+
+; Returns true when this copy installed itself or handed over to the
+; installed one, and should exit
+CheckInstall() {
+    if IsInstalledCopy()
+        return false
+    if FileExist(INSTALL_EXE) {
+        have := RegRead(UNINSTALL_KEY, "DisplayVersion", "")
+        if have = "" || VerCompare(VERSION, have) > 0 {
+            if MsgBox("Watchlog " (have != "" ? "v" have " " : "") "is installed on this PC. Update it to v" VERSION "?", "Watchlog setup", "YesNo Iconi Default1") = "Yes"
+                return InstallSelf(false)
+        }
+        try Run '"' INSTALL_EXE '"'
+        return true
+    }
+    askedFile := DataDir "\install.ini"
+    if IniRead(askedFile, "Install", "Asked", "") = VERSION
+        return false
+    try IniWrite VERSION, askedFile, "Install", "Asked"
+    if MsgBox("Install Watchlog on this PC?`n`n"
+        . "It adds Watchlog to the Start menu, starts it when Windows starts, and can be removed in Settings > Apps. It doesn't need administrator rights.`n`n"
+        . "Your settings and templates go in:`n" HomeDir "`n`n"
+        . "No = just run it from where it is this time.", "Watchlog setup", "YesNo Iconi Default1") = "Yes"
+        return InstallSelf(true)
+    return false
+}
+
+InstallSelf(fresh) {
+    CloseOtherCopies()
+    try DirCreate INSTALL_DIR
+    copied := false
+    Loop 10 {
+        try {
+            FileCopy A_ScriptFullPath, INSTALL_EXE, 1
+            copied := true
+            break
+        }
+        Sleep 300
+    }
+    if !copied {
+        MsgBox "Watchlog couldn't install itself to:`n" INSTALL_EXE "`n`nIt will keep running from where it is.", "Watchlog setup", "Icon!"
+        return false
+    }
+    try {
+        RegWrite "Watchlog", "REG_SZ", UNINSTALL_KEY, "DisplayName"
+        RegWrite VERSION, "REG_SZ", UNINSTALL_KEY, "DisplayVersion"
+        RegWrite INSTALL_EXE, "REG_SZ", UNINSTALL_KEY, "DisplayIcon"
+        RegWrite INSTALL_DIR, "REG_SZ", UNINSTALL_KEY, "InstallLocation"
+        RegWrite '"' INSTALL_EXE '" /uninstall', "REG_SZ", UNINSTALL_KEY, "UninstallString"
+        RegWrite 1, "REG_DWORD", UNINSTALL_KEY, "NoModify"
+        RegWrite 1, "REG_DWORD", UNINSTALL_KEY, "NoRepair"
+        RegWrite Integer(FileGetSize(INSTALL_EXE) / 1024), "REG_DWORD", UNINSTALL_KEY, "EstimatedSize"
+    }
+    SetShortcut(StartupLink(), fresh || FileExist(StartupLink()) != "")
+    SetShortcut(MenuLink(), true)
+    ; (a fresh install writes no log line yet: the activity log existing would make the new copy think Watchlog ran here before)
+    if !fresh
+        Activity("Updated the installed copy to v" VERSION " in " INSTALL_DIR)
+    try Run '"' INSTALL_EXE '"'
+    return true
+}
+
+; Closes any other running Watchlog (an older exe being replaced, or the
+; script version this exe takes over from)
+CloseOtherCopies() {
+    hidden := A_DetectHiddenWindows
+    DetectHiddenWindows true
+    me := ProcessExist()
+    for hwnd in WinGetList("ahk_class AutoHotkey") {
+        try {
+            pid := WinGetPID("ahk_id " hwnd)
+            if pid = me
+                continue
+            if StrLower(WinGetProcessName("ahk_id " hwnd)) = "watchlog.exe" || InStr(WinGetTitle("ahk_id " hwnd), "\Watchlog.ahk") {
+                ProcessClose pid
+                ProcessWaitClose pid, 3
+            }
+        }
+    }
+    DetectHiddenWindows hidden
+}
+
+Uninstall() {
+    if MsgBox("Remove Watchlog from this PC?`n`nYour settings, templates and shift journal stay in:`n" HomeDir, "Watchlog uninstall", "YesNo Icon? Default2") != "Yes"
+        return false
+    if MsgBox("Also delete the passwords Watchlog saved on this PC (in Windows Credential Manager)?`n`n"
+        . "Yes = delete them`nNo = keep them, in case you install Watchlog again", "Watchlog uninstall", "YesNo Icon? Default2") = "Yes" {
+        Loop 9 {
+            u := Trim(IniRead(SettingsFile, "Login" A_Index, "User", ""))
+            if u != ""
+                try CredRemove(u)
+        }
+    }
+    CloseOtherCopies()
+    SetShortcut(StartupLink(), false)
+    SetShortcut(MenuLink(), false)
+    try RegDeleteKey UNINSTALL_KEY
+    MsgBox "Watchlog has been removed from this PC.", "Watchlog uninstall", "Iconi"
+    if IsInstalledCopy()
+        ; run from Temp: Windows won't delete a folder something is working in
+        Run A_ComSpec ' /c ping -n 3 127.0.0.1 >nul & rmdir /s /q "' INSTALL_DIR '"', A_Temp, "Hide"
+    else if DirExist(INSTALL_DIR)
+        try DirDelete INSTALL_DIR, true
+    return true
+}
+
+SetShortcut(lnk, want) {
+    try {
+        if !want {
+            if FileExist(lnk)
+                FileDelete lnk
+            return
+        }
+        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, , "Watchlog - log templates"
+    } catch as err {
+        MsgBox "Watchlog couldn't update the shortcut:`n" lnk "`n`n" err.Message, "Watchlog", "Icon!"
+    }
+}
+
+; Puts the files built into the exe in the Watchlog folder: templates.txt
+; and LaunchWork.bat only when they're missing (they may have been edited),
+; the guides every time (so they match the version)
+InstallBuiltIns() {
+    try DirCreate HomeDir
+    try {
+        if !FileExist(TemplatesFile)
+            FileInstall "templates.txt", TemplatesFile, 0
+        if !FileExist(HomeDir "\LaunchWork.bat")
+            FileInstall "LaunchWork.bat", HomeDir "\LaunchWork.bat", 0
+        FileInstall "README.txt", HomeDir "\README.txt", 1
+        FileInstall "QUICK START.txt", HomeDir "\QUICK START.txt", 1
+    } catch as e {
+        Activity("Couldn't put the built-in files in " HomeDir ": " e.Message)
+    }
+}
+
+; An exe in the team folder (next to the team templates) replaces this one.
+; A running exe can be renamed but not overwritten, so this one is moved
+; aside as the backup, the new one is copied into its place, and started.
+UpdateExeFrom(f, v) {
+    tmp := A_Temp "\Watchlog update check.exe"
+    ok := false
+    try {
+        FileCopy f, tmp, true
+        ok := RunWait('"' tmp '" /selftest', , "Hide") = 0
+    }
+    try FileDelete tmp
+    if !ok {
+        Activity("Update to v" v " stopped: the team folder's Watchlog.exe didn't start")
+        MsgBox "The new Watchlog.exe in the team folder didn't start, so this PC stays on v" VERSION ".`n`nTell whoever looks after the tool.", "Watchlog update", "Icon!"
+        return
+    }
+    backup := DataDir "\Watchlog v" VERSION " (backup).exe"
+    moved := false
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        try FileDelete backup
+        FileMove A_ScriptFullPath, backup, 1
+        moved := true
+        FileCopy f, A_ScriptFullPath, 1
+    } catch as err {
+        if moved
+            try FileMove backup, A_ScriptFullPath, 1
+        Activity("Update to v" v " failed: " err.Message)
+        MsgBox "Couldn't update: " err.Message "`n`nThis PC stays on v" VERSION ".", "Watchlog update", "Icon!"
+        return
+    }
+    if IsInstalledCopy()
+        try RegWrite v, "REG_SZ", UNINSTALL_KEY, "DisplayVersion"
+    Activity("Updated from v" VERSION " to v" v " from " f " (old copy kept: " backup ")")
+    Run '"' A_ScriptFullPath '"'
+    ExitApp
+}
+
+
+; =====================================================================
+;  TUTORIAL  (first run on a new PC, and tray > Tutorial)
+;  A short guided tour with two practice boxes. Nothing typed here goes
+;  in the shift journal or the time saved numbers.
+; =====================================================================
+ShowTutorial(first := false) {
+    global TutorialWin
+    if IsObject(TutorialWin) {
+        try WinActivate "ahk_id " TutorialWin.Hwnd
+        return
+    }
+    steps := [
+        {head: "Welcome to Watchlog"
+            , body: "Watchlog types your standard log entries for you.`n`nYou type a short code that starts with a semicolon, like `;interior, and the whole entry appears. Codes that need details open a small form first.`n`nThis takes about two minutes. Nothing you do here is saved to your shift journal."
+            , practice: false, logins: false, start: false, check: "", done: ""}
+        , {head: "Your logins"
+            , body: "Watchlog can also type your usernames and passwords. Each login has its own code, like `;me, and can be locked to the program it belongs to, so it never types a password anywhere else.`n`nPasswords are kept in Windows Credential Manager on this PC, never in a file.`n`nAdd your logins now, or skip this and do it later: click the teal icon by the clock > Settings."
+            , practice: false, logins: true, start: false, check: "", done: ""}
+        , {head: "Try a quick entry"
+            , body: "Click in the box below and type:   `;interior`n`nThe whole line appears the moment you finish typing the code. There's no Enter to press."
+            , practice: true, logins: false, start: false, check: "interior door check", done: "That's a quick entry. Most codes work like that."}
+        , {head: "Try a form"
+            , body: "Some entries need details. Click in the box and type:   `;evict`n`nA form opens. Tab moves between the boxes, Enter inserts the entry, Esc cancels. The preview at the bottom shows how it will look."
+            , practice: true, logins: false, start: false, check: "Trespass", done: "That's a form. The log is ready to paste into iTrak."}
+        , {head: "Finding a code"
+            , body: "Can't remember a code? Press Ctrl+Alt+Space, type any word (like jackpot or audit) and pick the template from the list. Enter inserts it.`n`nTry it in the box below.`n`nCtrl+Alt+H shows every code on one page."
+            , practice: true, logins: false, start: false, check: "", done: ""}
+        , {head: "Handy keys, and you're set"
+            , body: "Ctrl+Alt+M   the Watchlog home window: everything as buttons`nCtrl+Alt+Space   find a template`nCtrl+Alt+H   cheat sheet of every code`nCtrl+Alt+L   start of shift (opens your work programs)`nCtrl+Alt+J   this shift's journal`n`nOr just click the teal Watchlog icon by the clock: it opens the home window. Right-click it for the menu."
+            , practice: false, logins: false, start: true, check: "", done: ""}
+    ]
+    st := {i: 1}
+    g := Gui(, "Watchlog tutorial")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 20, g.MarginY := 16
+    g.SetFont("s15 bold")
+    hd := g.AddText("w560 h34", "")
+    g.SetFont("s10 norm")
+    bd := g.AddText("w560 h150 y+6", "")
+    pr := g.AddEdit("w560 r6 Multi y+4")
+    stt := g.AddText("w560 h24 y+6 cGreen", "")
+    sw := g.AddCheckbox("w560 y+8", "Start Watchlog when Windows starts")
+    sw.Value := StartupShortcuts().Length ? 1 : 0
+    bBack := g.AddButton("xm y+14 w90", "Back")
+    bNext := g.AddButton("x+8 w110 Default", "Next")
+    bAdd := g.AddButton("x+8 w150", "Add logins...")
+    bClose := g.AddButton("x+8 w120", "Close")
+    bBack.OnEvent("Click", (*) => Go(-1))
+    bNext.OnEvent("Click", (*) => Go(1))
+    bAdd.OnEvent("Click", (*) => ShowSettings())
+    bClose.OnEvent("Click", Done)
+    g.OnEvent("Close", Done)
+    g.OnEvent("Escape", Done)
+    pr.OnEvent("Change", Check)
+    TutorialWin := g
+    Render()
+    g.Show()
+
+    Render() {
+        s := steps[st.i]
+        hd.Text := s.head
+        bd.Text := s.body
+        stt.Text := ""
+        pr.Visible := s.practice
+        sw.Visible := s.start
+        bAdd.Visible := s.logins
+        bBack.Enabled := st.i > 1
+        bNext.Text := st.i = steps.Length ? "Finish" : "Next"
+        g.Title := "Watchlog tutorial  (" st.i " of " steps.Length ")"
+        if s.practice {
+            pr.Value := ""
+            pr.Focus()
+        } else
+            bNext.Focus()
+    }
+
+    Check(*) {
+        s := steps[st.i]
+        if s.check != "" && InStr(pr.Value, s.check)
+            stt.Text := "✓  " s.done
+    }
+
+    Go(d) {
+        if d > 0 && st.i = steps.Length {
+            Done()
+            return
+        }
+        if st.i + d < 1
+            return
+        st.i += d
+        Render()
+    }
+
+    Done(*) {
+        global TutorialWin
+        if sw.Visible
+            SetStartup(sw.Value)
+        TutorialWin := ""
+        try g.Destroy()
+        if first
+            Activity("Tutorial finished on this PC")
+    }
+}
+
+
+; =====================================================================
+;  ICONS  (v3.10.0)
+;  The small pictures on the tray menu and on the home window's buttons
+;  are drawn from Windows' own icon font (Segoe Fluent Icons on Windows
+;  11, Segoe MDL2 Assets on Windows 10), so there are no icon files to
+;  ship. On a PC with neither font the menus just have no pictures.
+; =====================================================================
+IconFont() {
+    static font := ""
+    if font = ""
+        font := FileExist(A_WinDir "\Fonts\SegoeIcons.ttf") ? "Segoe Fluent Icons"
+            : FileExist(A_WinDir "\Fonts\segmdl2.ttf") ? "Segoe MDL2 Assets" : "-"
+    return font = "-" ? "" : font
+}
+
+; An icon of one picture from the icon font, in a colour (0xRRGGBB), size
+; pixels square. 0 when the font isn't there. Each one is made once.
+GlyphIcon(code, color := 0x0E746E, size := 16) {
+    static made := Map()
+    key := code "|" color "|" size
+    if made.Has(key)
+        return made[key]
+    made[key] := 0
+    font := IconFont()
+    if font = ""
+        return 0
+    hdc := DllCall("CreateCompatibleDC", "Ptr", 0, "Ptr")
+    bi := Buffer(40, 0)
+    NumPut("UInt", 40, "Int", size, "Int", -size, "UShort", 1, "UShort", 32, bi)
+    bits := 0
+    hbm := DllCall("CreateDIBSection", "Ptr", hdc, "Ptr", bi, "UInt", 0, "Ptr*", &bits, "Ptr", 0, "UInt", 0, "Ptr")
+    if !hbm || !bits {
+        DllCall("DeleteDC", "Ptr", hdc)
+        return 0
+    }
+    oldBm := DllCall("SelectObject", "Ptr", hdc, "Ptr", hbm, "Ptr")
+    hf := DllCall("CreateFontW", "Int", -Round(size * 0.9), "Int", 0, "Int", 0, "Int", 0, "Int", 400
+        , "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 4, "UInt", 0, "Str", font, "Ptr")
+    oldF := DllCall("SelectObject", "Ptr", hdc, "Ptr", hf, "Ptr")
+    DllCall("SetTextColor", "Ptr", hdc, "UInt", 0xFFFFFF)
+    DllCall("SetBkMode", "Ptr", hdc, "Int", 1)
+    rc := Buffer(16, 0)
+    NumPut("Int", size, "Int", size, rc, 8)
+    ; centred, one line, & is not special
+    DllCall("DrawTextW", "Ptr", hdc, "Str", Chr(code), "Int", -1, "Ptr", rc, "UInt", 0x825)
+    DllCall("GdiFlush")
+    ; White on black becomes the colour, with the brightness as how solid it is
+    rgb := color & 0xFFFFFF
+    Loop size * size {
+        off := (A_Index - 1) * 4
+        p := NumGet(bits, off, "UInt")
+        a := Max(p & 0xFF, (p >> 8) & 0xFF, (p >> 16) & 0xFF)
+        NumPut("UInt", a ? (a << 24) | rgb : 0, bits, off)
+    }
+    DllCall("SelectObject", "Ptr", hdc, "Ptr", oldF)
+    DllCall("DeleteObject", "Ptr", hf)
+    DllCall("SelectObject", "Ptr", hdc, "Ptr", oldBm)
+    DllCall("DeleteDC", "Ptr", hdc)
+    maskBits := Buffer(((size + 15) // 16) * 2 * size, 0)
+    mask := DllCall("CreateBitmap", "Int", size, "Int", size, "UInt", 1, "UInt", 1, "Ptr", maskBits, "Ptr")
+    ii := Buffer(A_PtrSize = 8 ? 32 : 20, 0)                  ; ICONINFO
+    NumPut("Int", 1, ii, 0)
+    mo := A_PtrSize = 8 ? 16 : 12
+    NumPut("Ptr", mask, ii, mo)
+    NumPut("Ptr", hbm, ii, mo + A_PtrSize)
+    h := DllCall("CreateIconIndirect", "Ptr", ii, "Ptr")
+    DllCall("DeleteObject", "Ptr", mask)
+    DllCall("DeleteObject", "Ptr", hbm)
+    made[key] := h
+    return h
+}
+
+; Adds a menu item with a picture from the icon font
+MenuItem(m, name, fn, glyph := 0) {
+    m.Add(name, fn)
+    if glyph && (h := GlyphIcon(glyph, 0x0E746E, DllCall("GetSystemMetrics", "Int", 49)))
+        try m.SetIcon(name, "HICON:*" h)
+}
+
+; A big button with a picture on the left and one or two lines of text
+IconButton(g, opt, text, glyph, color, fn) {
+    b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
+    if glyph && (h := GlyphIcon(glyph, color, 24))
+        SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
+    b.OnEvent("Click", fn)
+    return b
+}
+
+
+; =====================================================================
+;  TRAY MENU  (v3.10.0)
+;  Click the teal icon by the clock = the Watchlog home window.
+;  Right-click = this menu: everyday things on top, the rest in small
+;  sub-menus (Alert Grid, Windows, Advanced). AutoHotkey's own items
+;  (Window Spy, Edit Script...) are gone; Reload and Pause are under
+;  Advanced.
+; =====================================================================
+BuildTrayMenu() {
+    global WinMenu
+    tm := A_TrayMenu
+    tm.Delete()
+    MenuItem(tm, "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - update needed" : ""), (*) => ShowVersion(), 0xE946)
+    tm.Add()
+    MenuItem(tm, HOME_MENU, (*) => ShowHome(), 0xE80F)
+    MenuItem(tm, "Find a template  (Ctrl+Alt+Space)", (*) => ShowPicker(), 0xE721)
+    MenuItem(tm, "Cheat sheet  (Ctrl+Alt+H)", (*) => ShowCheatSheet(), 0xE8FD)
+    MenuItem(tm, "Shift journal  (Ctrl+Alt+J)", (*) => ShowJournal(), 0xE8F1)
+    MenuItem(tm, "Quick notes  (Ctrl+Alt+O)", (*) => ShowNotes(), 0xE70B)
+    MenuItem(tm, "Time saved", (*) => ShowTimeSaved(), 0xE916)
+    tm.Add()
+    MenuItem(tm, "Start of shift  (Ctrl+Alt+L)", (*) => StartOfShift(), 0xE768)
+    MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
+
+    ag := Menu()
+    MenuItem(ag, "Clear all alerts  (Ctrl+Alt+A)", (*) => ClearAlerts(), 0xE894)
+    MenuItem(ag, "Teach the clicks  (Ctrl+Alt+Shift+A)", (*) => TeachAlerts(), 0xE7C9)
+    MenuItem(tm, "Alert Grid", ag, 0xEA8F)
+
+    WinMenu := Menu()
+    MenuItem(WinMenu, "Save window layout  (Ctrl+Alt+Shift+S)", (*) => SaveLayout(), 0xE74E)
+    MenuItem(WinMenu, "Put windows back  (Ctrl+Alt+W)", (*) => RestoreLayout(), 0xE7C4)
+    WinMenu.Add(CAPS_MENU, (*) => ToggleCapsGuard())
+    if CapsGuard
+        WinMenu.Check(CAPS_MENU)
+    MenuItem(tm, "Windows", WinMenu, 0xE7F4)
+    tm.Add()
+
+    MenuItem(tm, "Template editor  (Ctrl+Alt+E)", (*) => ShowEditor(), 0xE70F)
+    MenuItem(tm, "Settings", (*) => ShowSettings(), 0xE713)
+    MenuItem(tm, "Tutorial", (*) => ShowTutorial(), 0xE7BE)
+
+    more := Menu()
+    MenuItem(more, "Security and status", (*) => ShowSecurity(), 0xE72E)
+    MenuItem(more, "Activity log", (*) => OpenActivity(), 0xE81C)
+    MenuItem(more, "Make a copy to share", (*) => MakeShareCopy(), 0xE8C8)
+    more.Add()
+    MenuItem(more, (Cfg["SharedTemplates"] != "" ? "Edit team templates" : "Edit templates") " in Notepad", (*) => EditFile(Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile), 0xE8A5)
+    MenuItem(more, "Edit my templates in Notepad", (*) => EditMine(), 0xE8A5)
+    MenuItem(more, "Edit settings file", (*) => EditFile(SettingsFile), 0xE8A5)
+    MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
+    MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
+    more.Add()
+    MenuItem(more, "Pause all shortcuts  (Ctrl+Alt+P)", (*) => TogglePause(), 0xE769)
+    MenuItem(more, "Reload Watchlog  (Ctrl+Alt+R)", (*) => Reload(), 0xE72C)
+    MenuItem(tm, "Advanced", more, 0xE712)
+    tm.Add()
+    MenuItem(tm, "Exit Watchlog", (*) => ExitApp(), 0xE711)
+
+    ; One click on the tray icon opens the home window
+    tm.Default := HOME_MENU
+    tm.ClickCount := 1
+}
+
+
+; =====================================================================
+;  WATCHLOG HOME  -  click the tray icon, or Ctrl+Alt+M   (v3.10.0)
+;  Everything in one window, as buttons with pictures, for anyone who
+;  doesn't know the shortcuts yet. Each button shows its shortcut, so
+;  it doubles as a way to learn them. Along the bottom: how this PC is
+;  doing (version, templates, Alert Grid, this shift's time saved),
+;  and the Caps Lock guard and pause switches.
+;  It closes as soon as a button is pressed, and anything that types (a
+;  template, a login) goes into the window you were in before.
+;  Ctrl+Alt+M again (or Esc) closes it.
+; =====================================================================
+^!m:: ShowHome()
+
+ShowHome() {
+    global HomeWin
+    if IsObject(HomeWin) {
+        if WinActive("ahk_id " HomeWin.Hwnd)
+            CloseHome()
+        else
+            try WinActivate "ahk_id " HomeWin.Hwnd
+        return
+    }
+    target := WorkWindow()
+    W := 180, gap := 8, per := 5
+    g := Gui("-MinimizeBox", "Watchlog  -  v" VERSION)
+    g.BackColor := "F7FAFA"
+    g.MarginX := 18, g.MarginY := 14
+    g.SetFont("s18 bold c0E746E", "Segoe UI")
+    g.AddText("xm", "Watchlog")
+    g.SetFont("s10 norm c606060")
+    g.AddText("x+12 yp+11", "Press a button, or learn the shortcut shown on it.")
+
+    Group("Logs", 0x0E746E, [
+        ["Find a template", "Ctrl+Alt+Space", 0xE721, () => ShowPicker(), true]
+        , ["Cheat sheet", "Ctrl+Alt+H", 0xE8FD, () => ShowCheatSheet(), false]
+        , ["Shift journal", "Ctrl+Alt+J", 0xE8F1, () => ShowJournal(), false]
+        , ["Quick notes", "Ctrl+Alt+O", 0xE70B, () => ShowNotes(), false]
+        , ["Time saved", "this shift and before", 0xE916, () => ShowTimeSaved(), false]])
+
+    Group("Shift", 0xB86E00, [
+        ["Start of shift", "Ctrl+Alt+L", 0xE768, () => StartOfShift(), false]
+        , ["End of shift", "Ctrl+Alt+Shift+L", 0xE7E8, () => EndOfShift(), false]
+        , ["Log out of SDS", "Ctrl+Alt+K", 0xE72E, () => SDSLogout(), false]
+        , ["Clear Alert Grid", "Ctrl+Alt+A or Caps Lock", 0xE894, () => ClearAlerts(), true]
+        , ["Put windows back", "Ctrl+Alt+W", 0xE7C4, () => RestoreLayout(), false]])
+
+    logins := []
+    for rec in LoginList
+        logins.Push(["Sign in  " rec.trig, rec.user, 0xE77B, HomeLogin.Bind(rec), true])
+    if logins.Length
+        Group("Logins  (types the username and password, like typing the shortcut)", 0x1565C0, logins)
+
+    Group("Set up", 0x555555, [
+        ["Template editor", "Ctrl+Alt+E", 0xE70F, () => ShowEditor(), false]
+        , ["Settings", "logins, shift, updates", 0xE713, () => ShowSettings(), false]
+        , ["Tutorial", "a two-minute tour", 0xE7BE, () => ShowTutorial(), false]
+        , ["Security and status", "what's kept where", 0xE72E, () => ShowSecurity(), false]
+        , ["Save window layout", "Ctrl+Alt+Shift+S", 0xE74E, () => SaveLayout(), false]])
+
+    ; How this PC is doing
+    fullW := per * W + (per - 1) * gap
+    g.AddText("xm y+18 w" fullW " h1 0x10")
+    Status(OutOfDate() ? "C62828" : "2E7D32", "Watchlog v" VERSION
+        . (OutOfDate() ? ": UPDATE NEEDED, the team is on v" Tpl.program
+        : UpdateWaiting() ? ": v" TeamProgramVersion() " is waiting in the update folder"
+        : Tpl.program != "" ? ": up to date" : ""))
+    Status(Tpl.src = "team-copy" || !Tpl.count ? "C62828" : "2E7D32"
+        , Tpl.count " templates" (Tpl.mine ? " + " Tpl.mine " of your own" : "")
+        . (Tpl.version != "" ? ", wording " Tpl.version : "")
+        . (Tpl.src = "team" ? " (team file)" : Tpl.src = "team-copy" ? " (saved copy: the team file can't be reached)" : ""))
+    taught := FileExist(AlertFile) != ""
+    Status(taught ? "2E7D32" : "B86E00", taught ? "Alert Grid clicks are taught on this PC"
+        : "Alert Grid clicks aren't taught on this PC yet (Settings > Alert Grid)")
+    sh := SavedShift()
+    Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")
+        . ", " SavedTime(sh.keys) " saved")
+
+    g.SetFont("s10 c303030")
+    capsCB := g.AddCheckbox("xm y+12" (CapsGuard ? " Checked" : ""), "Caps Lock guard")
+    capsCB.OnEvent("Click", (*) => ToggleCapsGuard())
+    pauseCB := g.AddCheckbox("x+24 yp" (A_IsSuspended ? " Checked" : ""), "Pause all shortcuts")
+    pauseCB.OnEvent("Click", (*) => TogglePause())
+    g.AddButton("x" (g.MarginX + fullW - 110) " yp-6 w110 Default", "Close").OnEvent("Click", (*) => CloseHome())
+    g.OnEvent("Escape", (*) => CloseHome())
+    g.OnEvent("Close", (*) => CloseHome())
+    HomeWin := g
+    g.Show()
+
+    ; A heading and a row (or two) of buttons
+    Group(title, color, tiles) {
+        g.SetFont("s11 bold c" Format("{:06X}", color), "Segoe UI")
+        g.AddText("xm y+16", title)
+        g.SetFont("s10 norm c202020")
+        for i, t in tiles {
+            pos := Mod(i - 1, per) = 0 ? "xm y+6" : "x+" gap " yp"
+            IconButton(g, pos " w" W " h52", t[1] "`n" t[2], t[3], color, Go.Bind(t[4], t[5]))
+        }
+    }
+
+    Status(color, text) {
+        g.SetFont("s10 c" color)
+        g.AddText("xm y+6", "●")
+        g.SetFont("s10 c303030")
+        g.AddText("x+8 yp", text)
+    }
+
+    ; Closes the home window, puts the keyboard back where it was when the
+    ; button types something, then does what the button says
+    Go(fn, back, *) {
+        CloseHome()
+        if back && target
+            ReturnTo(target)
+        fn()
+    }
+}
+
+CloseHome() {
+    global HomeWin
+    if IsObject(HomeWin) {
+        try HomeWin.Destroy()
+        HomeWin := ""
+    }
+}
+
+; The window you were working in: the active one, or (after a click on the
+; tray icon, which makes the taskbar active) the top one under it
+WorkWindow() {
+    a := WinExist("A")
+    try {
+        if a && !LayoutSkip(a) && !(WinGetClass("ahk_id " a) ~= "^(Shell_TrayWnd|Shell_SecondaryTrayWnd|NotifyIconOverflowWindow|TopLevelWindowForOverflowXamlIsland|Windows\.UI\.Core\.CoreWindow)$")
+            return a
+    }
+    for id in WinGetList() {
+        try {
+            if LayoutSkip(id) || WinGetMinMax("ahk_id " id) = -1
+                continue
+            if WinGetClass("ahk_id " id) ~= "^(NotifyIconOverflowWindow|TopLevelWindowForOverflowXamlIsland|Windows\.UI\.Core\.CoreWindow)$"
+                continue
+            return id
+        }
+    }
+    return 0
+}
+
+; A login button in the home window. A login locked to a program brings
+; that program to the front first; one that isn't locked asks before it
+; types, since it would type into whatever window is in front.
+HomeLogin(rec) {
+    SetTitleMatchMode 2
+    if rec.win != "" {
+        if !LoginWindowActive(rec.win) {
+            for part in StrSplit(rec.win, "|") {
+                part := Trim(part)
+                if part != "" && (id := WinExist(part)) {
+                    try WinActivate "ahk_id " id
+                    WinWaitActive "ahk_id " id, , 2
+                    break
+                }
+            }
+        }
+        if !LoginWindowActive(rec.win) {
+            MsgBox "The program " rec.trig " works in isn't open:`n`n" rec.win "`n`nOpen it, then try again.", "Watchlog", "Icon!"
+            return
+        }
+    } else {
+        here := WinExist("A"), title := ""
+        try title := WinGetTitle("ahk_id " here)
+        if !here || title = "" || MsgBox("Type the " rec.trig " login (" rec.user ") into this window?`n`n" title, "Watchlog", "YesNo Icon? Default2") != "Yes"
+            return
+        ReturnTo(here)
+    }
+    Sleep 150
+    DoLogin(rec.trig, rec.user, rec.pw, rec)
+}
+
+
+; =====================================================================
+;  TEMPLATE EDITOR  -  Ctrl+Alt+E, the home window or the tray menu
+;  (v3.10.0) Change the templates without opening templates.txt: pick
+;  one on the left, change its shortcut, name or wording on the right,
+;  and add or change its boxes with a small form instead of typing
+;  {Name: a | b} by hand. The preview shows how the log comes out. The
+;  Shared lists tab changes lists like @tables.
+;  Nothing is written until Save. Save keeps a copy of the file as it
+;  was (%LOCALAPPDATA%\Watchlog\template backups, the last 20), bumps
+;  the "# Wording version" line, and Watchlog picks up the new wording
+;  when the editor closes. Lines it doesn't touch (the notes at the top,
+;  the section headings) stay exactly as they were.
+;  Shortcuts don't fire while the editor is in front, so typing ;jack
+;  into it doesn't open the jackpot form.
+; =====================================================================
+$^!e:: ShowEditor()
+
+; The kinds of box, in the order the box form lists them
+BoxKinds() {
+    static kinds := [["plain", "Text you type"]
+        , ["list", "A list of choices"]
+        , ["shared", "A shared list (like @tables)"]
+        , ["next", "Steps: opens on the one after last time"]
+        , ["now", "The time now (can be changed)"]
+        , ["time", "A time you type (2130 becomes 21:30)"]
+        , ["money", "Money (10000 becomes 10,000)"]
+        , ["percent", "A percentage (67 becomes 67%)"]
+        , ["clip", "A copied number (copy it first)"]
+        , ["last", "Remembers what was typed last time"]
+        , ["alertcopy", "Facial rec alert # (copied in Edge)"]
+        , ["matchcopy", "Facial rec match % (copied in Edge)"]]
+    return kinds
+}
+
+; ---- Reading and writing the file ------------------------------------
+; A templates file as lines, plus where its templates, lists and section
+; headings are. Only the lines that change are ever rewritten.
+EdRead(file) {
+    raw := FileRead(file, "RAW")
+    bom := raw.Size >= 3 && NumGet(raw, 0, "UChar") = 0xEF && NumGet(raw, 1, "UChar") = 0xBB && NumGet(raw, 2, "UChar") = 0xBF
+    text := FileRead(file, "UTF-8")
+    doc := {file: file, crlf: InStr(text, "`r`n") > 0, bom: bom, time: FileTimeOf(file)
+        , lines: StrSplit(StrReplace(text, "`r`n", "`n"), "`n")}
+    EdScan(doc)
+    return doc
+}
+
+EdScan(doc) {
+    doc.tpls := [], doc.lists := [], doc.sections := []
+    section := ""
+    for i, raw in doc.lines {
+        line := Trim(raw)
+        if line = ""
+            continue
+        c := SubStr(line, 1, 1)
+        if c = "#" {
+            ; a heading like  # ----- FORMS -----
+            if RegExMatch(line, "^#\s*-{3,}\s*(.+?)\s*-*\s*$", &m) {
+                section := EdSectionName(m[1])
+                doc.sections.Push({name: section, line: i})
+            }
+            continue
+        }
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        if c = "@" {
+            doc.lists.Push({line: i, name: Trim(SubStr(line, 2, eq - 2)), items: EdItems(SubStr(line, eq + 1))})
+            continue
+        }
+        left := Trim(SubStr(line, 1, eq - 1)), body := Trim(SubStr(line, eq + 1))
+        trig := left, name := ""
+        if RegExMatch(left, "^(\S+)\s*\((.*)\)$", &m)
+            trig := m[1], name := Trim(m[2])
+        rep := RegExMatch(body, "i)\{repeat\}") > 0
+        body := RegExReplace(body, "i)\s*\{repeat\}")
+        doc.tpls.Push({line: i, trig: trig, name: name, body: StrReplace(body, "\n", "`n"), repeat: rep, section: section})
+    }
+}
+
+; "START / END OF SHIFT  (asks which bay)" -> "Start / end of shift"
+EdSectionName(s) {
+    s := Trim(RegExReplace(s, "\s*\(.*$"))
+    return StrUpper(SubStr(s, 1, 1)) StrLower(SubStr(s, 2))
+}
+
+EdItems(s) {
+    items := []
+    for it in StrSplit(s, "|")
+        if Trim(it) != ""
+            items.Push(Trim(it))
+    return items
+}
+
+; A template back into its line:  ;trig (Name) = wording {repeat}
+EdLine(t) {
+    body := Trim(StrReplace(StrReplace(t.body, "`r`n", "`n"), "`n", "\n"), " `t")
+    return t.trig (t.name != "" ? " (" t.name ")" : "") " = " body (t.repeat ? " {repeat}" : "")
+}
+
+EdListLine(l) {
+    s := ""
+    for it in l.items
+        s .= (s = "" ? "" : " | ") it
+    return "@" l.name " = " s
+}
+
+; "# Wording version: Oct 25, 2026 (2)" -> today's date, (3) if it's
+; still the same day, otherwise (1)
+EdBumpVersion(doc) {
+    today := FormatTime(, "MMM d, yyyy")
+    for i, line in doc.lines {
+        if !RegExMatch(line, "i)^(#\s*Wording version\s*:\s*)(.*?)\s*$", &m)
+            continue
+        n := RegExMatch(m[2], "^(.*?)\s*\((\d+)\)$", &v) && v[1] = today ? Integer(v[2]) + 1 : 1
+        doc.lines[i] := m[1] today " (" n ")"
+        return today " (" n ")"
+    }
+    return ""
+}
+
+; Writes the file, after keeping a copy of what was there
+EdWrite(doc) {
+    dir := DataDir "\template backups"
+    try {
+        DirCreate dir
+        SplitPath doc.file, , , , &stem
+        FileCopy doc.file, dir "\" stem " " FormatTime(, "yyyy-MM-dd HHmmss") ".txt", 1
+        ; keep the last 20
+        old := []
+        Loop Files dir "\*.txt"
+            old.Push(A_LoopFileTimeModified "|" A_LoopFileFullPath)
+        if old.Length > 20 {
+            sorted := ""
+            for o in old
+                sorted .= o "`n"
+            sorted := Sort(RTrim(sorted, "`n"))
+            for o in StrSplit(sorted, "`n")
+                if A_Index <= old.Length - 20
+                    try FileDelete SubStr(o, InStr(o, "|") + 1)
+        }
+    }
+    text := ""
+    for i, line in doc.lines
+        text .= (i > 1 ? (doc.crlf ? "`r`n" : "`n") : "") line
+    f := FileOpen(doc.file, "w", doc.bom ? "UTF-8" : "UTF-8-RAW")
+    f.Write(text)
+    f.Close()
+    doc.time := FileTimeOf(doc.file)
+}
+
+; ---- Checking a template -----------------------------------------------
+; What's wrong with a template ("" if nothing). others = the shortcuts of
+; the other file (team templates when editing your own, and the other way)
+EdProblems(doc, idx, others) {
+    t := doc.tpls[idx], trig := t.trig, p := ""
+    if trig = "" || trig = ";"
+        p .= "Type a shortcut, like `;jack`n"
+    else if RegExMatch(trig, "[\s=(){}|]")
+        p .= "The shortcut can't have spaces or = ( ) { } | in it.`n"
+    else {
+        if SubStr(trig, 1, 1) != ";"
+            p .= "Start the shortcut with `; so it never fires while you're typing normally.`n"
+        if RegExMatch(trig, "i)^(;t|;dd|;dt)")
+            p .= trig " starts like a time or date stamp (;t `;dd `;dt), so it would never fire.`n"
+        for j, o in doc.tpls {
+            if j = idx || o.trig = ""
+                continue
+            if o.trig == trig
+                p .= trig " is used twice in this file.`n"
+            else if InStr(o.trig, trig) = 1 || InStr(trig, o.trig) = 1
+                p .= trig " and " o.trig " start the same way, so the shorter one fires before you finish typing the longer one.`n"
+        }
+        for o in others.trigs
+            if InStr(o, trig) = 1 || InStr(trig, o) = 1
+                p .= trig (o == trig ? " is" : " and " o " start the same way: " o " is") " already " others.what ".`n"
+        for l in LoginList
+            if InStr(l.trig, trig) = 1 || InStr(trig, l.trig) = 1
+                p .= trig " clashes with the login shortcut " l.trig ".`n"
+    }
+    if RegExMatch(t.name, "[=()]")
+        p .= "The name can't have = ( or ) in it.`n"
+    body := t.body
+    if Trim(body, " `t`r`n") = ""
+        p .= "The wording is empty.`n"
+    depth := 0, bad := false
+    Loop Parse body {
+        if A_LoopField = "{"
+            depth += 1, bad := bad || depth > 1
+        else if A_LoopField = "}"
+            depth -= 1, bad := bad || depth < 0
+    }
+    if bad || depth != 0
+        p .= "A { has no matching } (or the other way round).`n"
+    have := Map()
+    have.CaseSense := false
+    for l in doc.lists
+        have[l.name] := true
+    for k in Lists
+        have[k] := true
+    for tok in EdTokens(body) {
+        if tok.key = ""
+            p .= "A box has no name: " tok.code "`n"
+        for opt in StrSplit(tok.opts, "|")
+            if SubStr(Trim(opt), 1, 1) = "@" && !have.Has(SubStr(Trim(opt), 2))
+                p .= "There's no shared list called " Trim(opt) ".`n"
+    }
+    return RTrim(p, "`n")
+}
+
+; The boxes in some wording: [{pos, len, code, key, opts}] ({repeat} left out)
+EdTokens(body) {
+    toks := [], pos := 1
+    while p := RegExMatch(body, "\{([^{}]*)\}", &m, pos) {
+        spec := m[1], c := InStr(spec, ":")
+        key := Trim(c ? SubStr(spec, 1, c - 1) : spec)
+        if !(StrLower(key) = "repeat" && !c)
+            toks.Push({pos: p, len: m.Len, code: m[0], key: key, opts: c ? SubStr(spec, c + 1) : ""})
+        pos := p + m.Len
+    }
+    return toks
+}
+
+; ---- One box, as the box form shows it -------------------------------
+BoxParse(spec) {
+    c := InStr(spec, ":")
+    b := {name: Trim(c ? SubStr(spec, 1, c - 1) : spec), kind: "plain", mins: 0, thousands: false, pick: false
+        , fromcopy: false, list: "", items: [], caps: false, upper: false, blankMode: 1, blank: ""
+        , prefix: "", suffix: "", numprefix: "", condWhen: "", condVal: "", keep: []}
+    if !c
+        return b
+    kinds := []
+    for opt in StrSplit(SubStr(spec, c + 1), "|") {
+        opt := Trim(opt), low := StrLower(opt)
+        if opt = ""
+            continue
+        if RegExMatch(low, "^(now|time|money|percent|clip|alertcopy|matchcopy|last|next)$")
+            kinds.Push({k: low, opt: opt})
+        else if RegExMatch(low, "^now\s*\+\s*(\d+)$", &n)
+            kinds.Push({k: "now", opt: opt, mins: Integer(n[1])})
+        else if low = "thousands"
+            b.thousands := true
+        else if low = "pick"
+            b.pick := true
+        else if low = "fromcopy"
+            b.fromcopy := true
+        else if low = "caps"
+            b.caps := true
+        else if low = "upper"
+            b.upper := true
+        else if SubStr(opt, 1, 1) = "@" && b.list = ""
+            b.list := SubStr(opt, 2)
+        else if b.condWhen = "" && RegExMatch(opt, "i)^if\s+(.+?)\s*=\s*(.*)$", &cm)
+            b.condWhen := cm[1], b.condVal := cm[2]
+        else if SubStr(low, 1, 6) = "blank="
+            b.blank := SubStr(opt, 7), b.blankMode := b.blank = "" ? 2 : 3
+        else if SubStr(low, 1, 7) = "prefix="
+            b.prefix := SubStr(opt, 8)
+        else if SubStr(low, 1, 7) = "suffix="
+            b.suffix := SubStr(opt, 8)
+        else if SubStr(low, 1, 13) = "numberprefix="
+            b.numprefix := SubStr(opt, 14)
+        else if SubStr(opt, 1, 1) = "@" || RegExMatch(low, "^if\s")
+            b.keep.Push(opt)       ; a second list or condition: kept as it is
+        else
+            b.items.Push(opt)
+    }
+    ; The kind is the first kind word; any other one is kept as it is
+    for i, k in kinds {
+        if i = 1 {
+            b.kind := k.k
+            if k.HasOwnProp("mins")
+                b.mins := k.mins
+        } else
+            b.keep.Push(k.opt)
+    }
+    if b.kind = "plain"
+        b.kind := b.list != "" ? "shared" : b.items.Length ? "list" : "plain"
+    return b
+}
+
+BoxListy(kind) => kind = "list" || kind = "shared" || kind = "next"
+
+BoxBuild(b) {
+    o := []
+    switch b.kind {
+        case "now": o.Push(b.mins ? "now+" b.mins : "now")
+        case "plain", "list", "shared":
+        default: o.Push(b.kind)
+    }
+    if b.kind = "money" && b.thousands
+        o.Push("thousands")
+    if BoxListy(b.kind) {
+        if b.pick
+            o.Push("pick")
+        if b.fromcopy
+            o.Push("fromcopy")
+        if b.kind = "shared" && b.list != ""
+            o.Push("@" b.list)
+        for it in b.items
+            o.Push(it)
+    }
+    if b.caps
+        o.Push("caps")
+    if b.upper
+        o.Push("upper")
+    if b.numprefix != ""
+        o.Push("numberprefix=" b.numprefix)
+    if b.prefix != ""
+        o.Push("prefix=" b.prefix)
+    if b.suffix != ""
+        o.Push("suffix=" b.suffix)
+    if b.blankMode = 2
+        o.Push("blank=")
+    else if b.blankMode = 3 && b.blank != ""
+        o.Push("blank=" b.blank)
+    if b.condWhen != ""
+        o.Push("if " b.condWhen "=" b.condVal)
+    for k in b.keep
+        o.Push(k)
+    s := ""
+    for x in o
+        s .= (s = "" ? "" : " | ") x
+    return "{" b.name (s != "" ? ": " s : "") "}"
+}
+
+; What a box is, in words, for the list of boxes
+BoxKindName(b) {
+    for k in BoxKinds()
+        if k[1] = b.kind
+            name := k[2]
+    if b.kind = "now" && b.mins
+        name := "The time now + " b.mins " minutes"
+    if BoxListy(b.kind) && b.pick
+        name .= " (must pick)"
+    return name
+}
+
+BoxDetails(b) {
+    d := []
+    if b.kind = "shared"
+        d.Push("@" b.list)
+    if BoxListy(b.kind) && b.items.Length
+        d.Push(b.items.Length = 1 ? b.items[1] : b.items.Length " choices")
+    if b.thousands && b.kind = "money"
+        d.Push("3.3 = 3,300")
+    if b.caps
+        d.Push("capitals in machine #s")
+    if b.upper
+        d.Push("ALL CAPITALS")
+    if b.prefix != "" || b.suffix != ""
+        d.Push("adds " b.prefix "..." b.suffix)
+    if b.numprefix != ""
+        d.Push(b.numprefix " before a number")
+    if b.blankMode = 2
+        d.Push("empty = nothing")
+    else if b.blankMode = 3
+        d.Push("empty = " b.blank)
+    if b.condWhen != ""
+        d.Push(b.condVal " when a box starts with " b.condWhen)
+    if b.fromcopy && BoxListy(b.kind)
+        d.Push("job title from the copy")
+    s := ""
+    for x in d
+        s .= (s = "" ? "" : ",  ") x
+    return s
+}
+
+; The log as it comes out with the boxes as they open (a list on its first
+; choice, the time now, the rest left as XX). Never reads the clipboard.
+EdPreview(body, doc) {
+    known := Map()
+    known.CaseSense := false
+    for k, v in Lists
+        known[k] := v
+    for l in doc.lists
+        known[l.name] := l.items
+    fields := [], vals := [], seen := Map()
+    for tok in EdTokens(body) {
+        if seen.Has(tok.key)
+            continue
+        seen[tok.key] := true
+        b := BoxParse(SubStr(tok.code, 2, -1))
+        ph := b.blankMode = 2 ? "" : b.blankMode = 3 ? b.blank
+            : b.kind = "now" || b.kind = "time" ? "XX:XX" : b.kind = "money" ? "XX,XXX" : b.kind = "percent" || b.kind = "matchcopy" ? "XX%" : "XX"
+        v := ""
+        if b.kind = "now"
+            v := FormatTime(DateAdd(A_Now, b.mins, "Minutes"), "HH:mm")
+        else if BoxListy(b.kind) {
+            items := b.items
+            if b.kind = "shared" && known.Has(b.list) && known[b.list].Length
+                items := known[b.list]
+            v := items.Length ? items[1] : ""
+        }
+        if v = ""
+            v := ph
+        else {
+            if b.caps
+                v := RegExReplace(v, "(\w*\d\w*)", "$U1")
+            v := b.prefix v b.suffix
+            if b.upper
+                v := StrUpper(v)
+            if b.numprefix != "" && RegExMatch(v, "^\d")
+                v := b.numprefix v
+        }
+        fields.Push({key: tok.key})
+        vals.Push(v)
+    }
+    return FillTemplate(body, fields, vals)
+}
+
+; ---- The editor window ------------------------------------------------
+ShowEditor() {
+    global EditorWin
+    if IsObject(EditorWin) {
+        try WinActivate "ahk_id " EditorWin.Hwnd
+        return
+    }
+    if IsObject(CurForm) {
+        MsgBox "Finish or close the form that's open first.", "Template editor"
+        return
+    }
+    ClosePicker()
+    ; The two files: the team's (or templates.txt) and your own
+    teamFile := Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile
+    teamName := Cfg["SharedTemplates"] != "" ? "Team templates" : "templates.txt"
+    canTeam := Tpl.src != "team-copy" && FileExist(teamFile)
+    ed := {doc: "", which: canTeam ? 1 : 2, cur: 0, rows: [], dirty: false, saved: false, teamOk: false, curList: 0
+        , loading: false, boxes: [], others: {trigs: [], what: ""}}
+
+    g := Gui("+AlwaysOnTop", "Template editor  -  v" VERSION)
+    EditorWin := g
+    g.BackColor := "FFFFFF"     ; the same white as the tab pages
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("xm y+2", "Editing:")
+    fileDD := g.AddDropDownList("x+8 yp-3 w380", [teamName (Cfg["SharedTemplates"] != "" ? " (everyone's)" : ""), "My own templates (my-templates.txt, just me)"])
+    fileT := g.AddText("x+12 yp+3 w440 c707070", "")
+    tabs := g.AddTab2("xm y+12 w960 h650", ["Templates", "Shared lists"])
+
+    ; ---- Templates tab
+    tabs.UseTab(1)
+    search := g.AddEdit("Section w300")
+    SendMessage 0x1501, 1, StrPtr("Search: a shortcut, name or any word"), search    ; grey hint
+    lv := g.AddListView("xs y+6 w300 h470 -Multi NoSortHdr", ["Shortcut", "Name", "Section"])
+    lv.ModifyCol(1, 90), lv.ModifyCol(2, 120), lv.ModifyCol(3, 70)
+    bNew := g.AddButton("xs y+8 w96", "New")
+    bCopy := g.AddButton("x+6 w96", "Copy")
+    bDel := g.AddButton("x+6 w96", "Delete")
+
+    rx := "xs+320"
+    g.AddText(rx " ys+3", "Shortcut:")
+    trigE := g.AddEdit("x+6 yp-3 w130")
+    g.AddText("x+16 yp+3", "Name:")
+    nameE := g.AddEdit("x+6 yp-3 w318")
+    g.AddText(rx " y+12", "Section:")
+    secDD := g.AddDropDownList("x+6 yp-3 w210")
+    repCB := g.AddCheckbox("x+16 yp+4", "Several in one log (an Add another button)")
+    g.AddText(rx " y+14 w600", "Wording. Type the log as it should read; the boxes are the parts in { }.")
+    bodyE := g.AddEdit(rx " y+4 w610 r5 Multi WantReturn")
+    g.AddText(rx " y+10", "Boxes in this log (double-click one to change it):")
+    boxLV := g.AddListView(rx " y+4 w610 r5 -Multi NoSortHdr", ["Box", "What goes in it", "Details"])
+    boxLV.ModifyCol(1, 130), boxLV.ModifyCol(2, 230), boxLV.ModifyCol(3, 230)
+    bAddBox := g.AddButton(rx " y+6 w150", "Add a box...")
+    bEditBox := g.AddButton("x+6 w150", "Change box...")
+    bDelBox := g.AddButton("x+6 w150", "Remove box")
+    g.SetFont("s9 c707070")
+    g.AddText(rx " y+10", "How it will look (lists on their first choice, empty boxes as XX):")
+    g.SetFont("s10 c000000")
+    prevE := g.AddEdit(rx " y+4 w610 r4 ReadOnly -TabStop BackgroundF1F5F5")
+    probT := g.AddText(rx " y+6 w610 r3 cC62828", "")
+
+    ; ---- Shared lists tab
+    tabs.UseTab(2)
+    llv := g.AddListView("Section w300 h470 -Multi NoSortHdr", ["List", "Choices"])
+    llv.ModifyCol(1, 150), llv.ModifyCol(2, 120)
+    bNewList := g.AddButton("xs y+8 w96", "New list")
+    bRenList := g.AddButton("x+6 w96", "Rename")
+    bDelList := g.AddButton("x+6 w96", "Delete")
+    g.AddText("xs+320 ys", "A shared list is used by every box that names it, so changing it here")
+    g.AddText("xs+320 y+0", "changes all of them (like @tables for every table template).")
+    lnameT := g.AddText("xs+320 y+14 w600", "")
+    g.AddText("xs+320 y+8", "Choices, one per line:")
+    litemsE := g.AddEdit("xs+320 y+4 w400 r16 Multi WantReturn")
+    lusedT := g.AddText("xs+320 y+8 w600 r3 c505050", "")
+    tabs.UseTab()
+
+    tabs.GetPos(&tx, &ty, &tw, &th)
+    bSave := g.AddButton("x" tx " y" (ty + th + 10) " w120", "Save")
+    bClose := g.AddButton("x+6 w120", "Close")
+    statT := g.AddText("x+14 yp+5 w680", "")
+
+    fileDD.OnEvent("Change", SwitchFile)
+    search.OnEvent("Change", (*) => Filter())
+    lv.OnEvent("ItemSelect", (ctl, row, sel) => sel ? Load(row) : 0)
+    for c in [trigE, nameE, bodyE]
+        c.OnEvent("Change", Changed)
+    repCB.OnEvent("Click", Changed)
+    secDD.OnEvent("Change", MoveSection)
+    bNew.OnEvent("Click", NewTpl)
+    bCopy.OnEvent("Click", CopyTpl)
+    bDel.OnEvent("Click", DeleteTpl)
+    bAddBox.OnEvent("Click", (*) => BoxDlg(0))
+    bEditBox.OnEvent("Click", (*) => BoxDlg(boxLV.GetNext() ? boxLV.GetNext() : -1))
+    boxLV.OnEvent("DoubleClick", (ctl, row) => row ? BoxDlg(row) : 0)
+    bDelBox.OnEvent("Click", RemoveBox)
+    llv.OnEvent("ItemSelect", (ctl, row, sel) => sel ? LoadList(row) : 0)
+    litemsE.OnEvent("Change", ListChanged)
+    bNewList.OnEvent("Click", NewList)
+    bRenList.OnEvent("Click", RenameList)
+    bDelList.OnEvent("Click", DeleteList)
+    bSave.OnEvent("Click", (*) => Save())
+    bClose.OnEvent("Click", CloseEd)
+    g.OnEvent("Close", CloseEd)
+    g.OnEvent("Escape", CloseEd)
+
+    if !Open(ed.which) {
+        EditorWin := ""
+        g.Destroy()
+        return
+    }
+    fileDD.Value := ed.which
+    if !canTeam
+        fileT.Text := "The team file can't be reached right now, so only your own templates can be changed."
+    g.Show()
+    search.Focus()
+
+    ; -- loading a file
+    Open(which) {
+        file := which = 1 ? teamFile : MyTemplatesFile
+        if which = 1 && !canTeam {
+            g.Opt("+OwnDialogs")
+            MsgBox "The team templates file can't be reached right now (is OneDrive running?), so it can't be changed.", "Template editor", "Icon!"
+            return false
+        }
+        if which = 2 && !FileExist(MyTemplatesFile) && !MakeMineFile()
+            return false
+        try doc := EdRead(file)
+        catch as e {
+            g.Opt("+OwnDialogs")
+            MsgBox "Couldn't open " file ":`n" e.Message, "Template editor", "Icon!"
+            return false
+        }
+        ed.doc := doc, ed.which := which, ed.dirty := false, ed.cur := 0, ed.curList := 0
+        ; the other file's shortcuts, to warn about clashes
+        ed.others := {trigs: [], what: which = 1 ? "one of your own templates (my-templates.txt)" : "a team template"}
+        for t in TemplateList
+            if (which = 1) = (t.src = "mine")
+                ed.others.trigs.Push(t.trig)
+        fileT.Text := file
+        secs := []
+        for s in doc.sections
+            secs.Push(s.name)
+        secDD.Delete()
+        if secs.Length
+            secDD.Add(secs)
+        secDD.Enabled := secs.Length > 0
+        search.Value := ""
+        Filter()
+        FillLists()
+        Status()
+        return true
+    }
+
+    SwitchFile(*) {
+        want := fileDD.Value
+        if want = ed.which
+            return
+        if !AskSave() || !Open(want)
+            fileDD.Value := ed.which
+    }
+
+    ; Unsaved changes: Yes saves, No drops them, Cancel stays. True = go on.
+    AskSave() {
+        if !ed.dirty
+            return true
+        g.Opt("+OwnDialogs")
+        r := MsgBox("Save your changes first?", "Template editor", "YesNoCancel Icon? Default1")
+        if r = "Cancel"
+            return false
+        return r = "No" || Save()
+    }
+
+    ; -- the list on the left
+    Filter(keep := 0) {
+        q := StrLower(Trim(search.Value))
+        ed.rows := []
+        lv.Opt("-Redraw")
+        lv.Delete()
+        for i, t in ed.doc.tpls {
+            if q != "" && !InStr(StrLower(t.trig " " t.name " " t.body " " t.section), q)
+                continue
+            ed.rows.Push(i)
+            lv.Add(, t.trig, t.name, t.section)
+        }
+        lv.Opt("+Redraw")
+        row := 0
+        for r, i in ed.rows
+            if i = keep
+                row := r
+        if !row && ed.rows.Length
+            row := 1
+        if row {
+            lv.Modify(row, "Select Focus Vis")
+            Load(row)
+        } else
+            Load(0)
+    }
+
+    Load(row) {
+        ed.cur := row ? ed.rows[row] : 0
+        on := ed.cur > 0
+        for c in [trigE, nameE, bodyE, repCB, boxLV, bAddBox, bEditBox, bDelBox, bCopy, bDel]
+            c.Enabled := on
+        secDD.Enabled := on && ed.doc.sections.Length
+        if !on {
+            ed.loading := true
+            trigE.Value := "", nameE.Value := "", bodyE.Value := "", repCB.Value := 0
+            ed.loading := false
+            boxLV.Delete(), prevE.Value := "", probT.Text := ""
+            return
+        }
+        t := ed.doc.tpls[ed.cur]
+        ed.loading := true
+        trigE.Value := t.trig
+        nameE.Value := t.name
+        bodyE.Value := StrReplace(t.body, "`n", "`r`n")
+        repCB.Value := t.repeat
+        if ed.doc.sections.Length {
+            for i, s in ed.doc.sections
+                if s.name = t.section
+                    secDD.Choose(i)
+        }
+        ed.loading := false
+        Refresh()
+    }
+
+    ; What's in the boxes now, into the template and its line
+    Changed(*) {
+        if ed.loading || !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        nt := Trim(trigE.Value), nn := Trim(nameE.Value), nb := StrReplace(bodyE.Value, "`r`n", "`n"), nr := repCB.Value
+        if nt == t.trig && nn == t.name && nb == t.body && nr = t.repeat
+            return
+        t.trig := nt, t.name := nn, t.body := nb, t.repeat := nr
+        ed.doc.lines[t.line] := EdLine(t)
+        for r, i in ed.rows
+            if i = ed.cur
+                lv.Modify(r, , t.trig, t.name)
+        Dirty()
+        Refresh()
+    }
+
+    Refresh() {
+        t := ed.doc.tpls[ed.cur]
+        boxLV.Opt("-Redraw")
+        boxLV.Delete()
+        ed.boxes := []
+        seen := Map()
+        for tok in EdTokens(t.body) {
+            if seen.Has(tok.key)
+                continue
+            seen[tok.key] := true
+            b := BoxParse(SubStr(tok.code, 2, -1))
+            ed.boxes.Push(tok)
+            boxLV.Add(, b.name, BoxKindName(b), BoxDetails(b))
+        }
+        boxLV.Opt("+Redraw")
+        try prevE.Value := StrReplace(EdPreview(t.body, ed.doc), "`n", "`r`n")
+            . (t.repeat ? "`r`n(Add another puts more lines like this one in the same log)" : "")
+        catch
+            prevE.Value := "(can't show this yet: check the { } boxes)"
+        probT.Text := EdProblems(ed.doc, ed.cur, ed.others)
+    }
+
+    Dirty() {
+        ed.dirty := true
+        Status()
+    }
+
+    Status(msg := "") {
+        statT.Text := msg != "" ? msg : ed.dirty ? "Changes not saved yet." : ed.doc.tpls.Length " templates, " ed.doc.lists.Length " shared lists. Nothing changed yet."
+        bSave.Enabled := ed.dirty
+    }
+
+    ; -- new, copy, delete, move to another section
+    ; The line number a new template goes in at: the end of its section
+    InsertAt(section) {
+        last := 0, head := 0
+        for t in ed.doc.tpls
+            if t.section = section
+                last := t.line
+        for s in ed.doc.sections
+            if s.name = section
+                head := s.line
+        if last
+            return last + 1
+        if head
+            return head + 1
+        return ed.doc.lines.Length + 1
+    }
+
+    AddLine(at, line) {
+        ed.doc.lines.InsertAt(Min(at, ed.doc.lines.Length + 1), line)
+        EdScan(ed.doc)
+        Dirty()
+        search.Value := ""
+        for i, t in ed.doc.tpls
+            if t.line = at {
+                Filter(i)
+                return
+            }
+        Filter()
+    }
+
+    NewTpl(*) {
+        section := ed.cur ? ed.doc.tpls[ed.cur].section : ed.doc.sections.Length ? ed.doc.sections[ed.doc.sections.Length].name : ""
+        trig := ";new", n := 1
+        while UsedTrig(trig)
+            trig := ";new" (++n)
+        AddLine(InsertAt(section), trig " (New template) = Type the log here.")
+        trigE.Focus()
+        SendMessage 0xB1, 0, -1, trigE
+    }
+
+    CopyTpl(*) {
+        if !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        trig := t.trig "2", n := 2
+        while UsedTrig(trig)
+            trig := t.trig (++n)
+        c := {trig: trig, name: t.name != "" ? t.name " (copy)" : "", body: t.body, repeat: t.repeat}
+        AddLine(t.line + 1, EdLine(c))
+        trigE.Focus()
+        SendMessage 0xB1, 0, -1, trigE
+    }
+
+    UsedTrig(trig) {
+        for t in ed.doc.tpls
+            if t.trig = trig
+                return true
+        return false
+    }
+
+    DeleteTpl(*) {
+        if !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        g.Opt("+OwnDialogs")
+        if MsgBox("Delete " t.trig (t.name != "" ? " (" t.name ")" : "") "?`n`nIt's gone once you Save (a copy of the old file is kept in the backups).", "Template editor", "YesNo Icon? Default2") != "Yes"
+            return
+        ed.doc.lines.RemoveAt(t.line)
+        next := ed.cur
+        EdScan(ed.doc)
+        Dirty()
+        Filter(Min(next, ed.doc.tpls.Length))
+    }
+
+    MoveSection(*) {
+        if ed.loading || !ed.cur || !secDD.Value
+            return
+        t := ed.doc.tpls[ed.cur]
+        want := ed.doc.sections[secDD.Value].name
+        if want = t.section
+            return
+        line := ed.doc.lines[t.line]
+        ed.doc.lines.RemoveAt(t.line)
+        EdScan(ed.doc)
+        at := InsertAt(want)
+        ed.doc.lines.InsertAt(Min(at, ed.doc.lines.Length + 1), line)
+        EdScan(ed.doc)
+        Dirty()
+        for i, x in ed.doc.tpls
+            if x.line = at
+                Filter(i)
+    }
+
+    ; -- boxes
+    ; row 0 = add a new box at the cursor; -1 = the box the cursor is in
+    BoxDlg(row) {
+        if !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        raw := StrReplace(StrReplace(bodyE.Value, "`r`n", "`n"), "`n", "`r`n")
+        selA := 0, selB := 0
+        DllCall("SendMessage", "Ptr", bodyE.Hwnd, "UInt", 0xB0, "UInt*", &selA, "UInt*", &selB)   ; EM_GETSEL
+        tok := ""
+        if row = -1 {
+            ; the box the cursor is in, if any
+            ; the cursor's place counted without the line breaks' extra character
+            StrReplace(SubStr(raw, 1, selA), "`r`n", , , &breaks)
+            at := selA - breaks
+            for x in EdTokens(StrReplace(raw, "`r`n", "`n"))
+                if at >= x.pos - 1 && at <= x.pos - 1 + x.len
+                    tok := x
+            if !tok {
+                g.Opt("+OwnDialogs")
+                MsgBox "Pick a box in the list first (or click inside one in the wording).", "Template editor"
+                return
+            }
+        } else if row > 0
+            tok := ed.boxes[row]
+        b := tok ? BoxParse(SubStr(tok.code, 2, -1)) : BoxParse("")
+        names := []
+        for l in ed.doc.lists
+            names.Push(l.name)
+        for k in Lists
+            if !HasVal(names, k)
+                names.Push(k)
+        BoxForm(g, b, names, tok ? "" : NamesInUse(t.body), Done)
+
+        Done(code) {
+            body := StrReplace(bodyE.Value, "`r`n", "`n")
+            if tok {
+                nb := BoxParse(SubStr(code, 2, -1))
+                ; the first one is replaced; any other spot with the same box gets the new name
+                body := SubStr(body, 1, tok.pos - 1) code SubStr(body, tok.pos + tok.len)
+                if nb.name !== tok.key {
+                    for x in EdTokens(body)
+                        if x.key == tok.key
+                            body := StrReplace(body, x.code, "{" nb.name SubStr(x.code, 2 + StrLen(x.key)), , , 1)
+                }
+                bodyE.Value := StrReplace(body, "`n", "`r`n")
+                Changed()
+                return
+            }
+            ; a new box goes where the cursor was
+            raw := StrReplace(body, "`n", "`r`n")
+            bodyE.Value := SubStr(raw, 1, selA) code SubStr(raw, selB + 1)
+            Changed()
+            bodyE.Focus()
+            SendMessage 0xB1, selA + StrLen(code), selA + StrLen(code), bodyE
+        }
+    }
+
+    NamesInUse(body) {
+        names := Map()
+        names.CaseSense := false
+        for x in EdTokens(body)
+            names[x.key] := true
+        return names
+    }
+
+    RemoveBox(*) {
+        row := boxLV.GetNext()
+        if !ed.cur || !row
+            return
+        key := ed.boxes[row].key
+        body := StrReplace(bodyE.Value, "`r`n", "`n")
+        for x in EdTokens(body)
+            if x.key == key
+                body := StrReplace(body, x.code, "", , , 1)
+        body := RegExReplace(body, " {2,}", " ")
+        bodyE.Value := StrReplace(body, "`n", "`r`n")
+        Changed()
+    }
+
+    ; -- shared lists
+    FillLists(keep := 0) {
+        llv.Opt("-Redraw")
+        llv.Delete()
+        for l in ed.doc.lists
+            llv.Add(, "@" l.name, l.items.Length)
+        llv.Opt("+Redraw")
+        if ed.doc.lists.Length {
+            row := keep && keep <= ed.doc.lists.Length ? keep : 1
+            llv.Modify(row, "Select Focus Vis")
+            LoadList(row)
+        } else
+            LoadList(0)
+    }
+
+    LoadList(row) {
+        ed.curList := row
+        litemsE.Enabled := row > 0, bRenList.Enabled := row > 0, bDelList.Enabled := row > 0
+        ed.loading := true
+        if !row {
+            lnameT.Text := "No shared lists in this file yet. New list makes one.", litemsE.Value := "", lusedT.Text := ""
+            ed.loading := false
+            return
+        }
+        l := ed.doc.lists[row]
+        s := ""
+        for it in l.items
+            s .= it "`r`n"
+        litemsE.Value := s
+        ed.loading := false
+        lnameT.Text := "@" l.name "   (in a box it's written  {Table: @" l.name "})"
+        used := UsedBy(l.name)
+        lusedT.Text := used != "" ? "Used by: " used : "Not used by any template in this file yet."
+    }
+
+    UsedBy(name) {
+        used := ""
+        for t in ed.doc.tpls
+            if RegExMatch(t.body, "i)[:|]\s*@\Q" name "\E\s*[|}]")
+                used .= (used = "" ? "" : ", ") t.trig
+        return used
+    }
+
+    ListChanged(*) {
+        if ed.loading || !ed.curList
+            return
+        l := ed.doc.lists[ed.curList]
+        items := []
+        for it in StrSplit(StrReplace(litemsE.Value, "`r`n", "`n"), "`n")
+            if Trim(it) != ""
+                items.Push(Trim(StrReplace(StrReplace(StrReplace(it, "|"), "{"), "}")))
+        l.items := items
+        ed.doc.lines[l.line] := EdListLine(l)
+        llv.Modify(ed.curList, , "@" l.name, items.Length)
+        Dirty()
+        if ed.cur
+            Refresh()
+    }
+
+    NewList(*) {
+        g.Opt("+OwnDialogs")
+        ib := InputBox("Name of the new list (one word, like tables or pits):", "New shared list", "w360 h140")
+        if ib.Result != "OK"
+            return
+        name := Trim(ib.Value, " @`t")
+        if !RegExMatch(name, "^[\w-]+$") {
+            MsgBox "A list name is one word: letters, numbers, - or _.", "Template editor", "Icon!"
+            return
+        }
+        for l in ed.doc.lists
+            if l.name = name {
+                MsgBox "There's already a list called @" name ".", "Template editor", "Icon!"
+                return
+            }
+        ; after the last list, or before the first template
+        at := ed.doc.lists.Length ? ed.doc.lists[ed.doc.lists.Length].line + 1
+            : ed.doc.tpls.Length ? ed.doc.tpls[1].line : ed.doc.lines.Length + 1
+        ed.doc.lines.InsertAt(Min(at, ed.doc.lines.Length + 1), "@" name " = ")
+        EdScan(ed.doc)
+        Dirty()
+        for i, l in ed.doc.lists
+            if l.name = name
+                FillLists(i)
+        litemsE.Focus()
+    }
+
+    RenameList(*) {
+        if !ed.curList
+            return
+        l := ed.doc.lists[ed.curList]
+        g.Opt("+OwnDialogs")
+        ib := InputBox("New name for @" l.name " (every template that uses it is changed too):", "Rename list", "w380 h150", l.name)
+        if ib.Result != "OK"
+            return
+        name := Trim(ib.Value, " @`t")
+        if name == l.name
+            return
+        if !RegExMatch(name, "^[\w-]+$") {
+            MsgBox "A list name is one word: letters, numbers, - or _.", "Template editor", "Icon!"
+            return
+        }
+        old := l.name
+        l.name := name
+        ed.doc.lines[l.line] := EdListLine(l)
+        for t in ed.doc.tpls {
+            nb := RegExReplace(t.body, "i)([:|]\s*)@\Q" old "\E(?=\s*[|}])", "$1@" name)
+            if nb != t.body {
+                t.body := nb
+                ed.doc.lines[t.line] := EdLine(t)
+            }
+        }
+        EdScan(ed.doc)
+        Dirty()
+        FillLists(ed.curList)
+        Filter(ed.cur)
+    }
+
+    DeleteList(*) {
+        if !ed.curList
+            return
+        l := ed.doc.lists[ed.curList]
+        g.Opt("+OwnDialogs")
+        if (used := UsedBy(l.name)) != "" {
+            MsgBox "@" l.name " is used by " used ". Change those boxes first, then delete the list.", "Template editor", "Icon!"
+            return
+        }
+        if MsgBox("Delete the list @" l.name "?", "Template editor", "YesNo Icon? Default2") != "Yes"
+            return
+        ed.doc.lines.RemoveAt(l.line)
+        EdScan(ed.doc)
+        Dirty()
+        FillLists(ed.curList)
+        Filter(ed.cur)
+    }
+
+    ; -- saving and closing
+    Save() {
+        g.Opt("+OwnDialogs")
+        probs := ""
+        for i, t in ed.doc.tpls
+            if (p := EdProblems(ed.doc, i, ed.others)) != ""
+                probs .= t.trig ":  " StrReplace(p, "`n", "`n      ") "`n"
+        if probs != "" && MsgBox("These need fixing:`n`n" probs "`nWatchlog skips a template with a problem (and says why) until it's fixed. Save anyway?", "Template editor", "YesNo Icon! Default2") != "Yes"
+            return false
+        if ed.which = 1 && Cfg["SharedTemplates"] != "" && !ed.teamOk {
+            if MsgBox("This is the team's templates file. Saving changes the wording on every bay once OneDrive syncs it.`n`nSave it?", "Template editor", "YesNo Icon? Default1") != "Yes"
+                return false
+            ed.teamOk := true
+        }
+        if FileTimeOf(ed.doc.file) != ed.doc.time
+            && MsgBox("Someone (or OneDrive) changed this file since the editor opened it.`n`nSave over it anyway? (No = keep theirs: close the editor and open it again.)", "Template editor", "YesNo Icon! Default2") != "Yes"
+            return false
+        ver := ed.which = 1 ? EdBumpVersion(ed.doc) : ""
+        try EdWrite(ed.doc)
+        catch as e {
+            MsgBox "Couldn't save " ed.doc.file ":`n" e.Message "`n`nIf OneDrive is syncing, press Save again in a moment.", "Template editor", "Icon!"
+            return false
+        }
+        ed.dirty := false, ed.saved := true
+        Activity("Template editor: saved " ed.doc.file " (" ed.doc.tpls.Length " templates" (ver != "" ? ", wording version " ver : "") ")")
+        Status("Saved" (ver != "" ? " (wording version " ver ")" : "") ". The new wording works as soon as you close the editor.")
+        return true
+    }
+
+    CloseEd(*) {
+        global EditorWin
+        if !AskSave()
+            return true
+        EditorWin := ""
+        g.Destroy()
+        if ed.saved {
+            Tip("Loading the new templates...", 1500, true)
+            Sleep 300
+            ReloadOnce()
+        }
+    }
+}
+
+; The box form: what a box is called, what goes in it, and the extras.
+; done(code) gets the finished box, like {Amount: money | thousands}.
+BoxForm(owner, b, listNames, inUse, done) {
+    d := Gui("+AlwaysOnTop +Owner" owner.Hwnd, b.name = "" ? "Add a box" : "Box: " b.name)
+    d.SetFont("s10", "Segoe UI")
+    d.MarginX := 16, d.MarginY := 12
+    d.AddText("w520", "Name (shown above the box on the form):")
+    nameE := d.AddEdit("w300", b.name)
+    d.AddText("w520 y+12", "What goes in it:")
+    names := [], idx := 1
+    for i, k in BoxKinds() {
+        names.Push(k[2])
+        if k[1] = b.kind
+            idx := i
+    }
+    kindDD := d.AddDropDownList("w360 r12 Choose" idx, names)
+
+    d.SetFont("s10 bold")
+    d.AddText("xm y+14", "Choices")
+    d.SetFont("s10 norm")
+    listT := d.AddText("xm y+6", "Shared list:")
+    choices := listNames.Clone()
+    lidx := 0
+    for i, n in choices
+        if n = b.list
+            lidx := i
+    if !lidx && b.list != ""
+        choices.Push(b.list), lidx := choices.Length
+    listDD := d.AddDropDownList("x+8 yp-3 w200" (lidx ? " Choose" lidx : ""), choices)
+    itemsT := d.AddText("xm y+10 w520", "Choices, one per line:")
+    s := ""
+    for it in b.items
+        s .= it "`r`n"
+    itemsE := d.AddEdit("xm w520 r6 Multi WantReturn", s)
+    pickCB := d.AddCheckbox("xm" (b.pick ? " Checked" : ""), "Must pick one of the choices (no typing your own)")
+    fromCB := d.AddCheckbox("xm" (b.fromcopy ? " Checked" : ""), "Open on the job title found in the copied text")
+    minsT := d.AddText("xm y+8", "Plus this many minutes:")
+    minsE := d.AddEdit("x+8 yp-3 w60 Number", b.mins ? b.mins : "")
+    thouCB := d.AddCheckbox("xm y+8" (b.thousands ? " Checked" : ""), "A decimal point means thousands (3.3 becomes 3,300)")
+
+    d.SetFont("s10 bold")
+    d.AddText("xm y+14", "Extras (optional)")
+    d.SetFont("s10 norm")
+    capsCB := d.AddCheckbox("xm y+6" (b.caps ? " Checked" : ""), "Capitals in machine numbers (b1410 becomes B1410)")
+    upperCB := d.AddCheckbox("xm" (b.upper ? " Checked" : ""), "ALL CAPITALS (rn becomes RN)")
+    d.AddText("xm y+10", "If it's left empty, leave:")
+    blankDD := d.AddDropDownList("x+8 yp-3 w150 Choose" b.blankMode, ["XX", "nothing", "this text:"])
+    blankE := d.AddEdit("x+8 yp w140", b.blank)
+    d.AddText("xm y+10", "When filled in, put in front:")
+    prefixE := d.AddEdit("x+8 yp-3 w70", b.prefix)
+    d.AddText("x+12 yp+3", "and after:")
+    suffixE := d.AddEdit("x+8 yp-3 w70", b.suffix)
+    d.AddText("xm y+10", "Put in front of a number only:")
+    numE := d.AddEdit("x+8 yp-3 w120", b.numprefix)
+    d.AddText("xm y+10", "Fill in")
+    condValE := d.AddEdit("x+8 yp-3 w100", b.condVal)
+    d.AddText("x+8 yp+3", "when another box starts with")
+    condWhenE := d.AddEdit("x+8 yp-3 w80", b.condWhen)
+
+    d.SetFont("s9 c707070")
+    d.AddText("xm y+14", "In the wording it's written:")
+    d.SetFont("s10 c000000", "Consolas")
+    codeE := d.AddEdit("xm w520 r2 ReadOnly -TabStop BackgroundF1F5F5")
+    d.SetFont("s10", "Segoe UI")
+    okB := d.AddButton("xm y+12 w120 Default", "OK")
+    d.AddButton("x+6 w120", "Cancel").OnEvent("Click", Cancel)
+    okB.OnEvent("Click", OK)
+    d.OnEvent("Escape", Cancel)
+    d.OnEvent("Close", Cancel)
+    for c in [nameE, itemsE, minsE, blankE, prefixE, suffixE, numE, condValE, condWhenE]
+        c.OnEvent("Change", Update)
+    for c in [kindDD, listDD, blankDD]
+        c.OnEvent("Change", Update)
+    for c in [pickCB, fromCB, thouCB, capsCB, upperCB]
+        c.OnEvent("Click", Update)
+    owner.Opt("+Disabled")
+    Update()
+    d.Show()
+    nameE.Focus()
+
+    ; Reads the form into the box, greys out what doesn't apply
+    Read() {
+        b.name := Trim(StrReplace(StrReplace(StrReplace(StrReplace(nameE.Value, ":"), "{"), "}"), "|"))
+        b.kind := BoxKinds()[kindDD.Value][1]
+        b.list := listDD.Text
+        b.items := []
+        for it in StrSplit(StrReplace(itemsE.Value, "`r`n", "`n"), "`n")
+            if (it := Trim(Clean(it))) != ""
+                b.items.Push(it)
+        b.pick := pickCB.Value, b.fromcopy := fromCB.Value
+        b.mins := IsInteger(minsE.Value) ? Integer(minsE.Value) : 0
+        b.thousands := thouCB.Value, b.caps := capsCB.Value, b.upper := upperCB.Value
+        b.blankMode := blankDD.Value, b.blank := Clean(blankE.Value)
+        b.prefix := Clean(prefixE.Value), b.suffix := Clean(suffixE.Value), b.numprefix := Clean(numE.Value)
+        b.condVal := Clean(condValE.Value), b.condWhen := Trim(StrReplace(Clean(condWhenE.Value), "="))
+        return b
+    }
+
+    Clean(s) => StrReplace(StrReplace(StrReplace(s, "|"), "{"), "}")
+
+    Update(*) {
+        Read()
+        listy := BoxListy(b.kind)
+        listT.Enabled := listDD.Enabled := b.kind = "shared"
+        itemsT.Enabled := itemsE.Enabled := listy
+        itemsT.Text := b.kind = "shared" ? "Extra choices besides the list (optional), one per line:" : b.kind = "next" ? "Steps, in order, one per line:" : "Choices, one per line:"
+        pickCB.Enabled := fromCB.Enabled := listy
+        minsT.Enabled := minsE.Enabled := b.kind = "now"
+        thouCB.Enabled := b.kind = "money"
+        blankE.Enabled := blankDD.Value = 3
+        codeE.Value := BoxBuild(b)
+    }
+
+    OK(*) {
+        Read()
+        d.Opt("+OwnDialogs")
+        err := ""
+        if b.name = ""
+            err := "Give the box a name, like Machine or Amount."
+        else if StrLower(b.name) = "repeat"
+            err := "repeat is a special word. Pick another name."
+        else if (b.kind = "list" || b.kind = "next") && !b.items.Length
+            err := "Type at least one choice."
+        else if b.kind = "shared" && b.list = ""
+            err := "Pick a shared list (make one on the Shared lists tab first)."
+        if err != "" {
+            MsgBox err, "Box", "Icon!"
+            return
+        }
+        if IsObject(inUse) && inUse.Has(b.name)
+            && MsgBox("This log already has a box called " b.name ". Both spots get the same answer.`n`nUse the same name anyway?", "Box", "YesNo Icon? Default2") != "Yes"
+            return
+        code := BoxBuild(b)
+        Cancel()
+        done(code)
+    }
+
+    Cancel(*) {
+        owner.Opt("-Disabled")
+        d.Destroy()
+        try WinActivate "ahk_id " owner.Hwnd
+    }
+}
+
+; Makes my-templates.txt with its notes at the top (the first time)
+MakeMineFile() {
+    if FileExist(MyTemplatesFile)
+        return true
+    text := "
+    (
+# =====================================================================
+#  MY TEMPLATES - your own extra templates
+#  These go on top of the team's templates, for you only. Same format
+#  as templates.txt (the notes at the top of it explain it all).
+#  If the team file already uses a trigger, yours is skipped, so the
+#  team wording always wins. Save this file and the script reloads.
+#  The template editor (Ctrl+Alt+E) changes this file for you too.
+#
+#  Example (take the # off the start of the line to use it):
+#  ;mynote (My note) = Operator note at {Time: now}: {Note}
+# =====================================================================
+
+    )"
+    try FileAppend text, MyTemplatesFile, "UTF-8"
+    catch as e {
+        MsgBox "Couldn't make my-templates.txt:`n" e.Message, "Watchlog", "Icon!"
+        return false
+    }
+    WatchTimes[MyTemplatesFile] := FileTimeOf(MyTemplatesFile)
+    return true
+}

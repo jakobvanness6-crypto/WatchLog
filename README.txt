@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.4.3  -  README
+  WATCHLOG  v3.10.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -8,6 +8,10 @@ background: its icon, a white log page with an eye on a teal square,
 sits in the tray near the clock. You type a short trigger like ;jack
 and it turns into a finished log entry. It also types logins, opens your work apps at the
 start of a shift, closes them at the end, and keeps quick notes.
+
+Click the teal icon (or press Ctrl+Alt+M) for the Watchlog home window:
+every feature as a button with a picture, each showing its shortcut.
+Right-click the icon for the menu (section 11).
 
 Can't remember a trigger?  Ctrl+Alt+Space  finds a template by name or
 any word in it (see section 3).
@@ -37,7 +41,7 @@ CONTENTS
  13. Team templates and your own templates
  14. Settings window and settings.ini reference
  15. Security, privacy and the activity log
- 16. Setting it up on another PC, or for a new operator
+ 16. Setting it up on another PC, or for a new operator (the exe)
  17. Troubleshooting
  18. Rules worth keeping
 
@@ -45,9 +49,13 @@ CONTENTS
 -----------------------------------------------------------------------
  1. FILES
 -----------------------------------------------------------------------
-These sit in the program folder (Documents\AutoHotkey on OneDrive):
+Watchlog.exe installs itself to %LOCALAPPDATA%\Programs\Watchlog and
+keeps these files in Documents\Watchlog (on OneDrive). The script
+version keeps them next to Watchlog.ahk (for example
+Documents\AutoHotkey). Either way:
 
-  Watchlog.ahk        The program. You shouldn't need to edit it.
+  Watchlog.exe        The program (or Watchlog.ahk, the script version).
+                      You shouldn't need to edit it.
   Watchlog.ico        The icon. Without it the tray shows a green H.
   templates.txt       The wording of every template. Edit freely. (If
                       the team's shared copy is set up, that one is
@@ -96,6 +104,9 @@ couple of seconds. No need to press anything.
                     in it, then Enter. See section 3.
   Ctrl+Alt+H        Cheat sheet: every template, login, app and hotkey
                     on this PC.
+  Ctrl+Alt+M        Watchlog home (v3.10.0): one window with a button for
+                    everything (templates, shift, logins, setup) and how
+                    this PC is doing. Clicking the tray icon opens it too.
 
   Ctrl+Alt+L        Start of shift. Opens the Bally apps (AlertGrid,
                     SDS, CMP) first, skips any already open, then the
@@ -109,6 +120,9 @@ couple of seconds. No need to press anything.
                     its login screen.
   Ctrl+Alt+J        Shift journal: how many of each log you've done this
                     shift, with a Copy summary button. See section 10.
+  Ctrl+Alt+Shift+S  Save where your windows are right now (window layout).
+  Ctrl+Alt+W        Put the windows back where you saved them. See the
+                    WINDOW LAYOUT notes in section 16.
 
   Ctrl+Alt+S        SDS: switch to it, minimise it if it's already in
                     front, or open it if it isn't running.
@@ -124,12 +138,36 @@ couple of seconds. No need to press anything.
   Ctrl+Alt+Q        Quick note. Type a note starting with a tag like
                     #todo, #incident or #idea. It's saved with the date
                     and time in Documents\Quick Notes.md.
-  Ctrl+Alt+O        Open all your quick notes in Notepad.
+  Ctrl+Alt+S, C ... (v3.9.0) The SDS and CMP app keys now also offer to log you in
+                    once the program is in front: "Log in to SDS as ...?" Enter =
+                    yes, Esc (or 6 seconds) = no. It uses the saved login locked to
+                    that program (your ;prd). Only say yes on the login screen.
+  Ctrl+Alt+L        (v3.9.0) at the end it asks "Sign in to SDS, CMP, Alert Grid
+                    now?" and, on yes, signs into the programs it just opened.
+                    [StartOfShift] SignIn=no turns the question off.
+  Tray > Advanced > Choose my own update folder   (v3.9.0; also Settings > Updates) a folder of your
+                    own, so you can test a build without the team getting it.
+  Ctrl+Alt+A        Clear ALL alerts in Alert Grid (v3.8.0). Brings Alert Grid to
+                    the front, does Ctrl+A, right-click, Acknowledge as received,
+                    Submit and OK, then puts you back where you were. It clears
+                    everything in the list, so look first. Never types a password.
+  Caps Lock         (v3.9.5) With the Caps Lock guard on, the plain Caps Lock key does
+                    nothing, so when Alert Grid is open it clears all the alerts (same
+                    as Ctrl+Alt+A). Caps Lock still turns itself off when it is on.
+                    [AlertGrid] CapsLockClears=no in settings.ini turns this off.
+  Ctrl+Alt+Shift+A  Teach it the clicks, once per PC: clear alerts by hand and press
+                    F8 (or Ctrl+Alt+Shift+A again if F8 needs the Fn key) over a row,
+                    the menu item, Submit, the final OK and the little button that clears the
+                    acknowledged alerts (Ctrl+Alt+Esc cancels).
+  Ctrl+Alt+O        Show all your quick notes in a window that is always up to
+                    date (Open in Notepad button inside). v3.7.1
                     (Ctrl+Alt+T used to find notes by tag. It was
                     removed in v2.7 and T is now Teams.)
 
-  Ctrl+Alt+E        Edit templates.txt in Notepad (or my-templates.txt,
-                    when the team's shared file is in use).
+  Ctrl+Alt+E        The template editor (v3.10.0): change wording, add
+                    templates and boxes, change lists like @tables,
+                    without Notepad. See section 12. (Notepad is still
+                    there: tray menu > Advanced.)
   Ctrl+Alt+I        Window info. Shows the title and program name of the
                     window in front and copies them. Use it when you
                     need a Window= line in settings.ini.
@@ -222,9 +260,18 @@ were typing.
       "now" boxes     already filled with the current time
       "now+20" boxes  filled with the time 20 minutes from now
       clip boxes      if you copied an employee # (4-8 digits) first,
-                      it's already filled in
+                      it's already filled in (a longer copy works too, if
+                      it has just one number like that in it)
+      ;audit type     if the text you copied has a job title in it (Pit
+                      Manager, Dealer...), the type box opens on it
+      ;face           the alert # (8 digits) and the match % you copied
+                      from the facial rec page in Edge fill themselves in,
+                      in either order. Details under "Facial rec copies".
       list boxes      pick from the list, or type over it, depending
-                      on the template. Typing just the number picks the
+                      on the template. Typing the start of an item fills
+                      in the rest (d becomes Dealer, ca becomes Cage
+                      Cashier); keep typing to replace it, Backspace
+                      to remove it. Typing just the number picks the
                       item ending in it: 202 becomes FB202
       ATM amount      (;mfill) fills in 100,000 when you pick an ATM;
                       type over it if it's different
@@ -270,6 +317,7 @@ Forms (open a form):
   ;found        Abandoned credits printed off and taken to Security:
                 amount, machine
   ;aml          AML alert: alert #, machine, time (now)
+  ;firm         NRT firmware check: department/title, location/NRT #, DUB # (with the fixed shot note)
   ;maint        Machine maintenance
   ;countstep    Soft count step (time now, opens on the next step)
   ;counttables  Soft count: table totals
@@ -289,6 +337,7 @@ Quick (paste straight away):
   ;selfex       Self-exclusion: patron taken into PlaySmart
   ;inventory    Inventory transfer, Delta Podium to Main Bank
   ;drop         Table drop
+  ;man          Garbage sweep (EVS Attendant escorted into Cage Mantrap)
   ;close        Table closing (tray lids, tokes)
   ;destroy      Card destruction
 
@@ -350,15 +399,26 @@ into Credential Manager, deletes it from the file and tells you.
 -----------------------------------------------------------------------
  7. HOURLY LOGIN REMINDER
 -----------------------------------------------------------------------
+SDS SIGNS BACK IN BY ITSELF (v3.10.1)
+SDS logs you out an hour after you sign in. When you sign in to SDS with
+its saved login (by typing the shortcut, the Yes/No question, or Ctrl+Alt+L),
+Watchlog starts a 62-minute countdown. When it runs out and SDS is back on
+its login screen, SDS comes to the front, the saved login is typed, and the
+window you were in is put back. If SDS still says Welcome it looks again
+every minute (up to 6 times). Because of this, the "log in again" pop-up
+is not shown for the SDS login. Settings > Logins has the tick box and the
+number of minutes (settings.ini: [SDS] ResignMinutes=62, 0 = off). Nothing
+is typed unless SDS is really on its login screen.
+
 For an app that signs you out every hour. In tray menu > Settings, edit
 that login and put 55 in "remind me to log in again after this many
 minutes". (In settings.ini it's a Remind=55 line under that login.)
 
 Each time you use that login, a 55-minute countdown starts. When it runs
-out you get a short beep and a small pop-up in the bottom-right corner
+out you get a small pop-up in the bottom-right corner
 saying it's time to log in again, with the trigger to use. It doesn't
 take the keyboard away from the window you're typing in, and it only
-beeps once, so it's easy to miss if you're away from the screen. Press
+makes no sound unless you tick "Beep when the login reminder pops up" in Settings (v3.9.4), so it's easy to miss if you're away. Press
 Esc (from any window) or click OK to close it, or just log in again:
 using the login closes the pop-up and restarts the countdown.
 
@@ -485,32 +545,60 @@ notice says so once.
 -----------------------------------------------------------------------
  11. TRAY MENU  (right-click the Watchlog icon near the clock)
 -----------------------------------------------------------------------
-  Watchlog v3.4.3 (date)        Which version is running, whether
+A plain click on the icon opens the Watchlog home window (Ctrl+Alt+M).
+Right-click it for this menu (v3.10.0: each item has a small picture,
+and the less-used items sit in sub-menus):
+
+  Watchlog v3.10.0 (date)       Which version is running, whether
                                 it's up to date, the program check
                                 code, and where the templates come from
+  Watchlog home                 Same as Ctrl+Alt+M (bold: a click on
+                                the icon does this)
   Find a template               Same as Ctrl+Alt+Space
   Cheat sheet                   Same as Ctrl+Alt+H
   Shift journal                 Same as Ctrl+Alt+J
+  Quick notes                   Same as Ctrl+Alt+O
   Time saved                    How much typing Watchlog has saved
                                 (see TIME SAVED in section 10)
-  Settings (logins, templates, journal)   Section 14
-  Security and status           What's kept where, checked live (15)
-  Activity log                  Opens the activity log (section 15)
-  Make a copy to share          A clean copy for a new operator (16)
-  Edit my templates             Opens my-templates.txt (makes it the
-                                first time)
-  Edit templates                Opens templates.txt ("Edit team
-                                templates" when the shared file is set)
-  Edit settings file (advanced) Opens settings.ini in Notepad
-  Open script folder            Opens the program folder
+  Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
+  Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
+                                clicks (Ctrl+Alt+Shift+A)
+  Windows >                     Save window layout, Put windows back,
+                                Caps Lock guard (ticked = on)
+  Template editor               Same as Ctrl+Alt+E (section 12)
+  Settings                      Section 14
+  Tutorial                      The guided tour again
+  Advanced >                    Security and status (15), Activity log
+                                (15), Make a copy to share (16), Edit
+                                templates / my templates / settings in
+                                Notepad, Open Watchlog folder, Choose my
+                                own update folder, Pause all shortcuts,
+                                Reload
+  Exit Watchlog                 Closes it (start it again from the
+                                Start menu)
+
+WATCHLOG HOME  (click the icon, or Ctrl+Alt+M)
+  Big buttons in four groups: Logs (find a template, cheat sheet,
+  journal, quick notes, time saved), Shift (start, end, log out of SDS,
+  clear Alert Grid, put windows back), Logins (one button per saved
+  login) and Set up (template editor, settings, tutorial, security and
+  status, save window layout). Each button shows its shortcut, so new
+  operators learn them as they go. It closes when you press a button,
+  and anything that types goes into the window you were in before.
+  A login button brings up the program its login is locked to; a login
+  that isn't locked asks which window first ("Type the ;jakob login
+  into this window?").
+  Along the bottom: whether this PC is up to date, the templates and
+  wording version, whether Alert Grid is taught, this shift's time
+  saved, and ticks for the Caps Lock guard and pausing all shortcuts.
 
 The tray menu is the backup if another program ever grabs a Ctrl+Alt
 hotkey. "Change a login password" moved into Settings in v3.0.
 
 WHICH VERSION AM I RUNNING?  AM I UP TO DATE?
   Hover over the icon, or look at the top of the tray menu. Every time
-  the script loads it also shows "Watchlog v3.4.3 running" in the
+  the script loads it also shows "Watchlog v3.7.0 running" in the
   bottom-right corner for a few seconds.
 
   The templates file has a line near the top, "# Program version:
@@ -542,7 +630,33 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
-Ctrl+Alt+E (or tray menu > Edit templates) opens it. Save and the
+THE TEMPLATE EDITOR  (Ctrl+Alt+E, v3.10.0)
+  The easy way. At the top, pick the file: the team's templates (or
+  templates.txt) or your own my-templates.txt.
+  Templates tab: the list on the left (type in the search box to find
+  one). Pick one and change its shortcut, name, section or wording on
+  the right. The boxes in it are listed underneath: Add a box opens a
+  small form (name, what goes in it: text, a list, a shared list,
+  steps, the time now, a time, money, a percentage, a copied number,
+  remember last time, facial rec alert # or match %, plus extras like
+  capitals, what to leave when empty, something in front or after).
+  The new box goes where the cursor is in the wording. Double-click a
+  box (or Change box) to change it; Remove box takes it out.
+  "How it will look" shows the finished log; anything wrong (a clash
+  with another shortcut, a missing } or list) shows in red.
+  New, Copy and Delete under the list. Several in one log = {repeat}.
+  Shared lists tab: pick @tables (or any list), one choice per line.
+  Rename changes every template that uses it.
+  Save writes the file: it keeps a copy of the old one first
+  (%LOCALAPPDATA%\Watchlog\template backups, the last 20) and moves
+  the "# Wording version" line on. Saving the team's file asks once,
+  since it changes every bay. If someone else saved the file while you
+  had it open, it asks before writing over theirs. The new wording
+  works as soon as you close the editor. Shortcuts don't fire inside
+  the editor, so typing ;jack there is safe.
+
+BY HAND IN NOTEPAD
+Tray menu > Advanced > Edit templates in Notepad opens it. Save and the
 script reloads by itself. The same rules apply to my-templates.txt and
 to the team's shared file. The top of templates.txt has the full
 instructions; the short version:
@@ -569,6 +683,11 @@ Blanks (any of these makes the template a form):
   {Amount: money}              10000 becomes 10,000
   {Match: percent}             67 becomes 67%
   {Employee #: clip}           fills in a copied employee #
+  {Type: fromcopy | A | B}     opens the list on the item found in the
+                               copied text
+  {Alert #: alertcopy}         the 8-digit alert # copied in Edge (used
+                               by ;face), checked against the last one
+  {Match: matchcopy}           the match % copied in Edge (used by ;face)
   {Bay: last}                  remembers what you typed last time
   {Step: next | A | B | C}     opens on the step after last time's
   {Machine: blank=AXXXX}       what to leave if the box is empty
@@ -588,7 +707,7 @@ Blanks (any of these makes the template a form):
 
 Shared lists: a line starting with @ near the top of the file is a list
 any blank can use. The table list is written once:
-  @tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206
+  @tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206 | RY301 | MP302 | BJ303 | BJ304 | BJ305 | RO306
 and ;fill, ;cards, ;auto and ;player all use it, so adding a table is
 one edit. If a template uses a list that doesn't exist, the script
 tells you which line.
@@ -629,14 +748,15 @@ TEAM TEMPLATES (one shared file for everyone)
     (like 47E3-2566). Two PCs with the same check code have exactly the
     same wording, which makes "is everyone on the new wording?" a quick
     check.
-  - Ctrl+Alt+E opens your my-templates.txt instead, so nobody edits the
-    team file by accident. Tray menu > Edit team templates opens it, and
-    SharePoint's permissions decide whether you can save it.
+  - The template editor (Ctrl+Alt+E) can change the team file; saving it
+    asks first, and SharePoint's permissions decide whether you can.
+    Tray menu > Advanced > Edit team templates in Notepad opens it too.
   Tip: right-click the synced folder > "Always keep on this device".
 
 YOUR OWN TEMPLATES (my-templates.txt)
-  Tray menu > Edit my templates makes my-templates.txt in the program
-  folder the first time. Same format as templates.txt. These are added
+  In the template editor, pick "My own templates" at the top (or tray
+  menu > Advanced > Edit my templates in Notepad). It makes
+  my-templates.txt in the program folder the first time. Same format as templates.txt. These are added
   on top of the team's (or your templates.txt), for you only:
   - A trigger the team file already uses is skipped (and you're told),
     so the team wording always wins.
@@ -651,16 +771,28 @@ YOUR OWN TEMPLATES (my-templates.txt)
 -----------------------------------------------------------------------
 Tray menu > Settings covers the everyday settings without editing the
 file. It's also the Welcome window the first time Watchlog runs on
-a PC.
-  Logins          add, edit, remove, change password (section 6)
-  Templates       the team's shared file: Browse / Clear (section 13)
-  Shift journal   what's saved, and when old shift files are deleted
-                  (section 10)
-  Windows         "Start Watchlog when I sign in to Windows" adds
-                  or removes a shortcut in your Startup folder
-Save writes settings.ini and reloads. Cancel changes nothing.
+a PC. Since v3.10.0 it has tabs:
+  Logins          add, edit, remove, change password (section 6), and
+                  the reminder beep
+  Templates       the team's shared file: Browse / Clear (section 13),
+                  and a button for the template editor
+  Start / end of shift
+                  sign in to the Bally programs after Ctrl+Alt+L (SignIn),
+                  put the windows back after it (AfterStart), how long it
+                  waits for the programs (LaunchWait), LaunchWork.bat,
+                  the Google account (ChromeAccount), and what end of
+                  shift closes ([EndOfShift] Close)
+  Alert Grid      taught on this PC or not, a Teach button, Caps Lock
+                  clears (CapsLockClears), wait between clicks (Pause)
+  Updates         your own update folder ([Updates] Folder), and what
+                  version is waiting there
+  General         shift journal (what's saved, when old files go), the
+                  Caps Lock guard, start Watchlog with Windows
+Save writes settings.ini and reloads. Cancel changes nothing. Settings
+you didn't change aren't written, so settings.ini stays short.
 
-Everything else is in settings.ini (tray menu > Edit settings file).
+Everything else is in settings.ini (tray menu > Advanced > Edit
+settings file).
 Save it and it reloads itself.
 
 [Templates]
@@ -782,7 +914,64 @@ THE ACTIVITY LOG  (tray menu > Activity log)
 -----------------------------------------------------------------------
  16. SETTING IT UP ON ANOTHER PC, OR FOR A NEW OPERATOR
 -----------------------------------------------------------------------
-YOUR OWN OTHER BAY PCs
+WINDOW LAYOUT (v3.7.0)
+  Arrange your windows the way you like them, press Ctrl+Alt+Shift+S, and
+  Ctrl+Alt+W puts them back any time (tray menu: Save window layout / Put
+  windows back). Ctrl+Alt+L also puts them back by itself at the end of
+  the start of shift, once everything is open; the window you were in
+  stays in front. If you never saved a layout, it does nothing.
+  - Add  [Layout]  AfterStart=no  to settings.ini to stop the automatic
+    part (Ctrl+Alt+W still works).
+  - What is kept: the program name, position and size of each window, as
+    numbers, in %LOCALAPPDATA%\Watchlog\layout.ini. This PC only: it is
+    not synced, because each bay's screens are different. No titles and no
+    contents.
+  - Windows are matched by program, in the order they sit on the screen, so
+    two Chrome windows go back to the first and second spots saved.
+    Minimised windows and Watchlog's own windows are left alone.
+  - W is no longer free for an app hotkey ([AppN] Key=W is skipped).
+
+CAPS LOCK GUARD (v3.7.0)
+  Plain Caps Lock can't turn Caps Lock ON by accident: Shift+Caps Lock
+  turns it on. Plain Caps Lock still turns it off (when it's already off it
+  just shows a short reminder). While it's on, a red "CAPS LOCK ON" tag sits
+  at the top right of the screen. No sounds. Tray menu > Caps Lock guard
+  (ticked = on) turns the whole thing off on this PC; Ctrl+Alt+P pauses it
+  along with the other shortcuts. Nothing is stored except that on/off
+  choice (last used.ini).
+
+FACIAL REC COPIES (v3.6.0)
+  The facial rec page won't copy the alert # and the match % together, so
+  Watchlog remembers your last copy of each. Copy the alert # (8 digits),
+  copy the match (65%), in either order, then type ;face.
+  - Only an 8-digit number or a percentage, copied in Edge, is remembered.
+  - It is kept in memory only: never written to a file, forgotten after
+    2 minutes or as soon as the log is inserted, and gone when Watchlog
+    closes.
+  - Alert numbers count up, so the last alert # logged is kept on this PC
+    (last used.ini, a number only). The alert # box says if the copied one
+    is the SAME as, or LOWER than, the last one logged.
+  - Copies in other programs (like Citrix) are never read.
+
+THE EXE (Watchlog.exe, v3.5.0 and later)
+  Double-click Watchlog.exe on any PC. It asks "Install Watchlog on this
+  PC?". Yes copies it to %LOCALAPPDATA%\Programs\Watchlog (no
+  administrator rights), adds a Start menu entry and the Start with
+  Windows shortcut, and lists it under Settings > Apps. A tutorial opens
+  the first time. Your settings, templates and journal go in
+  Documents\Watchlog, which OneDrive syncs between your bays. If the
+  script version ran on that PC before (settings in Documents\AutoHotkey),
+  it offers to copy your logins and your own templates across.
+  Running a newer Watchlog.exe later offers to update the installed one.
+  With a team folder set up, put the new Watchlog.exe next to the team
+  templates.txt: each PC asks "Update now?", checks the new file starts,
+  keeps the old one as a backup in %LOCALAPPDATA%\Watchlog, and restarts.
+  To remove it: Settings > Apps > Watchlog > Uninstall. It asks whether
+  to delete the saved passwords too, and keeps your settings and journal.
+  It isn't code-signed, so Windows may say "Windows protected your PC"
+  the first time: More info > Run anyway (or ask IT to allow it).
+
+YOUR OWN OTHER BAY PCs (script version)
   1. AutoHotkey v2 must be installed on that PC.
   2. Make sure OneDrive has synced the AutoHotkey folder (and
      LaunchWork.bat).
@@ -793,17 +982,20 @@ YOUR OWN OTHER BAY PCs
   5. The first time you use each login there, type its password once.
 
 A NEW OPERATOR
-  1. Tray menu > Make a copy to share. Pick a folder (a SharePoint or
-     Teams folder works). It makes a "Watchlog v3.4.3" folder with
-     only: the program, the icon, the templates (the team's, if that's in use),
-     QUICK START.txt, README.txt, settings.example.ini and
-     LaunchWork.bat. It never copies your settings.ini, my-templates.txt,
-     shift journal, notes, activity log or passwords, and it lists what
-     it left out. The activity log records the copy.
-  2. The new operator copies that folder to their own Documents and
-     double-clicks Watchlog.ahk. The Welcome window asks only for
-     their logins and where the team templates are. QUICK START.txt
-     walks them through it.
+  1. Tray menu > Advanced > Make a copy to share. Pick a folder (a SharePoint or
+     Teams folder works). It makes a "Watchlog v3.7.0" folder with
+     only: the program (Watchlog.exe, or Watchlog.ahk for the script
+     version), the templates (the team's, if that's in use),
+     QUICK START.txt, README.txt and LaunchWork.bat (the script version
+     also gets the icon and settings.example.ini). It never copies your
+     settings.ini, my-templates.txt, shift journal, notes, activity log
+     or passwords, and it lists what it left out. The activity log
+     records the copy.
+  2. The new operator double-clicks Watchlog.exe and presses Yes. The
+     tutorial asks only for their logins; the team templates are set in
+     Settings. QUICK START.txt walks them through it. (With the script
+     version they copy the folder to their own Documents and
+     double-click Watchlog.ahk instead.)
 
 
 -----------------------------------------------------------------------
@@ -862,7 +1054,7 @@ Something else broke
     would type your password inside an email address. The script warns
     you at startup about any login trigger with no ; and no window lock.
   - Don't share settings.ini. To give the tool to someone, use tray
-    menu > Make a copy to share.
+    menu > Advanced > Make a copy to share.
   - Never put passwords in templates.txt, settings.ini or a note.
   - Before sharing the tool with the team, get the surveillance
     manager's and IT's OK.

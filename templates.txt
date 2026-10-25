@@ -12,8 +12,11 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 22, 2026 (4)
-# Program version: 3.4.3
+# Wording version: Oct 25, 2026 (2)
+# Program version: 3.10.1
+#
+#  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
+#  Template editor) changes all of this for you, boxes included.
 #
 #  HOW A LINE WORKS
 #    ;trigger (Name) = the text that gets pasted
@@ -74,20 +77,20 @@
 #    it here and every template that uses it changes too.
 # =====================================================================
 
-@tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206
+@tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206 | RY301 | MP302 | BJ303 | BJ304 | BJ305 | RO306
 
 
 # ----- FORMS ---------------------------------------------------------
 
 ;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}.
 
-;audit (Audit) = Surveillance observed {Employee type: Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed.
+;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed.
 
 ;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results.
 
 ;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident.
 
-;face (Facial recognition) = Facial Recognition Alert #{Alert #}\n{Result: Rejected} ({Match: percent})
+;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy})
 
 
 # ----- START / END OF SHIFT (asks which bay, remembers the last one) -
@@ -108,6 +111,7 @@
 ;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
 ;account (Account review) = Account #{Account #: blank=} reviewed, not banned player, Guest Services notified
 ;drop (Table drop) = Security Officers performed Table Drop
+;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep.
 
 
 # ----- TABLES --------------------------------------------------------
@@ -128,6 +132,7 @@
 ;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found.
 ;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious.
 ;maint (Maintenance) = {Machines: caps | NRT2 and NRT4} Maintenance.
+;firm (NRT firmware check) = {Department/Title: blank=XXXXX} notified Surveillance that they will be conducting an NRT Firmware check at {Location/NRT#: caps | blank=NRTX}.\nDUB#{DUB #: blank=XXXXX} (Should have fixed shot taken)
 
 
 # ----- SOFT COUNT  (time fills in as now, step opens on the next one) -
