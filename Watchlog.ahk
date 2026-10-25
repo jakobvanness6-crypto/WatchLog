@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.10.1"
+VERSION := "3.11.0"
 VERSION_DATE := "Oct 25, 2026"
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
@@ -560,7 +560,7 @@ DoLogin(trig, user, fallbackPw, rec) {
     SendInput "{Tab}"
     SendInput "{Text}" pw
     SendInput "{Enter}"
-    CountSaved("login", StrLen(user) + StrLen(pw) + 2 - StrLen(trig))
+    CountSaved("login", StrLen(user) + StrLen(pw) + 2 - StrLen(trig), "Login " trig)
     pw := ""
     StartReminder(rec)
     if RegExMatch(WinGetTitle("A"), "i)^SDS\b")
@@ -1204,7 +1204,7 @@ RunTemplate(text, title, repeat := false, trig := "") {
         out := FixArticles(text)
         Paste(out)
         Journal(title, out)
-        CountSaved("log", StrLen(out) - StrLen(trig))
+        CountSaved("log", StrLen(out) - StrLen(trig), title)
         return
     }
     FormPaste(title, fields, vals => FillTemplate(text, fields, vals), repeat, StrLen(trig))
@@ -1760,7 +1760,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
             out .= (A_Index > 1 ? "`n" : "") entry
         SetForm("")
         g.Destroy()
-        CountSaved("log", StrLen(out) - trigLen - typed)
+        CountSaved("log", StrLen(out) - trigLen - typed, title)
         ; Give the window you were typing in a moment to take the keyboard
         ; back (Citrix needs longer) - otherwise the paste can get lost
         ReturnTo(target)
@@ -2504,7 +2504,7 @@ ClearAlerts() {
     if done {
         Tip("Alerts cleared", 1000)
         Activity("Alert Grid: cleared all alerts")
-        CountSaved("", 3)   ; keystrokes only: a clear isn't a log, a login or a stamp
+        CountSaved("", 3, "Alert Grid clear")   ; keystrokes only: a clear isn't a log, a login or a stamp
     } else {
         Activity("Alert Grid: clear all didn't finish")
     }
@@ -2623,7 +2623,7 @@ UpdateFrom(f, v) {
 ;  A shift starts with the first count after End of shift or after 6
 ;  hours with nothing counted.
 ; =====================================================================
-CountSaved(kind, keys) {
+CountSaved(kind, keys, name := "") {
     if IsObject(TutorialWin)
         return
     try {
@@ -2642,6 +2642,13 @@ CountSaved(kind, keys) {
             sh := SavedRow("")
             IniWrite A_Now, SavedFile, "Shift", "Start"
             IniWrite 0, SavedFile, "Shift", "Ended"
+            try IniDelete SavedFile, "ShiftItems"
+        }
+        if name != "" {
+            ; the shift count: how many times, and keystrokes saved, per item
+            name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
+            it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
+            IniWrite (it.n + 1) "," (it.keys + keys), SavedFile, "ShiftItems", name
         }
         if kind != ""
             sh.%kind% += 1
@@ -2649,6 +2656,13 @@ CountSaved(kind, keys) {
         IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
         IniWrite A_Now, SavedFile, "Shift", "Last"
     }
+}
+
+; "times,keystrokes" -> an object
+ItemRow(str) {
+    p := StrSplit(str, ",")
+    num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
+    return {n: num(1), keys: num(2)}
 }
 
 ; "logs,logins,stamps,keystrokes" -> an object
@@ -2704,6 +2718,81 @@ HasVal(arr, v) {
     return false
 }
 
+; =====================================================================
+;  SHIFT COUNT  (tray > Shift count, or the button in Time saved)
+;  Counts exactly what got done this shift, item by item: each template
+;  by name, each login, each time stamp, each Alert Grid clear, each
+;  app switch. Numbers only (never the log text), kept in time saved.ini.
+;  It starts by itself with the first thing you do and starts again after
+;  End of shift (or 6 hours of nothing); "Start a new count" restarts it.
+; =====================================================================
+ShowShiftCount() {
+    items := []
+    try section := IniRead(SavedFile, "ShiftItems")
+    catch
+        section := ""
+    for line in StrSplit(section, "`n", "`r") {
+        if !(eq := InStr(line, "="))
+            continue
+        it := ItemRow(SubStr(line, eq + 1))
+        it.name := SubStr(line, 1, eq - 1)
+        items.Push(it)
+    }
+    ; most used first (simple insertion sort, the list is short)
+    Loop items.Length - 1 {
+        i := A_Index + 1
+        cur := items[i], j := i - 1
+        while j >= 1 && items[j].n < cur.n {
+            items[j + 1] := items[j]
+            j -= 1
+        }
+        items[j + 1] := cur
+    }
+    live := items.Length > 0
+    sh := SavedShift()
+    start := last := ""
+    try start := IniRead(SavedFile, "Shift", "Start", "")
+    try last := IniRead(SavedFile, "Shift", "Last", "")
+    total := 0, keysTotal := 0
+    for it in items
+        total += it.n, keysTotal += it.keys
+    span := live && start != "" && last != "" ? "from " FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") : "nothing counted yet"
+    g := Gui("+AlwaysOnTop", "Shift count  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w480", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
+    lv := g.AddListView("w480 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved"])
+    report := "Watchlog shift count on " A_ComputerName " (" span ")`r`n"
+    for it in items {
+        lv.Add(, it.name, it.n, Commas(it.keys))
+        report .= it.name ": " it.n " (" Commas(it.keys) " keystrokes saved)`r`n"
+    }
+    lv.ModifyCol(1, 260), lv.ModifyCol(2, 70), lv.ModifyCol(3, 130)
+    sum := total " things done, " Commas(keysTotal) " keystrokes saved, " SavedTime(keysTotal) " at 40 words a minute"
+    report .= "TOTAL: " sum "`r`n"
+    g.AddText("xm w480", "Total: " sum)
+    g.AddButton("xm y+12 w120", "Start a new count").OnEvent("Click", NewCount)
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := report
+        g.Destroy()
+        Tip("Report copied. Paste it with Ctrl+V.")
+    }
+    NewCount(*) {
+        if MsgBox("Throw away this count and start again from zero?`n`n(The Time saved totals are not touched.)", "Shift count", "YesNo Icon? Default2") != "Yes"
+            return
+        try IniDelete SavedFile, "ShiftItems"
+        try IniWrite 1, SavedFile, "Shift", "Ended"
+        Activity("Shift count restarted by hand")
+        g.Destroy()
+        Tip("Shift count started again from zero")
+    }
+}
+
 ShowTimeSaved() {
     first := ""
     try first := IniRead(SavedFile, "Info", "First", "")
@@ -2725,7 +2814,8 @@ ShowTimeSaved() {
             . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
     }
     lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 120), lv.ModifyCol(6, 120)
-    g.AddButton("xm+352 y+12 w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("xm+232 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
     g.OnEvent("Escape", (*) => g.Destroy())
     g.Show()
@@ -2748,17 +2838,17 @@ ShowTimeSaved() {
 #HotIf !PickerActive() && !SettingsActive()
 :*:;t:: {
     SendInput "{Text}@" FormatTime(, "HH:mm")
-    CountSaved("stamp", 6 - 2)
+    CountSaved("stamp", 6 - 2, "Stamp `;t")
 }
 
 :*:;dd:: {
     SendInput "{Text}" FormatTime(, "yyyy-MM-dd")
-    CountSaved("stamp", 10 - 3)
+    CountSaved("stamp", 10 - 3, "Stamp `;dd")
 }
 
 :*:;dt:: {
     SendInput "{Text}" FormatTime(, "yyyy-MM-dd") " @" FormatTime(, "HH:mm")
-    CountSaved("stamp", 17 - 3)
+    CountSaved("stamp", 17 - 3, "Stamp `;dt")
 }
 #HotIf
 
@@ -2836,6 +2926,7 @@ MakeSwitchHandler(name, win, path) {
 ; Switches to the app, minimizes it if it's already in front, or opens it
 SwitchTo(name, match, runTarget := "") {
     SetTitleMatchMode 2
+    CountSaved("", 0, "Switch to " name)
     if match != "" && WinExist(match) {
         if WinActive(match)
             WinMinimize
@@ -5031,6 +5122,7 @@ BuildTrayMenu() {
     MenuItem(tm, "Shift journal  (Ctrl+Alt+J)", (*) => ShowJournal(), 0xE8F1)
     MenuItem(tm, "Quick notes  (Ctrl+Alt+O)", (*) => ShowNotes(), 0xE70B)
     MenuItem(tm, "Time saved", (*) => ShowTimeSaved(), 0xE916)
+    MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
     tm.Add()
     MenuItem(tm, "Start of shift  (Ctrl+Alt+L)", (*) => StartOfShift(), 0xE768)
     MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
@@ -5113,7 +5205,8 @@ ShowHome() {
         , ["Cheat sheet", "Ctrl+Alt+H", 0xE8FD, () => ShowCheatSheet(), false]
         , ["Shift journal", "Ctrl+Alt+J", 0xE8F1, () => ShowJournal(), false]
         , ["Quick notes", "Ctrl+Alt+O", 0xE70B, () => ShowNotes(), false]
-        , ["Time saved", "this shift and before", 0xE916, () => ShowTimeSaved(), false]])
+        , ["Time saved", "this shift and before", 0xE916, () => ShowTimeSaved(), false]
+        , ["Shift count", "exact tally of this shift", 0xE9D2, () => ShowShiftCount(), false]])
 
     Group("Shift", 0xB86E00, [
         ["Start of shift", "Ctrl+Alt+L", 0xE768, () => StartOfShift(), false]
