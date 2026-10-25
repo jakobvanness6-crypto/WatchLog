@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.4.3  -  QUICK START  (one page)
+  WATCHLOG  v3.10.1  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 
@@ -11,29 +11,30 @@ WHAT IT DOES
   shift, and keep a count of your logs for the End of Shift entry.
 
 
-SET IT UP  (about 5 minutes, once per PC)
-  1. AutoHotkey v2 must be installed on the PC (IT installs it if you
-     can't). Check: the Start menu has "AutoHotkey".
-  2. Copy this whole folder to your own Documents (OneDrive), for
-     example  Documents\Watchlog.  Don't run it from the shared
-     folder: your settings would end up where others can see them.
-  3. Double-click  Watchlog.ahk.  The Watchlog icon (a white
-     page with an eye, on teal) appears near the clock, and a Welcome
-     window opens:
-       - Add your logins (optional): the shortcut you'll type, your
-         username, and your password. The password goes into Windows
-         Credential Manager on this PC only, never into a file.
-       - Templates: press Browse and pick the team's templates.txt in
-         the SharePoint folder (your supervisor will say where). Then
-         everyone uses the same wording and gets updates automatically.
-       - Tick "Start Watchlog when I sign in to Windows".
-       - Press Save.
+SET IT UP  (about 2 minutes, once per PC)
+  1. Double-click  Watchlog.exe.  It asks "Install Watchlog on this
+     PC?"  Press Yes. (It needs no administrator rights and no other
+     software. It adds Watchlog to the Start menu and Settings > Apps,
+     and starts it when Windows starts.)
+  2. A short tutorial opens: it adds your logins (optional) and lets
+     you try a quick entry and a form. Your settings and templates are
+     kept in Documents\Watchlog.
+  3. Later, click the tray icon (the white page with an eye, on teal) >
+     Settings > Templates > Browse to pick the team's templates.txt in the
+     SharePoint folder (your supervisor will say where). Then everyone
+     uses the same wording and gets updates automatically.
   4. In File Explorer, right-click the synced SharePoint folder and
      choose "Always keep on this device", so the team templates are
      there even when the network is slow.
+  To see the tutorial again: tray icon > Tutorial.  To remove Watchlog:
+  Settings > Apps > Watchlog > Uninstall (your settings are kept).
+  (The script version, Watchlog.ahk in the "Script version" folder,
+  still works if AutoHotkey v2 is installed. IT may prefer it.)
 
 
 USE IT
+  Click the Watchlog icon  The home window: every feature as a button,
+  (or Ctrl+Alt+M)          each showing its shortcut.
   ;jack, ;audit, ;bv ...   Type a code anywhere. No Space or Enter
                            needed: it fires as soon as you finish it.
   Ctrl+Alt+Space           Can't remember a code? Type any word (like
@@ -45,8 +46,10 @@ USE IT
                            websites.  Ctrl+Alt+Shift+L closes them.
   Ctrl+Alt+P               Pause all shortcuts (press again to resume).
 
-  Right-click the Watchlog icon for Settings, Security and status, your
-  Activity log, and Edit my templates (your own extra codes).
+  Ctrl+Alt+E               Template editor: change the wording, add
+                           codes and boxes, change lists like @tables.
+  Right-click the Watchlog icon for the menu: Settings, the template
+  editor, and (under Advanced) Security and status and the Activity log.
 
 
 WHAT IT KEEPS  (tray menu > Security and status shows it all, live)
@@ -67,4 +70,5 @@ IF SOMETHING'S WRONG
   - "Couldn't open the team templates": start OneDrive and let it sync.
     The last good copy is used meanwhile, so codes keep working.
   - Anything else: tray menu > Security and status > Copy report, and
-    send it to whoever gave you this folder. README.txt has the details.
+    send it to whoever gave you this folder. (It's under right-click >
+    Advanced, or the Security and status button in the home window.) README.txt has the details.
