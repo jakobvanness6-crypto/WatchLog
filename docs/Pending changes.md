@@ -15,13 +15,9 @@ Current version: v3.10.0 (Oct 25, 2026).
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
 
-## Built in v3.10.1 (Oct 25)
-
-- SDS signs itself back in 62 minutes after an SDS login (Settings > Logins; [SDS] ResignMinutes=, 0 = off). Replaces the 55-minute pop-up for logins locked to SDS.
-
 ## Docs refreshed for v3.10.1 (Oct 25)
 
-- Overview (plain and illustrated), IT Summary and Summary updated; no new screenshots. Test notes in docs/Test notes v3.10.md.
+- Overview (plain and illustrated), IT Summary and Summary updated for v3.10.1 (home window, tray menu, tabbed Settings, template editor, SDS sign-back-in). No new screenshots. Test notes are in docs/Watchlog v3.10.1 - Test Checklist.md.
 
 ## Built in v3.10.0 (Oct 25)
 
