@@ -15,6 +15,10 @@ Current version: v3.10.0 (Oct 25, 2026).
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
 
+## Docs refreshed for v3.10.1 (Oct 25)
+
+- Overview (plain and illustrated), IT Summary and Summary updated for v3.10.1 (home window, tray menu, tabbed Settings, template editor, SDS sign-back-in). No new screenshots. Test notes are in docs/Watchlog v3.10.1 - Test Checklist.md.
+
 ## Built in v3.10.0 (Oct 25)
 
 - Watchlog home window: click the tray icon or Ctrl+Alt+M. Buttons with pictures in four groups (Logs, Shift, Logins, Set up), each showing its shortcut, and a status strip (up to date, templates, Alert Grid taught, this shift's time saved) with Caps Lock guard and pause ticks.

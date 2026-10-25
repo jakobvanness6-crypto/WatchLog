@@ -30,7 +30,7 @@ Security has its own section further down. In short: passwords are kept in Windo
 
 ## What it does
 
-It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.9.5 now.
+It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.10.1 now.
 
 <!-- fig: image4.png 1.7 | The Watchlog icon sits by the clock. Right-clicking it opens this menu. -->
 
@@ -81,7 +81,13 @@ The Acknowledge box already has the operator's own Alert Grid login filled in by
 - A short code types the username and password and presses Enter. Each login is locked to the programs it belongs to, so the code does nothing anywhere else.
 - When Ctrl+Alt+S or Ctrl+Alt+C brings SDS or CMP to the front, Watchlog asks "Log in to SDS as …?". Enter types the login, Esc or waiting 6 seconds says no.
 - At the start of shift it asks once whether to sign into the programs it just opened. On yes, it brings each one to the front and types its login.
-- For SDS, a pop-up reminds you about 55 minutes after each login. It's silent unless you turn the beep on in Settings.
+- SDS logs me out an hour after I sign in, so Watchlog signs it back in by itself. 62 minutes after an SDS login it checks that SDS is really on its login screen, types the saved login, and puts me back in the window I was in. If SDS still says Welcome it tries again every minute, up to 6 times. It never types unless it sees the login screen, and Settings > Logins can turn it off. Other logins that expire still get a quiet pop-up reminder, with the beep off unless you turn it on in Settings.
+
+### Finding your way around
+
+Clicking the Watchlog icon (or Ctrl+Alt+M) opens a home window with a button for every feature, grouped as Logs, Shift, Logins and Set up. Each button shows its shortcut, so new operators learn the keys as they go. A strip along the bottom shows the version, whether the templates are current, whether Alert Grid is taught on this PC and the time saved this shift. Right-clicking the icon gives the same things as a menu with small pictures, and the less-used items are tucked into Alert Grid, Windows and Advanced sub-menus.
+
+Settings is now a window with tabs (Logins, Templates, Start / end of shift, Alert Grid, Updates, General), so nothing needs editing in settings.ini by hand. Ctrl+Alt+E opens a template editor for whoever looks after the wording. It lists the templates, shows the finished entry as you change it, flags clashes, and keeps a backup before saving. Saving the team's file asks first, because it changes every bay. Editing in Notepad still works under Advanced.
 
 ### Everything around the logging
 
@@ -186,7 +192,7 @@ A few more things worth knowing:
 
 - It doesn't connect to the internet or send anything anywhere. Its files only reach another PC through the operator's own OneDrive and SharePoint, under our normal Microsoft 365 permissions. (Ctrl+Alt+L opens the work websites in the browser, the same as clicking a bookmark.)
 - It doesn't record what you type. It only watches for its own codes.
-- It only types a password when that login's code is typed, or when the operator says yes to "Log in?" or to the start of shift sign-in. Every time, it checks right before typing that the program in front is one that login is locked to. A login that isn't locked to a program is never typed automatically.
+- It only types a password when that login's code is typed, when the operator says yes to "Log in?" or to the start of shift sign-in, or when SDS comes back to its login screen after an SDS login the operator did. That last one can be turned off in Settings. Every time, it checks right before typing that the program in front is one that login is locked to. A login that isn't locked to a program is never typed automatically.
 - In Alert Grid it only clicks and presses Ctrl+A, Enter or Esc. It never types into the Acknowledge box.
 - It only looks at the clipboard when a form opens with a box that takes a copy, and for `;face` it notices copies made in Edge. Nothing it sees there is saved to a file.
 - It doesn't change iTrak or any other system. It types or clicks what the operator would have, and the operator still saves the entry.
@@ -220,19 +226,18 @@ What IT would need to approve:
 - Running Watchlog.exe from the user's own profile and starting it with Windows
 - Storing passwords in Windows Credential Manager and having the tool type them into the programs they're locked to
 - The tool clicking through the Alert Grid acknowledge steps for the operator
+- Signing back into SDS by itself about an hour after the operator's own SDS login, only when SDS is on its login screen
 - The shift journal keeping a copy of log text for 30 days
 - Who gets edit access to the SharePoint template folder. A new Watchlog.exe put there updates every PC that says yes, so I'd keep it to the supervisors and me
 
 ## Next steps
 
-Version 3.9.5 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.10.1 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.
 3. The approved file goes in a SharePoint folder that all the supervisors have access to.
 4. I count one full shift by hand to check the time saved numbers.
 5. Anyone on the team who wants it installs it on their bays.
-
-Later on I'd like to give it a more visual look, so it's easier for new users to pick up.
 
 I'm happy to show it working to anyone who'd like to see it.
