@@ -3,11 +3,16 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.10.0 (Oct 25, 2026).
+Current version: v3.11.0 (Oct 25, 2026).
 
 ## Waiting to be built
 
-- Wording review sheet: swap the four old refusal rows for one `;refuse` row once Jakob has finished his own edits.
+(Nothing right now.)
+
+## Done in v3.11.0 (Oct 25)
+- Shift count: exact per-item tally of one shift (templates by name, logins, stamps, Alert Grid clears, app switches) with keystrokes saved. Jakob said "build it".
+- Wording review sheet: the four old refusal rows are now the one `;refuse` row, with all its choices spelled out.
+
 
 ## Done Oct 21 (no version change)
 
@@ -15,9 +20,13 @@ Current version: v3.10.0 (Oct 25, 2026).
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
 
+## Built in v3.10.1 (Oct 25)
+
+- SDS signs itself back in 62 minutes after an SDS login (Settings > Logins; [SDS] ResignMinutes=, 0 = off). Replaces the 55-minute pop-up for logins locked to SDS.
+
 ## Docs refreshed for v3.10.1 (Oct 25)
 
-- Overview (plain and illustrated), IT Summary and Summary updated for v3.10.1 (home window, tray menu, tabbed Settings, template editor, SDS sign-back-in). No new screenshots. Test notes are in docs/Watchlog v3.10.1 - Test Checklist.md.
+- Overview (plain and illustrated), IT Summary and Summary updated; no new screenshots. Test notes in docs/Test notes v3.10.md.
 
 ## Built in v3.10.0 (Oct 25)
 

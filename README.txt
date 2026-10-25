@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.10.1  -  README
+  WATCHLOG  v3.11.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -489,6 +489,17 @@ never force-closed, because the same program runs the taskbar.
 Every log you insert, quick or form, is also saved with the time it
 went in. Logins and passwords are never saved.
 
+SHIFT COUNT (tray > Shift count, the Shift count tile on the home window,
+or the Shift count button in Time saved)
+  An exact tally of one shift, item by item: how many of each template
+  (by name), each login, each time stamp (;t ;dd ;dt), each Alert Grid
+  clear and each app switch (Ctrl+Alt+T, U, G and so on), with the
+  keystrokes each one saved and a total. It starts by itself with the
+  first thing you do, starts again after End of shift (or 6 hours of
+  nothing), and "Start a new count" restarts it by hand. Copy report
+  puts the numbers on the clipboard. Numbers only: never log text or
+  passwords. Kept in time saved.ini, same as Time saved.
+
 TIME SAVED (tray > Time saved, or the Time saved button in Ctrl+Alt+J)
   Every log, login and time stamp adds up the keystrokes it saved: the
   length of what went in, minus what you typed (the shortcut, what you
@@ -560,6 +571,8 @@ and the less-used items sit in sub-menus):
   Quick notes                   Same as Ctrl+Alt+O
   Time saved                    How much typing Watchlog has saved
                                 (see TIME SAVED in section 10)
+  Shift count                   Exact tally of this shift, item by item
+                                (see SHIFT COUNT in section 10)
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
