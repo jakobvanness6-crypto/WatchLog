@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.4.3 (Oct 22, 2026).
+Current version: v3.10.0 (Oct 25, 2026).
 
 ## Waiting to be built
 
@@ -14,6 +14,105 @@ Current version: v3.4.3 (Oct 22, 2026).
 - Overview: the Ctrl+Alt+L line is back, now saying apps first, then websites, ending on the Citrix page (v3.4.0 order). Done in both overview versions; later overview edits go in the plain version first, then the illustrated one is rebuilt. Overview easier to follow, screenshots version, time saved section, SDS logout line and Ctrl+Alt+K are all done too. Both say v3.4.1 now.
 - settings.example.ini: the example login was `;me`, which clashes with `;medical` (it would fire first and the template got skipped); now `;login`. LaunchWait example is 20, matching the "at least 20" note.
 - README: `suffix=` added to the box options list.
+
+## Built in v3.10.1 (Oct 25)
+
+- SDS signs itself back in 62 minutes after an SDS login (Settings > Logins; [SDS] ResignMinutes=, 0 = off). Replaces the 55-minute pop-up for logins locked to SDS.
+
+## Docs refreshed for v3.10.1 (Oct 25)
+
+- Overview (plain and illustrated), IT Summary and Summary updated; no new screenshots. Test notes in docs/Test notes v3.10.md.
+
+## Built in v3.10.0 (Oct 25)
+
+- Watchlog home window: click the tray icon or Ctrl+Alt+M. Buttons with pictures in four groups (Logs, Shift, Logins, Set up), each showing its shortcut, and a status strip (up to date, templates, Alert Grid taught, this shift's time saved) with Caps Lock guard and pause ticks.
+- Tray menu tidied: a picture beside each item; Alert Grid, Windows and Advanced sub-menus; AutoHotkey's own items gone (Pause and Reload under Advanced); Exit at the bottom.
+- Settings in tabs (Logins, Templates, Start / end of shift, Alert Grid, Updates, General). New boxes and ticks for what used to be settings.ini only: sign in after start of shift, windows back after start, launch wait, LaunchWork.bat, Google account, what end of shift closes, Caps Lock clears alerts, wait between Alert Grid clicks, own update folder, Caps Lock guard.
+- Template editor (Ctrl+Alt+E): change shortcut, name, section and wording; add, change and remove boxes with a form; live preview and problem check; New, Copy, Delete; Shared lists tab (@tables) with Rename; Save keeps a backup and bumps the wording version. Notepad editing is under tray > Advanced.
+
+## templates.txt only, Oct 25 (no version change)
+
+- New `;firm` (NRT firmware check): Department/Title, Location/NRT#, then a new line `DUB#` + number. Wording version Oct 25, 2026 (1). 35 templates.
+
+## Built in v3.9.5 (Oct 25)
+
+- Plain Caps Lock clears the Alert Grid alerts (guard on, Alert Grid open); CapsLockClears=no turns it off.
+
+## Built in v3.9.4 (Oct 25)
+
+- Login reminder beep is a Settings checkbox (default off).
+
+## Built in v3.9.3 (Oct 25)
+
+- The login reminder (SDS etc.) no longer beeps.
+
+## Built in v3.9.2 (Oct 25)
+
+- Alert Grid clear is faster and retries up to 3 times if a new alert drops the selection ([AlertGrid] Pause= is the wait between clicks, default 40 ms).
+
+## Built in v3.9.1 (Oct 25)
+
+- Alert Grid clears count 3 keystrokes each in Time saved (keystrokes only).
+
+## Built in v3.9.0 (Oct 25)
+
+- App keys for SDS and CMP offer to log you in after bringing the program forward (asks, Enter = yes, Esc or 6 s = no; uses the login locked to that program).
+- Ctrl+Alt+L ends by offering to sign into the Bally programs it just opened (SignIn=no turns it off).
+- Own update folder: tray > Choose my own update folder ([Updates] Folder=).
+
+
+## Built in v3.8.5 (Oct 25)
+
+- Alert Grid: 5th teach spot, the button that clears acknowledged alerts, clicked at the end of Ctrl+Alt+A.
+
+## Built in v3.8.4 (Oct 24)
+
+- Alert Grid teach has a 4th spot (the final OK button), clicked instead of pressing Enter.
+
+## Built in v3.8.3 (Oct 24)
+
+- Teach step reads F8 / Ctrl+Alt+Shift+A by polling the keys instead of hotkeys (F8 did nothing on his PC with Alert Grid in front).
+
+## Built in v3.8.2 (Oct 24)
+
+- Teach step: Esc no longer cancels (it was swallowed, and he uses it to close the menu); Ctrl+Alt+Esc cancels.
+
+## Built in v3.8.1 (Oct 24)
+
+- Teach step for the Alert Grid key also accepts Ctrl+Alt+Shift+A as the capture key (in case F8 needs Fn), and says so when it is cancelled or times out. Rolled in with the v3.8.0 items below.
+
+## Built in v3.8.0 (Oct 24)
+
+- Alert Grid clear-all: Ctrl+Alt+A from any window clears every alert (Ctrl+A, right-click, Acknowledge as received, Submit, OK) and puts you back. Ctrl+Alt+Shift+A teaches the three click spots once per PC (F8). Never types the password. Tested under Wine with a fake Alert Grid; real one and the teach step not tested.
+- Pit 3 tables RY301 MP302 BJ303 BJ304 BJ305 RO306 added to @tables (wording version Oct 24, 2026 (1)).
+
+## Built in v3.7.1 (Oct 24)
+
+- Quick notes: Ctrl+Alt+O opens a Watchlog window that always reads Quick Notes.md fresh (Open in Notepad button inside), refreshes when a note is added, and moves notes saved on this PC while OneDrive was off into Quick Notes.md. Ctrl+Alt+Q warns if Quick Notes.md is open in Notepad (a stale tab saved over new notes). Tested under Wine; not tested with real Notepad.
+
+## Built in v3.7.0 (Oct 24)
+
+- Window layout moved in from Desk Helper (layout confirmed working on Jakob's PC): Ctrl+Alt+Shift+S saves, Ctrl+Alt+W puts back, also on the tray menu. Stored per PC in %LOCALAPPDATA%\Watchlog\layout.ini (numbers only). Ctrl+Alt+L puts the layout back by itself at the end (after the Citrix tab step, keeps the window you were in in front); `[Layout] AfterStart=no` turns that off. Minimised windows and Watchlog's own windows are left alone. W added to the taken app keys.
+- Caps Lock guard moved in too, with no beep anywhere: Shift+Caps Lock turns it on, plain Caps Lock only turns it off (a short tooltip reminder when it's already off), red CAPS LOCK ON tag top right while on. Tray menu > Caps Lock guard (ticked) switches it on/off per PC (last used.ini [Caps]); default on. Not testable under Wine: the real CapsLock key hook; the state, tag and toggle were tested.
+- Desk Helper is now retired (files kept in desk-helper/; don't run both, they use the same keys).
+- Not tested: Ctrl+Alt+L auto-restore on a real start of shift, real CapsLock presses.
+
+## Built in v3.6.0 (Oct 22)
+
+- `;face` fills itself: remembers your last copy of the alert # (exactly 8 digits) and the match % (e.g. 65%) in memory only (Edge only, 2 minutes, cleared on insert), in either order. The alert # box warns if the copied number is the same as or lower than the last one logged (kept on this PC, number only).
+- `;audit`: the Employee type opens on the job title found in the copied text, if any; the Employee # `clip` box now also works from a longer copy with exactly one 4-8 digit number in it.
+- Pick-or-type lists complete as you type (d becomes Dealer, ca becomes Cage Cashier); on every such box in every template. Only when text is added, so Backspace never fights you; drop-down-only (`pick`) lists unchanged.
+- New box options: `alertcopy`, `matchcopy`, `fromcopy`. Wording version Oct 22, 2026 (5).
+- Not tested: real Edge copy events and the clipboard watcher on Windows (Wine only tested the logic).
+
+## Built in v3.5.0 (Oct 22)
+
+- Watchlog.exe: one file, no AutoHotkey needed. It installs itself (Start menu, Start with Windows, Settings > Apps, uninstall) and keeps settings in Documents\Watchlog. First run offers to copy settings from the script version.
+- Guided tutorial on first run (tray > Tutorial any time): logins, a quick entry, a form, finding a code, handy keys. Nothing from it goes in the journal or time saved.
+- Team-folder updates work with Watchlog.exe too (backup kept, restarts by itself).
+- build/ has the two files that make the exe.
+
+Ideas for later: visual template editor, Help/About window, code signing if IT asks, build the exe with a GitHub Action.
 
 ## Built in v3.4.3 (Oct 22)
 
