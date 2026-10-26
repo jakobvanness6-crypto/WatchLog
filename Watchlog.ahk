@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.17.0"
+VERSION := "3.18.0"
 VERSION_DATE := "Oct 26, 2026"
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
@@ -56,6 +56,9 @@ TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
 AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
+; the keys kept in alertgrid.ini (all numbers, plus Basis=client from v3.18.0)
+ALERT_KEYS := ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY", "OkX", "OkY"
+    , "ClearX", "ClearY", "GridW", "GridH", "MenuLine", "Basis"]
 CallPadFile := DataDir "\call pad.txt"            ; the call pad text, this PC only, wiped at end of shift
 CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, this PC only
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
@@ -3156,8 +3159,16 @@ JournalSummaryOf(text) => JournalStats("", text).summary
 ;  types a password (the Acknowledge box already has your login filled in).
 ;  It clears EVERYTHING in the list, so look at the list first.
 ;  Ctrl+Alt+Shift+A teaches it where to click, once per PC: you clear
-;  alerts by hand and press F8 over three spots. Only numbers are kept
+;  alerts by hand and press F8 over five spots. Only numbers are kept
 ;  (%LOCALAPPDATA%\Watchlog\alertgrid.ini), positions inside each window.
+;  v3.18.0: Alert Grid can be anywhere and any size. Spots in Alert Grid
+;  are measured from the inside of the window (not its frame), the
+;  clear-acknowledged button follows the edge it was nearest when the
+;  window is resized, the menu line can be picked with the arrow keys
+;  when the menu opens upward near the bottom of the screen, and one PC's
+;  teach can be shared through the team folder (alertgrid.ini beside the
+;  team templates file, one section per screen scaling) for PCs that
+;  haven't been taught. A PC's own teach always wins.
 ; =====================================================================
 ^!a:: ClearAlerts()
 ^!+a:: TeachAlerts()
@@ -3165,6 +3176,140 @@ JournalSummaryOf(text) => JournalStats("", text).summary
 AlertGridWin() {
     SetTitleMatchMode "RegEx"
     return WinExist("^Alert Grid \( ahk_exe javaw.exe")
+}
+
+; alertgrid.ini in the team folder (beside the team templates file), or ""
+AlertTeamFile() {
+    if Cfg["SharedTemplates"] = ""
+        return ""
+    SplitPath Cfg["SharedTemplates"], , &dir
+    return dir = "" ? "" : dir "\alertgrid.ini"
+}
+
+; The team file's section for this PC's screen scaling (96 = 100%)
+AlertTeamSection() => "Clicks-" A_ScreenDPI
+
+; Where the taught clicks come from: "here" (this PC's own teach), "team"
+; (the team copy for this screen scaling) or "" (not taught)
+AlertTaught() {
+    global AlertFile
+    if FileExist(AlertFile) && IniRead(AlertFile, "Clicks", "RowX", "") != ""
+        return "here"
+    f := AlertTeamFile()
+    try {
+        if f != "" && FileExist(f) && IniRead(f, AlertTeamSection(), "RowX", "") != ""
+            return "team"
+    }
+    return ""
+}
+
+; The taught clicks as a Map, or "" when there are none. An alertgrid.ini
+; taught before v3.18.0 measured the Alert Grid spots from the window's
+; outer corner: with Alert Grid open (grid) it's turned into
+; inside-the-window numbers once and saved back. Until then (Alert Grid
+; minimised) the old numbers are used the old way.
+AlertLoad(grid := 0) {
+    global AlertFile, ALERT_KEYS
+    src := AlertTaught()
+    if src = ""
+        return ""
+    f := src = "here" ? AlertFile : AlertTeamFile()
+    sec := src = "here" ? "Clicks" : AlertTeamSection()
+    c := Map("Src", src)
+    try {
+        for k in ALERT_KEYS
+            c[k] := Trim(IniRead(f, sec, k, ""))
+    } catch
+        return ""
+    ; the menu line set on this PC (Settings) wins over the team copy's
+    if src = "team" && FileExist(AlertFile) {
+        own := Trim(IniRead(AlertFile, "Clicks", "MenuLine", ""))
+        if own != ""
+            c["MenuLine"] := own
+    }
+    for k in ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY"]
+        if !IsInteger(c[k])
+            return ""
+    if c["Basis"] != "client" && src = "here" && grid && WinGetMinMax("ahk_id " grid) != -1 {
+        WinGetPos &wx, &wy, , , "ahk_id " grid
+        WinGetClientPos &cx, &cy, &cw, &ch, "ahk_id " grid
+        ox := cx - wx, oy := cy - wy
+        c["RowX"] := Integer(c["RowX"]) - ox, c["RowY"] := Integer(c["RowY"]) - oy
+        if IsInteger(c["ClearX"]) && IsInteger(c["ClearY"])
+            c["ClearX"] := Integer(c["ClearX"]) - ox, c["ClearY"] := Integer(c["ClearY"]) - oy
+        c["GridW"] := cw, c["GridH"] := ch, c["Basis"] := "client"
+        try {
+            for k in ["RowX", "RowY", "ClearX", "ClearY", "GridW", "GridH", "Basis"]
+                if c[k] != ""
+                    IniWrite c[k], AlertFile, "Clicks", k
+            Activity("Alert Grid: taught clicks changed to inside-the-window numbers (v3.18.0)")
+        }
+    }
+    return c
+}
+
+; Where a taught Alert Grid spot (keys kx, ky) is on the screen now, in &x
+; and &y. With inside-the-window numbers, a spot taught in the right half
+; of Alert Grid keeps its distance from the right edge when the window is
+; resized, and one in the bottom half from the bottom edge. topLeft keeps
+; it measured from the top-left corner whatever (the alert rows: wider
+; columns can leave blank space on the right that isn't a row).
+; False when the spot falls outside the window as it is now.
+AlertSpot(c, grid, kx, ky, topLeft, &x, &y) {
+    tx := Integer(c[kx]), ty := Integer(c[ky])
+    if c["Basis"] != "client" {
+        WinGetPos &wx, &wy, &ww, &wh, "ahk_id " grid
+        x := wx + tx, y := wy + ty
+        return tx >= 0 && ty >= 0 && tx < ww && ty < wh
+    }
+    WinGetClientPos &cx, &cy, &cw, &ch, "ahk_id " grid
+    w0 := IsInteger(c["GridW"]) ? Integer(c["GridW"]) : cw
+    h0 := IsInteger(c["GridH"]) ? Integer(c["GridH"]) : ch
+    if !topLeft && tx > w0 // 2
+        tx := cw - (w0 - tx)
+    if !topLeft && ty > h0 // 2
+        ty := ch - (h0 - ty)
+    x := cx + tx, y := cy + ty
+    return tx >= 0 && ty >= 0 && tx < cw && ty < ch
+}
+
+; True when (x, y) is on one of the screens
+AlertOnScreen(x, y) {
+    loop MonitorGetCount() {
+        MonitorGet A_Index, &l, &t, &r, &b
+        if x >= l && x < r && y >= t && y < b
+            return true
+    }
+    return false
+}
+
+; True when a right-click at (x, y) is likely to open its menu upward:
+; Java does that when the menu doesn't fit between the spot and the bottom
+; of the screen (above the taskbar). dy is how far down the taught menu
+; line was; the 60 px is room for the lines below it.
+AlertMenuFlips(x, y, dy) {
+    loop MonitorGetCount() {
+        MonitorGetWorkArea A_Index, &l, &t, &r, &b
+        if x >= l && x < r && y >= t && y < b
+            return y + dy + 60 > b
+    }
+    return false
+}
+
+; Picks line n of the open right-click menu with the arrow keys (the first
+; Down lands on the top line), then Enter
+AlertMenuKeys(n) {
+    loop n {
+        SendEvent "{Down}"
+        Sleep 25
+    }
+    SendEvent "{Enter}"
+}
+
+; The menu line of "Acknowledge as received" set on this PC ("" = not set)
+AlertMenuLine() {
+    global AlertFile
+    return FileExist(AlertFile) ? Trim(IniRead(AlertFile, "Clicks", "MenuLine", "")) : ""
 }
 
 ; Waits for F8 or Ctrl+Alt+Shift+A (true), or Ctrl+Alt+Esc / 3 minutes (false).
@@ -3216,11 +3361,11 @@ TeachRun() {
         MsgBox "Open Alert Grid first, with at least one alert in the list.", "Teach Alert Grid", "Icon!"
         return
     }
-    if MsgBox("This takes about a minute and you do it once on each PC.`n`nYou will clear the alerts by hand, and at five points hover the mouse over the right spot and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels).`n`nAlert Grid needs at least one alert in the list. Start?", "Teach Alert Grid", "YesNo Icon?") != "Yes"
+    if MsgBox("This takes about a minute and you do it once on each PC (or once for the whole team, if you share it afterwards).`n`nYou will clear the alerts by hand, and at five points hover the mouse over the right spot and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels).`n`nAlert Grid needs at least one alert in the list. Start?", "Teach Alert Grid", "YesNo Icon?") != "Yes"
         return
     CoordMode "Mouse", "Screen"
     SetTitleMatchMode "RegEx"
-    if !TeachWait("1 of 5`nHover over an alert row in Alert Grid and press F8 (or Ctrl+Alt+Shift+A)   (Ctrl+Alt+Esc cancels)")
+    if !TeachWait("1 of 5`nHover over the TOP alert row in Alert Grid and press F8 (or Ctrl+Alt+Shift+A)   (Ctrl+Alt+Esc cancels)")
         return
     MouseGetPos &sx, &sy, &hwnd
     grid := AlertGridWin()
@@ -3228,7 +3373,8 @@ TeachRun() {
         MsgBox "Alert Grid isn't open any more. Nothing saved.", "Teach Alert Grid", "Icon!"
         return
     }
-    WinGetPos &gx, &gy, , , "ahk_id " grid
+    ; inside the window, so the frame (maximised or not) doesn't matter (v3.18.0)
+    WinGetClientPos &gx, &gy, &gw, &gh, "ahk_id " grid
     rowx := sx - gx, rowy := sy - gy
     if !TeachWait("2 of 5`nNow press Ctrl+A, right-click the row, hover over 'Acknowledge as received' and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
         return
@@ -3250,11 +3396,17 @@ TeachRun() {
         IniWrite dy, AlertFile, "Clicks", "MenuDY"
         IniWrite bx - ax, AlertFile, "Clicks", "SubmitX"
         IniWrite by - ay, AlertFile, "Clicks", "SubmitY"
+        IniWrite gw, AlertFile, "Clicks", "GridW"
+        IniWrite gh, AlertFile, "Clicks", "GridH"
+        IniWrite "client", AlertFile, "Clicks", "Basis"
+        ; an older teach's OK and clear button spots don't belong with these
+        for k in ["OkX", "OkY", "ClearX", "ClearY"]
+            try IniDelete AlertFile, "Clicks", k
     } catch {
         MsgBox "Couldn't save the clicks to " AlertFile, "Teach Alert Grid", "Icon!"
         return
     }
-    Activity("Alert Grid: clicks taught (row " rowx "," rowy "  menu " dx "," dy "  submit " bx - ax "," by - ay ")")
+    Activity("Alert Grid: clicks taught (row " rowx "," rowy "  menu " dx "," dy "  submit " bx - ax "," by - ay "  window " gw "x" gh ")")
     if !TeachWait("4 of 5`nNow click Submit. When the 'Acknowledgement Successful' box shows, hover over its OK button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
         return
     MouseGetPos &kx, &ky
@@ -3277,19 +3429,82 @@ TeachRun() {
         MsgBox "Alert Grid isn't open any more. The first four clicks are saved.", "Teach Alert Grid", "Icon!"
         return
     }
-    WinGetPos &gx, &gy, , , "ahk_id " grid
+    WinGetClientPos &gx, &gy, &gw, &gh, "ahk_id " grid
     try {
         IniWrite cx - gx, AlertFile, "Clicks", "ClearX"
         IniWrite cy - gy, AlertFile, "Clicks", "ClearY"
+        IniWrite gw, AlertFile, "Clicks", "GridW"
+        IniWrite gh, AlertFile, "Clicks", "GridH"
     }
     Activity("Alert Grid: clear-acknowledged button taught (" cx - gx "," cy - gy ")")
-    MsgBox "Saved. Now click that button yourself to finish.`n`nFrom now on Ctrl+Alt+A does all of it.", "Teach Alert Grid"
+    MsgBox "Saved. Now click that button yourself to finish.", "Teach Alert Grid"
+    AskMenuLine()
+    MsgBox "All done. From now on Ctrl+Alt+A does all of it, wherever Alert Grid is and whatever its size.`n`nSo teammates' PCs don't have to be taught: tray > Alert Grid > Share my setup with the team.", "Teach Alert Grid"
+}
+
+; The last teach question: which line of the right-click menu
+; "Acknowledge as received" is (used with the arrow keys when the menu
+; opens upward). Blank = not used.
+AskMenuLine() {
+    global AlertFile
+    r := InputBox("Last question. In Alert Grid's right-click menu, which line is 'Acknowledge as received'? Count from the top (1 = the top line).`n`nIt's used with the arrow keys when Alert Grid is near the bottom of the screen and the menu opens upward. Leave it blank if you're not sure.", "Teach Alert Grid", "w440 h210", AlertMenuLine())
+    if r.Result != "OK"
+        return
+    n := Trim(r.Value)
+    if n = "" {
+        try IniDelete AlertFile, "Clicks", "MenuLine"
+        return
+    }
+    if !IsInteger(n) || n < 1 || n > 20 {
+        MsgBox "That isn't a line number, so the arrow keys won't be used. You can type it later in Settings > Alert Grid.", "Teach Alert Grid", "Icon!"
+        return
+    }
+    try IniWrite Integer(n), AlertFile, "Clicks", "MenuLine"
+    Activity("Alert Grid: menu line set to " Integer(n))
+}
+
+; Puts this PC's taught clicks in alertgrid.ini in the team folder, under
+; this PC's screen scaling, so PCs that haven't been taught use them.
+; Numbers only. A PC's own teach always wins over the team copy.
+ShareAlertSetup() {
+    global AlertFile, ALERT_KEYS
+    f := AlertTeamFile()
+    if f = "" {
+        MsgBox "There's no team folder set up (the team templates file in Settings), so there's nowhere to share it.", "Share Alert Grid setup", "Icon!"
+        return
+    }
+    if AlertTaught() != "here" {
+        MsgBox "Alert Grid isn't taught on this PC, so there's nothing of this PC's to share. Teach it first (Ctrl+Alt+Shift+A).", "Share Alert Grid setup", "Icon!"
+        return
+    }
+    c := AlertLoad(AlertGridWin())
+    if !c || c["Basis"] != "client" {
+        MsgBox "Open Alert Grid first (not minimised): this PC's numbers were taught by an older version and it needs the window once to update them. Then try again.", "Share Alert Grid setup", "Icon!"
+        return
+    }
+    sec := AlertTeamSection()
+    scale := Round(A_ScreenDPI / 96 * 100)
+    if MsgBox("Share this PC's Alert Grid clicks with the team?`n`nThey go in " f " for screens at " scale "% scaling. PCs that haven't been taught use them; a PC that has been taught keeps its own.`n`nOnly click positions are saved (numbers): no names, logins or passwords.", "Share Alert Grid setup", "YesNo Icon?") != "Yes"
+        return
+    try {
+        for k in ALERT_KEYS {
+            if c[k] != ""
+                IniWrite c[k], f, sec, k
+            else
+                try IniDelete f, sec, k
+        }
+    } catch as e {
+        MsgBox "Couldn't write to the team folder:`n" e.Message "`n`nIf OneDrive is syncing, try again in a moment.", "Share Alert Grid setup", "Icon!"
+        return
+    }
+    Activity("Alert Grid: shared this PC's clicks with the team (" scale "% scaling)")
+    MsgBox "Shared. PCs that haven't been taught now clear alerts with these clicks (once OneDrive has synced the team folder).`n`nA PC with different screen scaling still needs its own teach, and can share it the same way.", "Share Alert Grid setup"
 }
 
 ClearAlerts() {
     global AlertFile
-    if !FileExist(AlertFile) {
-        MsgBox "Alert Grid clicks haven't been taught on this PC yet.`n`nPress Ctrl+Alt+Shift+A once and follow the steps.", "Clear alerts", "Icon!"
+    if AlertTaught() = "" {
+        MsgBox "Alert Grid clicks haven't been taught on this PC yet (and the team folder has none for this screen).`n`nPress Ctrl+Alt+Shift+A once and follow the steps.", "Clear alerts", "Icon!"
         return
     }
     grid := AlertGridWin()
@@ -3297,33 +3512,68 @@ ClearAlerts() {
         Tip("Alert Grid isn't open.", 2000, true)
         return
     }
-    rowx := Integer(IniRead(AlertFile, "Clicks", "RowX")), rowy := Integer(IniRead(AlertFile, "Clicks", "RowY"))
-    dx := Integer(IniRead(AlertFile, "Clicks", "MenuDX")), dy := Integer(IniRead(AlertFile, "Clicks", "MenuDY"))
-    subx := Integer(IniRead(AlertFile, "Clicks", "SubmitX")), suby := Integer(IniRead(AlertFile, "Clicks", "SubmitY"))
-    okx := IniRead(AlertFile, "Clicks", "OkX", ""), oky := IniRead(AlertFile, "Clicks", "OkY", "")
-    clrx := IniRead(AlertFile, "Clicks", "ClearX", ""), clry := IniRead(AlertFile, "Clicks", "ClearY", "")
+    c := AlertLoad(grid)
+    if !c {
+        MsgBox "The taught Alert Grid clicks can't be read. Teach them again (Ctrl+Alt+Shift+A).", "Clear alerts", "Icon!"
+        return
+    }
+    dx := Integer(c["MenuDX"]), dy := Integer(c["MenuDY"])
+    subx := Integer(c["SubmitX"]), suby := Integer(c["SubmitY"])
+    okx := c["OkX"], oky := c["OkY"]
+    line := IsInteger(c["MenuLine"]) && c["MenuLine"] > 0 ? Integer(c["MenuLine"]) : 0
+    ; wait for Ctrl/Alt/Shift/Caps Lock to come up first: while they're held,
+    ; Alert Grid can see Ctrl+Alt+A (or nothing) instead of Ctrl+A (v3.17.1)
+    ; (all together, at most 250 ms in all, so a held key can't slow it down)
+    ; (Caps Lock isn't waited for: it can't turn Ctrl+A into something else)
+    held := A_TickCount + 250
+    while A_TickCount < held && (GetKeyState("Ctrl", "P") || GetKeyState("Alt", "P") || GetKeyState("Shift", "P"))
+        Sleep 5
     prev := WinExist("A")
     CoordMode "Mouse", "Screen"
+    CoordMode "Pixel", "Screen"
     MouseGetPos &ox, &oy
-    if WinGetMinMax("ahk_id " grid) = -1
+    wasMin := WinGetMinMax("ahk_id " grid) = -1
+    if wasMin
         WinRestore "ahk_id " grid
     WinActivate "ahk_id " grid
     if !WinWaitActive("ahk_id " grid, , 2) {
         Tip("Couldn't bring Alert Grid to the front.", 2500, true)
         return
     }
-    WinGetPos &gx, &gy, , , "ahk_id " grid
-    px := gx + rowx, py := gy + rowy
+    if wasMin && c["Basis"] != "client"
+        c := AlertLoad(grid)    ; it was minimised: now old numbers can be changed over
+    ; where the top alert row is now, wherever Alert Grid is and whatever its size
+    if !AlertSpot(c, grid, "RowX", "RowY", true, &px, &py) {
+        Tip("Alert Grid is too small for the taught spot. Make it bigger, or teach the clicks again.", 3500, true)
+        Activity("Alert Grid: not cleared (window smaller than the taught row spot)")
+        AlertBack(prev, grid)
+        return
+    }
+    if !AlertOnScreen(px, py) {
+        Tip("Alert Grid's alert list is off the screen. Drag Alert Grid back onto the screen.", 3500, true)
+        Activity("Alert Grid: not cleared (alert list off the screen)")
+        AlertBack(prev, grid)
+        return
+    }
+    WinGetClientPos , &cy0, , &ch0, "ahk_id " grid
+    bottom := cy0 + ch0
+    ; near the bottom of the screen Java opens the menu upward, so the taught
+    ; menu spot would miss: use the arrow keys there (when the line is known)
+    useKeys := line && AlertMenuFlips(px, py, dy)
+    keysUsed := false
     done := false
+    checked := false
     ; A new alert arriving while this runs re-draws the list and drops the
     ; selection, so everything here is fast, and if the Acknowledge box or
     ; the "Successful" box doesn't turn up it starts again (up to 3 tries).
     ; [AlertGrid] Pause= in settings.ini is the wait between clicks in ms
     ; (default 40; raise it if a click lands before the menu is up).
     gap := Integer(IniRead(SettingsFile, "AlertGrid", "Pause", "40"))
-    ; the grid is slow to take Ctrl+A: [AlertGrid] SelectWait= (ms) is the wait
-    ; before the right-click, so the whole list is selected (v3.13.0)
-    selWait := Integer(IniRead(SettingsFile, "AlertGrid", "SelectWait", "200"))
+    ; [AlertGrid] SelectWait= (ms) is the most it waits for Ctrl+A to show
+    ; before the right-click (v3.17.1: it now watches the list turn blue
+    ; instead of just waiting, and presses Ctrl+A again if it didn't take.
+    ; One alert never changes colour, so 300 ms is all that case costs: v3.17.2)
+    selWait := Integer(IniRead(SettingsFile, "AlertGrid", "SelectWait", "120"))
     SetMouseDelay 0
     SetKeyDelay 0
     attempts := 0
@@ -3332,14 +3582,41 @@ ClearAlerts() {
         try {
             Click px, py
             Sleep gap
-            Send "^a"
-            Sleep selWait
+            ; the rows under the clicked one, before and after Ctrl+A: when
+            ; there's more than one alert they turn blue, so a change means
+            ; the whole list is selected. No change = one alert, or Ctrl+A
+            ; was missed, so it presses Ctrl+A again halfway through the wait.
+            before := AlertColumn(px, py, bottom)
+            AlertSelectAll()
+            ; a lone alert is already blue from the click, so nothing can change:
+            ; when the column under the row is one plain colour, wait only a moment (v3.17.3)
+            lone := AlertIsPlain(before)
+            stop := A_TickCount + (lone ? Min(selWait, 40) : selWait), again := lone ? 0 : A_TickCount + selWait // 2
+            checked := false
+            while A_TickCount < stop {
+                Sleep 3
+                if AlertColumn(px, py, bottom) != before {
+                    checked := true
+                    break
+                }
+                if again && A_TickCount >= again {
+                    AlertSelectAll()
+                    again := 0
+                }
+            }
             Click px, py, "Right"
             Sleep gap * 2
-            Click px + dx, py + dy
+            if useKeys {
+                AlertMenuKeys(line)
+                keysUsed := true
+            } else
+                Click px + dx, py + dy
             dlg := WinWait("^Acknowledge$ ahk_exe javaw.exe", , 1.5)
             if !dlg {
                 Send "{Escape}"
+                ; the menu spot missed (menu somewhere else): try the arrow keys next time
+                if line && !useKeys
+                    useKeys := true
                 if attempts = 3
                     Tip("Nothing to clear (or the menu didn't open).", 2500, true)
                 continue
@@ -3359,33 +3636,81 @@ ClearAlerts() {
                 continue
             }
             WinActivate "ahk_id " ok
-            if okx != "" && oky != "" {
+            if IsInteger(okx) && IsInteger(oky) {
                 WinGetPos &kx, &ky, , , "ahk_id " ok
                 Click kx + Integer(okx), ky + Integer(oky)
             } else
                 Send "{Enter}"
             WinWaitClose "ahk_id " ok, , 2
             done := true
-            ; the little button that clears the acknowledged alerts
-            if clrx != "" && clry != "" && WinExist("ahk_id " grid) {
+            ; the little button that clears the acknowledged alerts (it follows
+            ; the edge it was nearest when Alert Grid has been resized)
+            if IsInteger(c["ClearX"]) && IsInteger(c["ClearY"]) && WinExist("ahk_id " grid) {
                 WinActivate "ahk_id " grid
                 WinWaitActive "ahk_id " grid, , 2
-                WinGetPos &gx, &gy, , , "ahk_id " grid
-                Click gx + Integer(clrx), gy + Integer(clry)
-                Sleep gap
+                if AlertSpot(c, grid, "ClearX", "ClearY", false, &bx, &by) {
+                    Click bx, by
+                    Sleep gap
+                } else
+                    Activity("Alert Grid: the clear-acknowledged button spot is outside the window now (skipped it)")
             }
         }
     }
     if done {
         Tip("Alerts cleared", 1000)
-        Activity("Alert Grid: cleared all alerts")
+        Activity("Alert Grid: cleared all alerts" (keysUsed ? " (picked the menu line with the arrow keys)" : "")
+            . (c["Src"] = "team" ? " (team setup)" : "")
+            . (checked ? "" : " (list didn't change colour after Ctrl+A: only one alert, or Ctrl+A missed)"))
         CountSaved("", 3, "Alert Grid clear")   ; keystrokes only: a clear isn't a log, a login or a stamp
     } else {
-        Activity("Alert Grid: clear all didn't finish")
+        Activity("Alert Grid: clear all didn't finish" (line ? "" : " (no menu line set for the arrow keys: Settings > Alert Grid)"))
     }
     MouseMove ox, oy, 0
+    AlertBack(prev, grid)
+}
+
+; Puts back the window that was in front before a clear
+AlertBack(prev, grid) {
     if prev && prev != grid && WinExist("ahk_id " prev)
         try WinActivate "ahk_id " prev
+}
+
+; Ctrl+A held down long enough for Java to see it (a fast SendInput burst
+; can slip past Alert Grid)
+AlertSelectAll() {
+    SendEvent "{Ctrl down}"
+    Sleep 5
+    SendEvent "{a down}"
+    Sleep 10
+    SendEvent "{a up}"
+    Sleep 5
+    SendEvent "{Ctrl up}"
+}
+
+; True when every sampled colour in AlertColumn's string is the same
+AlertIsPlain(col) {
+    first := ""
+    loop parse col, "," {
+        if A_LoopField = ""
+            continue
+        if first = ""
+            first := A_LoopField
+        else if A_LoopField != first
+            return false
+    }
+    return true
+}
+
+; The screen colours down a line from just under the clicked row to the
+; bottom of the window (5 points down the list, so 5 reads: it has
+; to stay quick when alerts arrive many a second), as one string
+AlertColumn(x, y, bottom) {
+    s := ""
+    for off in [12, 24, 40, 80, 140] {
+        if y + off < bottom - 8
+            try s .= PixelGetColor(x, y + off) ","
+    }
+    return s
 }
 
 ; =====================================================================
@@ -5000,16 +5325,21 @@ ShowSettings(welcome := false, startTab := 1) {
 
     ; ---- Alert Grid
     tabs.UseTab(4)
-    taught := FileExist(AlertFile) != ""
-    g.AddText("Section w" W, "Ctrl+Alt+A acknowledges every alert in Alert Grid in one go (it never types your password). Each PC has to be shown where to click, once.")
-    g.SetFont("s10 c" (taught ? "2E7D32" : "B86E00"))
-    g.AddText("xs y+12 w" W, taught ? "●  The clicks are taught on this PC." : "●  The clicks aren't taught on this PC yet.")
+    taught := AlertTaught()
+    g.AddText("Section w" W, "Ctrl+Alt+A acknowledges every alert in Alert Grid in one go (it never types your password), wherever Alert Grid is and whatever its size. A PC has to be shown where to click once, or it can use a setup shared from another PC.")
+    g.SetFont("s10 c" (taught != "" ? "2E7D32" : "B86E00"))
+    g.AddText("xs y+12 w" W, taught = "here" ? "●  The clicks are taught on this PC."
+        : taught = "team" ? "●  Using the team's shared setup (taught on another PC)." : "●  The clicks aren't taught on this PC yet.")
     g.SetFont("s10 c000000")
-    g.AddButton("xs y+8 w240", taught ? "Teach the clicks again..." : "Teach the clicks now...").OnEvent("Click", TeachNow)
+    g.AddButton("xs y+8 w240", taught = "here" ? "Teach the clicks again..." : "Teach the clicks now...").OnEvent("Click", TeachNow)
+    g.AddButton("x+8 w240", "Share my setup with the team...").OnEvent("Click", (*) => ShareAlertSetup())
     capsClearCB := g.AddCheckbox("xs y+16" (Cfg["CapsClearsAlerts"] ? " Checked" : ""), "Plain Caps Lock clears the alerts too (needs the Caps Lock guard on, General tab)")
     g.AddText("xs y+14", "Wait between clicks:")
     pauseE := g.AddEdit("x+6 yp-3 w60 Number", clickGap)
     g.AddText("x+6 yp+3", "milliseconds (40 is normal; raise it if a clear misses a step)")
+    g.AddText("xs y+14", "'Acknowledge as received' is menu line:")
+    lineE := g.AddEdit("x+6 yp-3 w40 Number", AlertMenuLine())
+    g.AddText("x+6 yp+3", "(1 = top; for the arrow keys when the menu opens upward)")
 
     ; ---- Updates
     tabs.UseTab(5)
@@ -5253,6 +5583,12 @@ ShowSettings(welcome := false, startTab := 1) {
             MsgBox "Type the wait between Alert Grid clicks in milliseconds, like 40 (2000 at most).", "Watchlog", "Icon!"
             return
         }
+        menuLine := Trim(lineE.Value)
+        if menuLine != "" && (!IsInteger(menuLine) || menuLine < 1 || menuLine > 20) {
+            tabs.Choose(4)
+            MsgBox "Type which line of Alert Grid's right-click menu 'Acknowledge as received' is, like 2 (1 = top), or leave it blank.", "Watchlog", "Icon!"
+            return
+        }
         failed := ""
         ; New passwords go into Credential Manager first
         for x in st.logins {
@@ -5294,6 +5630,12 @@ ShowSettings(welcome := false, startTab := 1) {
                 IniWrite yn(capsClearCB.Value), SettingsFile, "AlertGrid", "CapsLockClears"
             if gap != clickGap
                 IniWrite gap, SettingsFile, "AlertGrid", "Pause"
+            if menuLine != AlertMenuLine() {
+                if menuLine = "" {
+                    try IniDelete AlertFile, "Clicks", "MenuLine"
+                } else
+                    IniWrite Integer(menuLine), AlertFile, "Clicks", "MenuLine"
+            }
             if st.upd != Cfg["UpdateFolder"]
                 IniWrite st.upd, SettingsFile, "Updates", "Folder"
         } catch as e {
@@ -5917,7 +6259,7 @@ RestoreLayout(auto := false) {
 $CapsLock:: {
     if GetKeyState("CapsLock", "T")
         SetCapsLockState "Off"
-    else if Cfg["CapsClearsAlerts"] && FileExist(AlertFile) && AlertGridWin()
+    else if Cfg["CapsClearsAlerts"] && AlertTaught() != "" && AlertGridWin()
         ClearAlerts()    ; Caps Lock was doing nothing, so it clears the Alert Grid alerts
     else
         Tip("Hold Shift and press Caps Lock to turn it on", 1500)
@@ -6371,6 +6713,7 @@ BuildTrayMenu() {
     ag := Menu()
     MenuItem(ag, "Clear all alerts  (Ctrl+Alt+A)", (*) => ClearAlerts(), 0xE894)
     MenuItem(ag, "Teach the clicks  (Ctrl+Alt+Shift+A)", (*) => TeachAlerts(), 0xE7C9)
+    MenuItem(ag, "Share my setup with the team", (*) => ShareAlertSetup(), 0xE72D)
     MenuItem(tm, "Alert Grid", ag, 0xEA8F)
 
     WinMenu := Menu()
@@ -6483,8 +6826,9 @@ ShowHome() {
         , Tpl.count " templates" (Tpl.mine ? " + " Tpl.mine " of your own" : "")
         . (Tpl.version != "" ? ", wording " Tpl.version : "")
         . (Tpl.src = "team" ? " (team file)" : Tpl.src = "team-copy" ? " (saved copy: the team file can't be reached)" : ""))
-    taught := FileExist(AlertFile) != ""
-    Status(taught ? "2E7D32" : "B86E00", taught ? "Alert Grid clicks are taught on this PC"
+    taught := AlertTaught()
+    Status(taught != "" ? "2E7D32" : "B86E00", taught = "here" ? "Alert Grid clicks are taught on this PC"
+        : taught = "team" ? "Alert Grid clicks: using the team's shared setup"
         : "Alert Grid clicks aren't taught on this PC yet (Settings > Alert Grid)")
     sh := SavedShift()
     Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")

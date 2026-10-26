@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.17.0 (Oct 26, 2026).
+Current version: v3.18.0 (Oct 26, 2026).
 
 ## Waiting to be built
 
@@ -13,6 +13,27 @@ Current version: v3.17.0 (Oct 26, 2026).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.18.0 (Oct 26)
+- Alert Grid clear works wherever Alert Grid is and whatever its size: spots measured from inside the window (old teach files change over by themselves), the clear-acknowledged button follows its nearest edge on resize, the teach asks which menu line "Acknowledge as received" is (also in Settings > Alert Grid) and the arrow keys pick it when the menu opens upward near the bottom of the screen or a menu click misses, and it refuses (clicks nothing) when Alert Grid is too small or off the screen. Tray > Alert Grid > Share my setup with the team puts the numbers in alertgrid.ini in the team folder (per screen scaling) for PCs that haven't been taught. Not done: UI Automation / Java Access Bridge, picture search. Wine-tested with a fake Alert Grid (11 cases pass); the real Java menu and arrow keys only on a bay.
+
+## Done in v3.17.6 (Oct 26)
+- Alert Grid clear, option A (Jakob): no Caps Lock wait, modifier wait only while Ctrl/Alt/Shift are really down (max 250 ms), Ctrl+A held ~20 ms, 5 colour reads instead of ~20, SelectWait default 120 (Ctrl+A re-pressed halfway), lone alert 40 ms.
+
+## Done in v3.17.5 (Oct 26)
+- Alert Grid clear faster again (Jakob: still slower than before): key-release wait capped at 250 ms in total, SelectWait default 200, lone alert 50 ms, 5 ms polling, no extra pause after the list turns blue.
+
+## Done in v3.17.4 (Oct 26)
+- Alert Grid clear made quicker for busy lists (about a dozen alerts a second): shorter Ctrl+A hold, 15 ms polling, about 20 colour reads instead of 100.
+
+## Done in v3.17.3 (Oct 26)
+- Alert Grid clear with a single alert: the row is already blue from the click, so a plain column under it now means only a 100 ms wait.
+
+## Done in v3.17.2 (Oct 26)
+- Alert Grid clear with a single alert was slow (waited 800 ms for a colour change that never comes): wait is now 300 ms.
+
+## Done in v3.17.1 (Oct 26)
+- Alert Grid clear (Ctrl+Alt+A, Caps Lock) no longer clears just the top alert half the time: waits for Ctrl/Alt/Shift/Caps Lock to be let go, holds Ctrl+A like a real keypress, watches the list turn selected (presses Ctrl+A again if it didn't), then right-clicks. Wine-tested only with a fake list that ignores the first Ctrl+A.
 
 ## Done in v3.17.0 (Oct 26)
 - Edits in the shift journal count everywhere: each log carries a [k] tag with its exact keystrokes saved; removing, renaming or adding logs in Ctrl+Alt+J and pressing Save changes updates Shift count, this shift, Time saved and the dashboard. Old untagged logs use the type's average.
