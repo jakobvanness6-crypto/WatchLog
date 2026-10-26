@@ -12,8 +12,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 25, 2026 (2)
-# Program version: 3.11.0
+# Wording version: Oct 26, 2026 (1)
+# Program version: 3.17.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -58,7 +58,10 @@
 #                                     (12345 becomes #12345, RN stays RN)
 #      {Player #: upper}              all capitals (rn becomes RN)
 #      {Machine: caps}                capitals in machine numbers
-#                                     (b1410 becomes B1410)
+#                                     (b1410 becomes B1410; in a Machine
+#                                     or NRT box n3 becomes NRT3, a1 ATM1)
+#      {Note: tidy}                   bvs becomes BVs, bvs divert
+#                                     becomes BVs/Divert
 #      {Table: @tables}               uses the @tables list below
 #      {Amount: if ATM=100000}        fills in 100000 when another box
 #                                     starts with ATM (you can change it)
@@ -121,7 +124,7 @@
 ;auto (Auto-close) = {Table: @tables | blank=XXXXX} Closed and Auto-Close started.
 ;cards (Card change) = Card change on {Table: @tables}.
 ;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat}
-;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {repeat}
+;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat}
 ;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=}
 
 
@@ -132,7 +135,7 @@
 ;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found.
 ;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious.
 ;maint (Maintenance) = {Machines: caps | NRT2 and NRT4} Maintenance.
-;firm (NRT firmware check) = {Department/Title: blank=XXXXX} notified Surveillance that they will be conducting an NRT Firmware check at {Location/NRT#: caps | blank=NRTX}.\nDUB#{DUB #: blank=XXXXX} (Should have fixed shot taken)
+;firm (NRT firmware check) = {Department/Title: Operations Supervisor | blank=XXXXX} notified Surveillance that they will be conducting an NRT Firmware check at {Location/NRT#: caps | blank=NRTX}.\nDUB#{DUB #: blank=XXXXX} (Should have fixed shot taken)
 
 
 # ----- SOFT COUNT  (time fills in as now, step opens on the next one) -
