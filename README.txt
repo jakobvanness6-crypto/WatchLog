@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.11.0  -  README
+  WATCHLOG  v3.17.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -102,8 +102,8 @@ couple of seconds. No need to press anything.
 -----------------------------------------------------------------------
   Ctrl+Alt+Space    Find a template: type part of its name or any word
                     in it, then Enter. See section 3.
-  Ctrl+Alt+H        Cheat sheet: every template, login, app and hotkey
-                    on this PC.
+  Ctrl+Alt+H        Cheat sheet (laid out in three columns since v3.15.0):
+                    every template, login, app and hotkey on this PC.
   Ctrl+Alt+M        Watchlog home (v3.10.0): one window with a button for
                     everything (templates, shift, logins, setup) and how
                     this PC is doing. Clicking the tray icon opens it too.
@@ -155,6 +155,8 @@ couple of seconds. No need to press anything.
                     nothing, so when Alert Grid is open it clears all the alerts (same
                     as Ctrl+Alt+A). Caps Lock still turns itself off when it is on.
                     [AlertGrid] CapsLockClears=no in settings.ini turns this off.
+                    [AlertGrid] SelectWait= (v3.13.0, default 200) is the pause in ms after
+                    Ctrl+A before the right-click; raise it if only the top alert clears.
   Ctrl+Alt+Shift+A  Teach it the clicks, once per PC: clear alerts by hand and press
                     F8 (or Ctrl+Alt+Shift+A again if F8 needs the Fn key) over a row,
                     the menu item, Submit, the final OK and the little button that clears the
@@ -163,6 +165,12 @@ couple of seconds. No need to press anything.
                     date (Open in Notepad button inside). v3.7.1
                     (Ctrl+Alt+T used to find notes by tag. It was
                     removed in v2.7 and T is now Teams.)
+
+  Numpad +          The call pad (v3.12.0): a small pad to jot a phone call into with
+  (or Ctrl+Alt+N)   one hand. See CALL PAD AND AUTOCORRECT below. The + key on the number
+                    pad opens it from any program except Watchlog's own windows;
+                    Shift+ or Ctrl+ with it still types a +.
+                    [CallPad] Key=off in settings.ini gives the + key back.
 
   Ctrl+Alt+E        The template editor (v3.10.0): change wording, add
                     templates and boxes, change lists like @tables,
@@ -317,7 +325,7 @@ Forms (open a form):
   ;found        Abandoned credits printed off and taken to Security:
                 amount, machine
   ;aml          AML alert: alert #, machine, time (now)
-  ;firm         NRT firmware check: department/title, location/NRT #, DUB # (with the fixed shot note)
+  ;firm         NRT firmware check: department/title (starts as Operations Supervisor), location/NRT # (n2 becomes NRT2), DUB # (with the fixed shot note)
   ;maint        Machine maintenance
   ;countstep    Soft count step (time now, opens on the next step)
   ;counttables  Soft count: table totals
@@ -489,6 +497,26 @@ never force-closed, because the same program runs the taskbar.
 Every log you insert, quick or form, is also saved with the time it
 went in. Logins and passwords are never saved.
 
+Ctrl+Alt+J opens the journal window (v3.15.0): the count of each log at
+the top, and below it every log of this shift as text you can EDIT. Click
+in it, fix a typo or delete a line, then Save changes (Undo edits puts back
+what was saved; closing asks if you have unsaved edits). A log inserted
+while the window is open is kept: it is added after your text. If the file
+was changed by something else meanwhile, nothing is overwritten and the
+window tells you (Copy shift text keeps what you typed). Copy summary uses
+the edited text.
+  Edits count everywhere (v3.17.0): each log in the journal now has a tag
+  like [k112] after its title, the keystrokes that log saved. When you
+  Save changes, a log you removed comes off Shift count, this shift's
+  numbers, Time saved (day, week, month, since the start) and the Shift
+  dashboard, with exactly its own keystrokes. Renaming a log's title (keep
+  the [k] tag) moves it to the other log type; a log you type in by hand
+  counts as one log saving nothing unless you give it a [k] tag. Logs from
+  before v3.17.0 have no tag, so they come off at the average for their
+  type. Logins, stamps, Alert Grid clears and app switches aren't in the
+  journal, so they stay as counted. The tags don't show in the counts or in
+  Copy summary.
+
 SHIFT COUNT (tray > Shift count, the Shift count tile on the home window,
 or the Shift count button in Time saved)
   An exact tally of one shift, item by item: how many of each template
@@ -499,6 +527,21 @@ or the Shift count button in Time saved)
   nothing), and "Start a new count" restarts it by hand. Copy report
   puts the numbers on the clipboard. Numbers only: never log text or
   passwords. Kept in time saved.ini, same as Time saved.
+
+SHIFT DASHBOARD (Ctrl+Alt+Shift+D, tray > Shift dashboard, or the Dashboard
+button in Shift count / Time saved)  -  new in v3.16.0
+  Three tabs. This shift: tiles for logs, alert clears, typing saved and
+  shift length, then logs by type as bars. Week and Month: one row per day
+  (logs, alert clears, typing saved), the top log types, and on Month the
+  busiest day and the previous 30 days for comparison. Copy summary puts
+  a plain-text shift summary on the clipboard; Save as a sheet writes a
+  one-page HTML sheet to Shift Reports (next to settings.ini) and opens it
+  to print. The tick box leaves typing saved off the copy and the sheet.
+  "Alert clears" counts each Clear all, not each alert. Numbers only: log
+  type names and counts, never log text, employee numbers, patron names,
+  machine or alert numbers. Kept on this PC in time saved.ini ([DayItems]),
+  nothing sent anywhere. Week and Month fill in from the day v3.16.0 is
+  installed (older days show logs and typing saved only).
 
 TIME SAVED (tray > Time saved, or the Time saved button in Ctrl+Alt+J)
   Every log, login and time stamp adds up the keystrokes it saved: the
@@ -565,6 +608,7 @@ and the less-used items sit in sub-menus):
                                 code, and where the templates come from
   Watchlog home                 Same as Ctrl+Alt+M (bold: a click on
                                 the icon does this)
+  Call pad                      Same as Numpad + (v3.12.0)
   Find a template               Same as Ctrl+Alt+Space
   Cheat sheet                   Same as Ctrl+Alt+H
   Shift journal                 Same as Ctrl+Alt+J
@@ -573,6 +617,7 @@ and the less-used items sit in sub-menus):
                                 (see TIME SAVED in section 10)
   Shift count                   Exact tally of this shift, item by item
                                 (see SHIFT COUNT in section 10)
+  Shift dashboard               Same as Ctrl+Alt+Shift+D (v3.16.0)
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
@@ -643,6 +688,74 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
+CALL PAD AND AUTOCORRECT  (Numpad +, v3.12.0; shorthand v3.13.0)
+Most of what goes into a log arrives on a phone call. The call pad is a
+small window to jot it into while you talk, so it replaces the paper
+notepad. It opens with the cursor in the box (one key, no mouse), stamps
+the time of your first key, and keeps the text if you press Esc.
+
+  Esc               Hides the pad. The text stays until New call.
+  Ctrl+Enter        Make a log (v3.13.0): copies the call to the clipboard,
+                    hides the pad and takes you back to the window you were
+                    in. Then type any log's trigger (like ;jack): its boxes
+                    are already filled in from the saved call, marked
+                    "(from your call pad)". When that log is inserted the
+                    call moves to Earlier calls and the next Numpad + opens
+                    a fresh, empty pad (one call is one log).
+                    (Cancelling the form keeps the call on the pad.)
+                    What it picks up:
+                      machine   B1410, NRT2, ATM3 (a letter and 3 to 5 digits)
+                      table     any table in the @tables list, like UT201
+                      amount    $4,000 or 4k  (not in ;player, which has Buy-in)
+                      alert #   an 8-digit number (;aml)
+                    A box is only filled when the pad holds exactly one of
+                    that kind. Two different machines leaves the box empty.
+                    Lists you pick from are only set to an item that exists.
+
+SHORTHAND ON THE PAD  (v3.13.0), one per line:
+  n3 190800 bvs         machine fill: NRT3 $190,800 (BVs)   (n1-n4 or nrt1-4)
+  a1 100000             ATM1 $100,000                        (a1-a5 or atm1-5)
+  n1 5000 bvs/divert    NRT1 $5,000 (BVs/Divert)   (any text with "div" in it)
+  n2 90k                NRT2 $90,000        (k = thousand)
+    Type ;mfill: the first fill is in the boxes and the form adds the
+    others by itself (Add another), so the log has one line per machine.
+    The new Note box on ;mfill is the text in brackets after the amount.
+    Words after the amount other than bvs or divert go in the brackets as
+    typed. Typing bvs straight into the Note box works the same (v3.14.0). (templates.txt wording Oct 25, 2026 (3) has the Note box: copy
+    the new templates.txt into Documents\Watchlog, or the team folder.)
+  c2102 11421.11 win 3 cash
+                    a jackpot: type ;jack and the machine (C2102), the
+                    amount ($11,421.11, cents kept) and the window (#3) are
+                    filled in. The wording already says "paid all cash".
+                    Time paid is not filled in (jot-time shorthand is not built).
+  Copy all          Copies the pad text. Paste into window puts it where you
+                    were typing.
+  New call          Puts this call under "Earlier calls this shift" (the
+                    last 8) and starts a fresh pad.
+
+Time saved (v3.13.1): the keys you type on the pad for a call (and the + key and
+Ctrl+Enter) count as typed when that call's log is inserted. The boxes the
+pad filled are not counted a second time, so the saving is the log's length
+minus what you actually typed on the pad.
+
+The pad text and the earlier calls are kept on this PC only
+(%LOCALAPPDATA%\Watchlog\call pad.txt and call pad history.txt), never in
+settings.ini, the shared folder or the activity log. They are wiped at end
+of shift (Ctrl+Alt+Shift+L) and are ignored after 14 hours.
+
+Casino autocorrect fixes slang and acronyms as you type in the call pad and
+in the log form boxes (typed boxes and boxes with a list, v3.14.0), when you
+finish the word with a space, Enter or punctuation (tito becomes TITO,
+handpay becomes hand pay, titos becomes TITOs). Ctrl+Z puts the old
+word back. The built-in list comes from the SOP glossary acronyms: ABM AGCO AJM
+APC CCOM CVT CFE CPU XVU CTR EPROM GMS GBHC IOC OLG PTM PMGR ROMSIG TITO MEAL RAM
+WAN GM, plus handpay, cashbox, softcount, mainbank and shortpay.
+Tray menu > Advanced > Edit the autocorrect list saves the list as
+autocorrect.txt in the Watchlog folder and opens it in Notepad. That file is
+then the whole list: add lines like  wrong = right, or put # in front of one
+to switch it off. A saved change is used within a second (v3.14.1).
+[CallPad] Autocorrect=no turns it off. It does not run in other programs.
+
 THE TEMPLATE EDITOR  (Ctrl+Alt+E, v3.10.0)
   The easy way. At the top, pick the file: the team's templates (or
   templates.txt) or your own my-templates.txt.
@@ -710,7 +823,9 @@ Blanks (any of these makes the template a form):
   {Signs: prefix=( | suffix=) | blank=}
                                adds ( ) around it only if you fill it in
   {Machine: caps}              capitals in machine numbers
-                               (b1410 becomes B1410)
+                               (b1410 becomes B1410; in a Machine or
+                               NRT box n3 becomes NRT3, a1 ATM1)
+  {Note: tidy}                 bvs becomes BVs, bvs divert BVs/Divert
   {Table: @tables}             uses the @tables list (see below)
   {repeat}                     at the end of a form: adds an "Add
                                another" button (several in one log,
@@ -869,8 +984,11 @@ Save it and it reloads itself.
  15. SECURITY, PRIVACY AND THE ACTIVITY LOG
 -----------------------------------------------------------------------
 Tray menu > Security and status shows all of this for the PC you're on,
-checked live, with a Copy report button (to paste into an email to IT
-or a supervisor). It never shows a password.
+checked live. Since v3.15.0 it opens with green/amber/red lights (no password
+in settings.ini, version up to date, OneDrive running, nothing sent anywhere)
+and one tab per part: Passwords, Templates, Journal, Kept on this PC, Never.
+Copy full report (to paste into an email to IT
+or a supervisor) copies the whole thing as text. It never shows a password.
 
 WHAT IT KEEPS, AND WHERE
   Passwords        Windows Credential Manager on that PC only, as
@@ -889,6 +1007,8 @@ WHAT IT KEEPS, AND WHERE
                    Deleted after 30 days by default.
   Quick notes      Only what you type with Ctrl+Alt+Q, in
                    Documents\Quick Notes.md, until you delete it.
+  Call pad         The text on the call pad and the last 8 calls, on that PC
+                   only, wiped at end of shift (see CALL PAD above).
   Activity log     See below. On that PC only.
   Registry         The time of the last login per username, for the
                    log-in-again reminder (HKCU\Software\Watchlog).

@@ -26,8 +26,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.11.0"
-VERSION_DATE := "Oct 25, 2026"
+VERSION := "3.17.0"
+VERSION_DATE := "Oct 26, 2026"
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
 HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
@@ -44,6 +44,7 @@ if A_IsCompiled && !FileExist(A_ScriptDir "\settings.ini")
 TemplatesFile := HomeDir "\templates.txt"
 IconFile := A_IsCompiled ? "" : A_ScriptDir "\Watchlog.ico"   ; the exe carries its own icon
 MyTemplatesFile := HomeDir "\my-templates.txt"
+AutoFile := HomeDir "\autocorrect.txt"
 SettingsFile := HomeDir "\settings.ini"
 NotesFile := A_MyDocuments "\Quick Notes.md"
 ; Kept on this PC only (not synced): the activity log and the last good
@@ -55,6 +56,8 @@ TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
 AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
+CallPadFile := DataDir "\call pad.txt"            ; the call pad text, this PC only, wiped at end of shift
+CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, this PC only
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
@@ -70,6 +73,19 @@ PickMode := false        ; true while Pick window waits for a click
 PickHwnd := 0
 TeachBusy := false       ; true while the Alert Grid teach step runs
 NotesWin := ""           ; the quick notes window while it's open
+LeftOnClip := ""         ; the last log Watchlog left on the clipboard (not your own copy)
+CallPadWin := ""         ; the call pad window (hidden, not closed, when you press Esc)
+CallPadTarget := 0       ; the window you were in when the pad opened
+CallPadLoaded := false
+PadText := ""            ; what is on the call pad now (this PC only)
+PadStart := ""           ; HH:mm the current call began
+PadStamp := 0            ; when the pad text last changed
+DashWin := ""             ; the open Shift dashboard window
+PadKeys := 0             ; keys typed on the pad for this call (for the time saved tally)
+PadHistory := []         ; earlier calls this shift, newest first
+AutoMap := Map()         ; casino autocorrect: what you type -> what it becomes
+AutoMap.CaseSense := false
+AutoStamp := "-"         ; modified time of autocorrect.txt when it was last read
 CurForm := ""
 JustFired := 0
 ReminderGui := ""
@@ -112,6 +128,7 @@ Loop Reg RegKey
     RanBefore := true
 
 TrimActivity()
+TrimDayItems()
 Activity("Started v" VERSION " on " A_ComputerName " (Windows user " A_UserName ") from " A_ScriptDir)
 OnExit(LogExit)
 OnError(LogError)
@@ -347,6 +364,10 @@ LoadSettings() {
     ; Minutes after an SDS login to sign back into SDS by itself (0 = off)
     sr := Trim(IniRead(SettingsFile, "SDS", "ResignMinutes", "62"))
     Cfg["SdsResign"] := IsInteger(sr) && sr >= 0 && sr <= 600 ? Integer(sr) : 62
+    ; Call pad: Numpad + opens it (Ctrl+Alt+N always does). Key=off frees the + key.
+    Cfg["PadKey"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Key", "NumpadAdd"))), "^(off|no|0|false|none)$")
+    ; Casino autocorrect in the call pad and the log forms
+    Cfg["Autocorrect"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Autocorrect", "yes"))), "^(no|off|0|false)$")
     ; Beep with the login reminder pop-up (off unless asked for in Settings)
     Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
     ; A folder of your own to take updates from, instead of the team folder
@@ -899,7 +920,7 @@ Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, 
 
 ; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
 ; Add more as [App3], [App4] ... up to [App9].
-; Taken keys: Q O I H P X R L E J K W A M
+; Taken keys: Q O I H P X R L E J K W A M N
 ; Built in already: T Teams, U Outlook, Y Spotify, G Chrome. To change one,
 ; add an [AppN] with the same Name and a new Key (Key=none turns it off).
 [App1]
@@ -1203,8 +1224,9 @@ RunTemplate(text, title, repeat := false, trig := "") {
     if fields.Length = 0 {
         out := FixArticles(text)
         Paste(out)
-        Journal(title, out)
-        CountSaved("log", StrLen(out) - StrLen(trig), title)
+        saved := StrLen(out) - StrLen(trig)
+        Journal(title, out, saved)
+        CountSaved("log", saved, title)
         return
     }
     FormPaste(title, fields, vals => FillTemplate(text, fields, vals), repeat, StrLen(trig))
@@ -1326,7 +1348,7 @@ ParseField(spec, last := Map()) {
         } else if low = "percent" {
             f.kind := "percent", f.ph := "XX%", hint := "  (e.g. 67)"
         } else if low = "clip" {
-            f.def := NumberFromCopy(A_Clipboard)
+            f.def := NumberFromCopy(CopiedText())
             hint := "  (copy it first to auto-fill)"
         } else if low = "alertcopy" {
             ; facial rec alert #: the 8-digit number copied in the last two
@@ -1363,6 +1385,8 @@ ParseField(spec, last := Map()) {
             pick := true
         } else if low = "caps" {
             f.caps := true
+        } else if low = "tidy" {
+            f.tidy := true              ; bvs -> BVs, bvs divert -> BVs/Divert
         } else if low = "upper" {
             f.upper := true             ; all capitals: rn -> RN
         } else if SubStr(opt, 1, 1) = "@" && Lists.Has(SubStr(opt, 2)) {
@@ -1395,7 +1419,7 @@ ParseField(spec, last := Map()) {
             hint := "  (pick or type)"
         ; "fromcopy": open the list on the job title found in what was copied
         if f.HasOwnProp("fromCopy") {
-            at := TitleFromCopy(items, A_Clipboard)
+            at := TitleFromCopy(items, CopiedText())
             if at {
                 f.choose := at
                 hint := "  (from the copied text)"
@@ -1475,10 +1499,22 @@ ReturnTo(hwnd) {
     Sleep WinActive("ahk_exe wfica32.exe") ? 400 : 50
 }
 
+; What you copied, for the clip and fromcopy boxes. A log Watchlog itself
+; left on the clipboard doesn't count: the next form would otherwise pick a
+; number or a job title out of the last log (v3.14.2).
+CopiedText() {
+    text := ""
+    try text := A_Clipboard
+    if LeftOnClip != "" && Trim(StrReplace(text, "`r`n", "`n")) == Trim(StrReplace(LeftOnClip, "`r`n", "`n"))
+        return ""
+    return text
+}
+
 ; Fast paste: backs up your clipboard, pastes the text, then restores it
 ; keep = true leaves the text on the clipboard afterwards (used by forms, so
 ; if the paste doesn't land you can still press Ctrl+V yourself).
 Paste(text, keep := false) {
+    global LeftOnClip
     ; Windows apps want a CR+LF pair for a new line - a bare LF gets ignored
     text := StrReplace(StrReplace(text, "`r`n", "`n"), "`n", "`r`n")
     ; Pasting into Citrix (iTrak): the log stays on the clipboard and the old
@@ -1492,6 +1528,8 @@ Paste(text, keep := false) {
     saved := keep ? "" : ClipboardAll()
     ; Set it in one go (no emptying first), so Citrix sees a single change
     A_Clipboard := text
+    if keep
+        LeftOnClip := text
     ; Citrix copies the clipboard across to the session on its own
     ; schedule: give it a moment before pasting
     if citrix
@@ -1515,9 +1553,9 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
     g := Gui("+AlwaysOnTop +ToolWindow", title)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
-    ctrls := [], starts := []
+    ctrls := [], starts := [], labs := []
     for f in fields {
-        g.AddText(A_Index > 1 ? "y+10" : "", f.label)
+        labs.Push(g.AddText(A_Index > 1 ? "y+10" : "", f.label))
         kind := f.HasOwnProp("kind") ? f.kind : ""
         n := f.HasOwnProp("choose") ? f.choose : 1
         ; Lists open showing up to 12 choices at once
@@ -1531,6 +1569,17 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
         ctrls.Push(c)
         starts.Push({text: c.Text, choose: n})
     }
+    ; Boxes the call pad can fill (machine, table, amount, alert #)
+    hints := PadHints()
+    padUsed := 0, padRows := [], padMarks := Map()
+    if hints.Count {
+        res := PadFill(fields, ctrls, labs, hints, padMarks)
+        padUsed := res.n, padRows := res.rows
+    }
+    LoadAutocorrect()
+    for c in ctrls
+        if c.Type = "Edit" || c.Type = "ComboBox"
+            c.OnEvent("Change", AutoFixEdit)
     done := []          ; finished entries so far, when "Add another" is used
     typed := 0          ; keystrokes typed into the form, for the time saved tracker
     autoVals := Map()   ; boxes filled in by an "if" option, and with what
@@ -1569,6 +1618,16 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
         }
     }
     first.Focus()
+    ; Several machine fills jotted on the pad: one set of boxes for each
+    if padRows.Length {
+        for i, row in padRows {
+            PadSetRow(fields, ctrls, labs, row, padMarks)
+            if i < padRows.Length
+                AddAnother()
+        }
+        padUsed := padRows.Length
+        Changed()
+    }
 
     Cancel(*) {
         SetForm("")
@@ -1671,8 +1730,17 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
                     v := RTrim(v, "%") "%"
                 ; caps: capitals in machine numbers (b1410 -> B1410). Only words
                 ; with a digit in them change, so "nrt2 and nrt4" -> "NRT2 and NRT4"
-                if f.HasOwnProp("caps")
+                if f.HasOwnProp("caps") {
+                    ; in a machine or NRT box, a lone n or a before a single
+                    ; digit: n3 -> NRT3, a1 -> ATM1 (not in Location boxes)
+                    if RegExMatch(f.key, "i)machine|nrt|atm") {
+                        v := RegExReplace(v, "i)(?<![A-Za-z0-9])n(?=\d(?!\d))", "NRT")
+                        v := RegExReplace(v, "i)(?<![A-Za-z0-9])a(?=\d(?!\d))", "ATM")
+                    }
                     v := RegExReplace(v, "(\w*\d\w*)", "$U1")
+                }
+                if f.HasOwnProp("tidy")
+                    v := PadNote(v)
                 if f.HasOwnProp("prefix")
                     v := f.prefix v
                 if f.HasOwnProp("suffix")
@@ -1715,6 +1783,9 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
     TypedNow() {
         n := 0
         for i, c in ctrls {
+            ; a box the call pad filled costs nothing here: its keys are counted from the pad
+            if padMarks.Has(i)
+                continue
             v := Trim(c.Text)
             n += 1
             ; a box left blank keeps its placeholder (XXXXX), which saves nothing
@@ -1760,12 +1831,18 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
             out .= (A_Index > 1 ? "`n" : "") entry
         SetForm("")
         g.Destroy()
-        CountSaved("log", StrLen(out) - trigLen - typed, title)
+        ; what was typed on the call pad for this call, plus the + key and Ctrl+Enter
+        if padUsed
+            typed += PadKeys + 2
+        saved := StrLen(out) - trigLen - typed
+        CountSaved("log", saved, title)
         ; Give the window you were typing in a moment to take the keyboard
         ; back (Citrix needs longer) - otherwise the paste can get lost
         ReturnTo(target)
         Paste(out, true)
-        Journal(title, out)
+        Journal(title, out, saved)
+        if padUsed
+            CallPadUsed()
     }
 }
 
@@ -1917,6 +1994,7 @@ QuickNote() {
     if SaveNote(NotesFile, note) {
         Tip("Note saved", 1000)
         RefreshNotes()
+        SetTitleMatchMode 2
         if WinExist("Quick Notes ahk_exe Notepad.exe")
             MsgBox "Quick Notes.md is open in Notepad. Your note IS saved, but that Notepad window still shows the old text.`n`nClose it and choose Don't save (saving it would write over your new note). Ctrl+Alt+O shows your notes without this problem.", "Quick Note", "Icon! 4096"
         return
@@ -2015,6 +2093,611 @@ MergeNotesBackup() {
 
 
 ; =====================================================================
+;  CALL PAD  (v3.12.0)
+;  Numpad +  (or Ctrl+Alt+N) = a small pad to jot a phone call into, with
+;  one hand. It opens with the cursor in the box and stamps the time of
+;  your first key. Esc hides it (the text stays), Ctrl+Enter makes a log
+;  from it: the log forms then open with the machine, table, amount and
+;  alert # already filled in from what you jotted ("from your call pad").
+;  Nothing is guessed: if you jotted two different machines, the box stays
+;  empty. The text is kept on this PC only (never in settings.ini or the
+;  shared folder) and is wiped by New call and at end of shift.
+;  Casino autocorrect (autocorrect.txt) fixes slang and acronyms as you
+;  type, in the pad and in the log form boxes. Ctrl+Z undoes a fix.
+;  [CallPad] Key=off frees the + key; Autocorrect=no turns the fixes off.
+; =====================================================================
+#HotIf CallPadKeyOn()
+NumpadAdd:: ShowCallPad()
+#HotIf
+^!n:: ShowCallPad()
+
+#HotIf CallPadActive()
+^Enter:: CallPadMakeLog()
+^NumpadEnter:: CallPadMakeLog()
+#HotIf
+
+; The + key only opens the pad while you're in some other program, so it
+; still types a + in Watchlog's own boxes. Shift+ or Ctrl+ with it types a +.
+CallPadKeyOn() => Cfg.Has("PadKey") && Cfg["PadKey"] && !WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
+CallPadActive() => IsObject(CallPadWin) && WinActive("ahk_id " CallPadWin.Hwnd)
+
+ShowCallPad() {
+    global CallPadWin, CallPadTarget
+    if !WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
+        CallPadTarget := WinExist("A")
+    if IsObject(CallPadWin) {
+        if WinActive("ahk_id " CallPadWin.Hwnd) {
+            CallPadHide()
+            return
+        }
+        LoadAutocorrect()
+        CallPadWin.Show()
+        WinActivate "ahk_id " CallPadWin.Hwnd
+        CallPadWin["Pad"].Focus()
+        return
+    }
+    LoadCallPad()
+    LoadAutocorrect()
+    g := Gui("+AlwaysOnTop +ToolWindow", "Call pad  -  v" VERSION)
+    g.MarginX := 12, g.MarginY := 10
+    g.SetFont("s10 c606060", "Segoe UI")
+    g.AddText("vStamp w290", "")
+    g.AddButton("vEarlier x+6 yp-5 w184", "Earlier calls this shift").OnEvent("Click", Earlier)
+    g.SetFont("s12 c000000", "Segoe UI")
+    ed := g.AddEdit("vPad xm w480 r10 Multi WantReturn", PadText)
+    g.SetFont("s10", "Segoe UI")
+    g.AddButton("vLog xm w150", "Make a log (Ctrl+Enter)").OnEvent("Click", (*) => CallPadMakeLog())
+    g.AddButton("x+6 yp w80", "Copy all").OnEvent("Click", CopyAll)
+    g.AddButton("x+6 yp w130", "Paste into window").OnEvent("Click", PasteInto)
+    g.AddButton("x+6 yp w100", "New call").OnEvent("Click", NewCall)
+    g.SetFont("s9 c707070")
+    g.AddText("xm w480", "Esc hides the pad and keeps the text. The + key brings it back.")
+    ed.OnEvent("Change", PadChanged)
+    g.OnEvent("Escape", (*) => CallPadHide())
+    g.OnEvent("Close", (*) => (CallPadHide(), true))
+    CallPadWin := g
+    ShowStamp()
+    g.Show()
+    WinActivate "ahk_id " g.Hwnd
+    ed.Focus()
+    ; cursor at the end of what is already there
+    SendMessage 0xB1, StrLen(ed.Value), StrLen(ed.Value), ed.Hwnd
+
+    PadChanged(*) {
+        global PadText, PadStart, PadStamp, PadKeys
+        AutoFixEdit(ed)
+        PadKeys += Abs(StrLen(ed.Value) - StrLen(PadText))
+        PadText := ed.Value
+        PadStamp := A_TickCount
+        if PadStart = "" && Trim(PadText) != ""
+            PadStart := FormatTime(, "HH:mm")
+        ShowStamp()
+        SetTimer SaveCallPad, -700
+    }
+    ShowStamp() {
+        g["Stamp"].Text := PadStart != "" ? "Call started " PadStart : "Type while you talk. The time is stamped at your first key."
+    }
+    CopyAll(*) {
+        if Trim(PadText) = "" {
+            Tip("Nothing on the pad yet")
+            return
+        }
+        A_Clipboard := PadText
+        Tip("Copied. Paste it with Ctrl+V.")
+    }
+    PasteInto(*) {
+        if Trim(PadText) = ""
+            return
+        CallPadHide()
+        Paste(PadText)
+    }
+    NewCall(*) {
+        global PadText, PadStart, PadKeys
+        PadPush()
+        PadText := "", PadStart := "", PadKeys := 0
+        ed.Value := ""
+        ShowStamp()
+        SaveCallPad()
+        ed.Focus()
+    }
+    Earlier(*) {
+        m := Menu()
+        if !PadHistory.Length {
+            m.Add("(no earlier calls this shift)", (*) => 0)
+            m.Disable("1&")
+        }
+        for i, h in PadHistory {
+            first := StrReplace(StrReplace(SubStr(Trim(h.text), 1, 40), "`r"), "`n", " ")
+            m.Add(h.start "  " first, LoadOld.Bind(i))
+        }
+        m.Show()
+    }
+    LoadOld(i, *) {
+        global PadText, PadStart, PadStamp, PadKeys
+        h := PadHistory.RemoveAt(i)
+        PadPush()
+        PadText := h.text, PadStart := h.start, PadKeys := h.keys, PadStamp := A_TickCount
+        ed.Value := PadText
+        ShowStamp()
+        SaveCallPad()
+        ed.Focus()
+    }
+}
+
+; Puts the current call on the list of earlier calls (if there is one)
+PadPush() {
+    global PadHistory
+    if Trim(PadText) = ""
+        return
+    PadHistory.InsertAt(1, {start: PadStart != "" ? PadStart : "--:--", text: PadText, keys: PadKeys})
+    while PadHistory.Length > 8
+        PadHistory.Pop()
+}
+
+CallPadHide() {
+    if !IsObject(CallPadWin)
+        return
+    CallPadWin.Hide()
+    if CallPadTarget
+        ReturnTo(CallPadTarget)
+}
+
+; Ctrl+Enter / "Make a log": the call goes on the clipboard and the pad hides.
+; Then type any log trigger: its form reads the saved call and fills its
+; boxes. When that log is inserted the call moves to Earlier calls and the
+; next Numpad + gives a fresh pad.
+CallPadMakeLog() {
+    if Trim(PadText) = "" {
+        Tip("Nothing on the pad yet")
+        return
+    }
+    A_Clipboard := PadText
+    if IsObject(CallPadWin)
+        CallPadWin.Hide()
+    if CallPadTarget
+        ReturnTo(CallPadTarget)
+    Tip("Call saved. Now type the trigger of the log (like `;jack) and it fills in the boxes.", 3500)
+}
+
+; A log that used the call has been inserted: the call goes to the earlier
+; calls and the pad is empty for the next one
+CallPadUsed() {
+    global PadText, PadStart, PadKeys
+    PadPush()
+    PadText := "", PadStart := "", PadKeys := 0
+    if IsObject(CallPadWin) {
+        try CallPadWin["Pad"].Value := ""
+        try CallPadWin["Stamp"].Text := "Type while you talk. The time is stamped at your first key."
+    }
+    SaveCallPad()
+}
+
+; The pad text is saved a moment after you stop typing, so a reload or a
+; crash can't lose a call. Files are on this PC only.
+SaveCallPad() {
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        if Trim(PadText) = "" {
+            try FileDelete CallPadFile
+        } else {
+            f := FileOpen(CallPadFile, "w", "UTF-8")
+            f.Write(PadStart "|" PadKeys "`n" PadText)
+            f.Close()
+        }
+        if !PadHistory.Length {
+            try FileDelete CallHistFile
+        } else {
+            out := ""
+            for h in PadHistory
+                out .= "@@@@ " h.start "|" h.keys "`n" StrReplace(h.text, "@@@@", "@@@") "`n"
+            f := FileOpen(CallHistFile, "w", "UTF-8")
+            f.Write(out)
+            f.Close()
+        }
+    }
+}
+
+; Reads the saved pad once. Files older than 14 hours are from an earlier
+; shift and are thrown away.
+LoadCallPad() {
+    global CallPadLoaded, PadText, PadStart, PadStamp, PadHistory, PadKeys
+    if CallPadLoaded
+        return
+    CallPadLoaded := true
+    for file in [CallPadFile, CallHistFile] {
+        if FileExist(file) && DateDiff(A_Now, FileGetTime(file, "M"), "Hours") >= 14
+            try FileDelete file
+    }
+    try {
+        if FileExist(CallPadFile) {
+            t := FileRead(CallPadFile, "UTF-8")
+            nl := InStr(t, "`n")
+            head := StrSplit(nl ? SubStr(t, 1, nl - 1) : "", "|")
+            PadStart := head.Length ? head[1] : ""
+            PadKeys := head.Length > 1 && IsInteger(head[2]) ? Integer(head[2]) : 0
+            PadText := nl ? SubStr(t, nl + 1) : t
+            ; keep the call's real age (forms only use a call jotted in the last 90 minutes)
+            PadStamp := A_TickCount - DateDiff(A_Now, FileGetTime(CallPadFile, "M"), "Seconds") * 1000
+        }
+    }
+    try {
+        if FileExist(CallHistFile) {
+            PadHistory := []
+            for chunk in StrSplit(FileRead(CallHistFile, "UTF-8"), "@@@@ ") {
+                if Trim(chunk) = ""
+                    continue
+                nl := InStr(chunk, "`n")
+                head := StrSplit(SubStr(chunk, 1, nl - 1), "|")
+                PadHistory.Push({start: head[1], keys: head.Length > 1 && IsInteger(head[2]) ? Integer(head[2]) : 0, text: RTrim(SubStr(chunk, nl + 1), "`r`n")})
+            }
+        }
+    }
+}
+
+; End of shift: the pad and the earlier calls are wiped
+CallPadEndShift() {
+    global PadText, PadStart, PadHistory, PadKeys
+    PadText := "", PadStart := "", PadHistory := [], PadKeys := 0
+    try FileDelete CallPadFile
+    try FileDelete CallHistFile
+    if IsObject(CallPadWin) {
+        try CallPadWin["Pad"].Value := ""
+        try CallPadWin["Stamp"].Text := "Type while you talk. The time is stamped at your first key."
+    }
+}
+
+; ---- Reading the pad for the log forms ------------------------------
+; Looks for a machine (B1410, NRT2, ATM3), a table from the @tables list,
+; a dollar amount ($4,000 or 4k) and an 8-digit alert #. A value is only
+; used when the pad holds exactly one of that kind. Expires after 90
+; minutes without typing on the pad.
+PadHints() {
+    hints := Map()
+    if Trim(PadText) = "" || A_TickCount - PadStamp > 5400000
+        return hints
+    text := PadText
+    found := Map()
+    pos := 1
+    while p := RegExMatch(text, "i)(?<![A-Za-z0-9])((?:[A-Za-z]\d{3,5})|(?:NRT|ATM)\d)(?![A-Za-z0-9])", &m, pos) {
+        found[StrUpper(m[1])] := true
+        pos := p + m.Len
+    }
+    if found.Count = 1
+        for k in found
+            hints["machine"] := k
+    found := Map()
+    if Lists.Has("tables") {
+        for it in Lists["tables"]
+            if RegExMatch(text, "i)(?<![A-Za-z0-9])" it "(?![A-Za-z0-9])")
+                found[it] := true
+    }
+    if found.Count = 1
+        for k in found
+            hints["table"] := k
+    found := Map()
+    pos := 1
+    while p := RegExMatch(text, "(?<![\w.])\$\s?(\d[\d,]*(?:\.\d+)?)(k?)(?![\w])", &m, pos) {
+        found[PadMoney(m[1], m[2])] := true
+        pos := p + m.Len
+    }
+    pos := 1
+    while p := RegExMatch(text, "i)(?<![\w.$,])(\d[\d,]*(?:\.\d+)?)\s?(k)(?![\w])", &m, pos) {
+        found[PadMoney(m[1], m[2])] := true
+        pos := p + m.Len
+    }
+    if found.Count = 1
+        for k in found
+            hints["money"] := k
+    found := Map()
+    pos := 1
+    while p := RegExMatch(text, "(?<!\d)\d{8}(?!\d)", &m, pos) {
+        found[m[0]] := true
+        pos := p + m.Len
+    }
+    if found.Count = 1
+        for k in found
+            hints["alert"] := k
+    shorthand := PadParse(text)
+    if shorthand.fills.Length
+        hints["fills"] := shorthand.fills
+    if IsObject(shorthand.jack)
+        hints["jack"] := shorthand.jack
+    return hints
+}
+
+; Shorthand lines on the pad, one per line:
+;   n3 190800 bvs         a machine fill: NRT3, 190,800, note (BVs)
+;   a1 100000             ATM1, 100,000   (NRT1-4, ATM1-5)
+;   c2102 11421.11 win 3 cash   a jackpot: machine, amount, window #
+; Returns the fills (a list) and the jackpot (only when there is exactly one).
+PadParse(text) {
+    fills := [], jacks := []
+    for line in StrSplit(text, "`n", "`r") {
+        line := Trim(line)
+        if line = ""
+            continue
+        if RegExMatch(line, "i)^(n|nrt|a|atm)\s*(\d)\s+\$?(\d[\d,]*(?:\.\d+)?)(k?)(?![\w.])\s*(.*)$", &m) {
+            nrt := SubStr(StrLower(m[1]), 1, 1) = "n"
+            if m[2] >= 1 && m[2] <= (nrt ? 4 : 5)
+                fills.Push({machine: (nrt ? "NRT" : "ATM") m[2], amount: PadMoney(m[3], m[4]), note: PadNote(m[5])})
+        } else if RegExMatch(line, "i)^([A-Za-z]\d{3,5})\s+\$?(\d[\d,]*(?:\.\d+)?)(k?)\s+w(?:in(?:dow)?)?\.?\s*#?(\d+)\b", &m) {
+            jacks.Push({machine: StrUpper(m[1]), amount: PadMoney(m[2], m[3]), window: m[4]})
+        }
+    }
+    return {fills: fills, jack: jacks.Length = 1 ? jacks[1] : ""}
+}
+
+; The words after an amount on a fill line, as the note in brackets
+PadNote(words) {
+    r := StrLower(Trim(RegExReplace(words, "[()]")))
+    if r = ""
+        return ""
+    if InStr(r, "div") || r = "bvd"
+        return "BVs/Divert"
+    if r = "bv" || r = "bvs"
+        return "BVs"
+    return Trim(RegExReplace(words, "[()]"))
+}
+
+PadMoney(num, k) {
+    v := StrReplace(num, ",") + 0
+    if k != ""
+        v *= 1000
+    return v = Floor(v) ? String(Integer(v)) : Format("{:.2f}", v)
+}
+
+; Fills the form boxes the pad has an answer for and marks them. Returns
+; how many boxes it filled, and for a machine fill form the rows to enter
+; (FormPaste adds each one with "Add another").
+PadFill(fields, ctrls, labs, hints, marks) {
+    n := 0
+    hasBuyIn := false, hasWindow := false
+    for f in fields {
+        if f.key = "Buy-in"
+            hasBuyIn := true
+        else if RegExMatch(StrLower(f.key), "^window")
+            hasWindow := true
+    }
+    ; a machine fill form (;mfill): a Machine list holding the fill machines
+    fills := hints.Has("fills") ? hints["fills"] : []
+    if fills.Length {
+        for f in fields
+            if StrLower(f.key) = "machine" && f.HasOwnProp("items") && HasVal(f.items, fills[1].machine)
+                return {n: 0, rows: fills}
+    }
+    jack := hints.Has("jack") && hasWindow ? hints["jack"] : ""
+    for i, f in fields {
+        kind := f.HasOwnProp("kind") ? f.kind : ""
+        if f.HasOwnProp("alertCopy") || f.HasOwnProp("matchCopy") || kind = "time"
+            continue
+        k := StrLower(f.key)
+        val := ""
+        if InStr(k, "machine")
+            val := IsObject(jack) ? jack.machine : hints.Get("machine", "")
+        else if RegExMatch(k, "^table")
+            val := hints.Get("table", "")
+        else if (k = "amount" && !hasBuyIn) || k = "tito value"
+            val := IsObject(jack) ? jack.amount : hints.Get("money", "")
+        else if RegExMatch(k, "^alert #")
+            val := hints.Get("alert", "")
+        else if RegExMatch(k, "^window") && IsObject(jack)
+            val := jack.window
+        if val = ""
+            continue
+        if PadPut(f, ctrls[i], val) {
+            labs[i].Text := f.label "  (from your call pad)"
+            marks[i] := true
+            n += 1
+        }
+    }
+    return {n: n, rows: []}
+}
+
+; Puts a value in one box. A list you must pick from only takes an item it has.
+PadPut(f, c, val) {
+    kind := f.HasOwnProp("kind") ? f.kind : ""
+    if kind = "list" {
+        hit := 0
+        for j, it in f.items
+            if StrLower(it) = StrLower(val)
+                hit := j
+        if !hit
+            return false
+        c.Choose(hit)
+    } else if f.HasOwnProp("items") {
+        c.Text := val
+    } else {
+        if Trim(c.Text) != ""
+            return false
+        c.Value := val
+    }
+    return true
+}
+
+; One shorthand fill row (machine, amount, note) into a machine fill form
+PadSetRow(fields, ctrls, labs, row, marks) {
+    for i, f in fields {
+        k := StrLower(f.key)
+        val := ""
+        if k = "machine"
+            val := row.machine
+        else if k = "amount"
+            val := row.amount
+        else if k = "note"
+            val := row.note
+        if val = ""
+            continue
+        c := ctrls[i]
+        if f.HasOwnProp("items") {
+            if PadPut(f, c, val) {
+                labs[i].Text := f.label "  (from your call pad)"
+                marks[i] := true
+            }
+        } else {
+            c.Value := val
+            labs[i].Text := f.label "  (from your call pad)"
+            marks[i] := true
+        }
+    }
+}
+
+; ---- Casino autocorrect ---------------------------------------------
+; autocorrect.txt (in the Watchlog folder, made from the built-in list
+; the first time you choose Advanced > Edit the autocorrect list). One
+; fix per line:  what you type = what it becomes. Lines starting with # are
+; notes. A fix happens when you finish a word with a space, Enter or
+; punctuation, never in the middle of a word.
+LoadAutocorrect() {
+    global AutoMap, AutoStamp
+    stamp := ""
+    try stamp := FileGetTime(AutoFile, "M")
+    if stamp = AutoStamp
+        return
+    AutoStamp := stamp
+    AutoMap := Map()
+    AutoMap.CaseSense := false
+    if !Cfg["Autocorrect"]
+        return
+    text := AutoDefault()
+    if stamp != ""
+        try text := FileRead(AutoFile, "UTF-8")
+    for line in StrSplit(text, "`n", "`r") {
+        line := Trim(line)
+        if line = "" || SubStr(line, 1, 1) = "#"
+            continue
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        wrong := Trim(SubStr(line, 1, eq - 1))
+        right := Trim(SubStr(line, eq + 1))
+        if wrong != "" && right != "" && !InStr(wrong, " ")
+            AutoMap[wrong] := right
+    }
+}
+
+; Call from an Edit's Change event: if the word just finished is in the
+; list, swap it. Uses the Edit's own undo, so Ctrl+Z puts the old word back.
+AutoFixEdit(ctrl, *) {
+    static busy := false
+    if busy
+        return
+    ; picks up a saved change to autocorrect.txt (checked at most once a second)
+    static checked := 0
+    if A_TickCount - checked > 1000 {
+        checked := A_TickCount
+        LoadAutocorrect()
+    }
+    if !AutoMap.Count
+        return
+    ; a combo box keeps its typing in a child Edit
+    hw := ctrl.Hwnd
+    if ctrl.Type = "ComboBox" {
+        hw := DllCall("FindWindowEx", "Ptr", hw, "Ptr", 0, "Str", "Edit", "Ptr", 0, "Ptr")
+        if !hw
+            return
+    }
+    sel := Buffer(8, 0)
+    SendMessage 0xB0, sel.Ptr, sel.Ptr + 4, hw        ; EM_GETSEL
+    caret := NumGet(sel, 4, "UInt")
+    if caret < 2
+        return
+    ; The Edit counts a line break as 2 characters (CR+LF); work on a copy
+    ; with single-character breaks and convert the position
+    text := StrReplace(ctrl.Text, "`r`n", "`n")
+    pos := caret
+    Loop 5 {
+        part := SubStr(text, 1, pos)
+        np := caret - (StrLen(part) - StrLen(StrReplace(part, "`n")))
+        if np = pos
+            break
+        pos := np
+    }
+    ch := SubStr(text, pos, 1)
+    if ch = "" || !InStr(" `t`n.,;:!?)", ch)
+        return
+    wordEnd := pos - 1
+    if wordEnd < 1 || !RegExMatch(SubStr(text, 1, wordEnd), "([\p{L}\d'-]+)$", &m)
+        return
+    word := m[1]
+    if AutoMap.Has(word) {
+        rep := AutoMap[word]
+    } else if RegExMatch(word, "i)^(.{2,})s$", &pl) && AutoMap.Has(pl[1]) {
+        rep := AutoMap[pl[1]] "s"       ; titos -> TITOs, handpays -> hand pays
+    } else
+        return
+    if rep == word
+        return
+    ; a capital at the start of the typed word carries over to a lower-case fix
+    if RegExMatch(word, "^\p{Lu}") && RegExMatch(rep, "^\p{Ll}")
+        rep := StrUpper(SubStr(rep, 1, 1)) SubStr(rep, 2)
+    start := wordEnd - StrLen(word)
+    before := SubStr(text, 1, start)
+    start += StrLen(before) - StrLen(StrReplace(before, "`n"))
+    busy := true
+    try {
+        SendMessage 0xB1, start, start + StrLen(word), hw             ; EM_SETSEL
+        SendMessage 0xC2, 1, StrPtr(rep), hw                          ; EM_REPLACESEL (can undo)
+        after := caret + StrLen(rep) - StrLen(word)
+        SendMessage 0xB1, after, after, hw
+    }
+    busy := false
+}
+
+EditAutocorrect() {
+    if !FileExist(AutoFile) {
+        try FileAppend AutoDefault(), AutoFile, "UTF-8"
+    }
+    EditFile(AutoFile)
+}
+
+; The built-in list: acronyms from the SOP glossary (fixed to capitals) and
+; a few words that should be two words. Choosing Advanced > Edit the
+; autocorrect list saves a copy to edit; that copy is then the whole list.
+AutoDefault() {
+    return "
+(
+# Watchlog casino autocorrect. One fix per line:  what you type = what it becomes
+# A fix happens when you finish the word with a space, Enter or punctuation.
+# Ctrl+Z puts the old word back. Put # in front of a line to switch it off.
+# Save the file and it is used the next time you open the call pad or a form.
+
+# Acronyms
+abm = ABM
+agco = AGCO
+ajm = AJM
+apc = APC
+ccom = CCOM
+cvt = CVT
+cfe = CFE
+cpu = CPU
+xvu = XVU
+ctr = CTR
+eprom = EPROM
+gms = GMS
+gbhc = GBHC
+ioc = IOC
+olg = OLG
+ptm = PTM
+pmgr = PMGR
+romsig = ROMSIG
+tito = TITO
+meal = MEAL
+ram = RAM
+wan = WAN
+gm = GM
+
+# Words that should be two words
+handpay = hand pay
+cashbox = cash box
+softcount = soft count
+mainbank = Main Bank
+shortpay = short pay
+)"
+}
+
+
+; =====================================================================
 ;  SHIFT JOURNAL
 ;  Every log you insert is also saved, with the time, in
 ;  Documents\Shift Journal\<date the shift started>.txt
@@ -2027,12 +2710,14 @@ MergeNotesBackup() {
 JournalDir() => A_MyDocuments "\Shift Journal"
 JournalBackupDir() => DataDir "\Shift Journal (this PC)"
 
-Journal(title, text) {
+Journal(title, text, keys := "") {
     global JournalNotified
     mode := Cfg["JournalSave"]
     if mode = "off"
         return
-    entry := FormatTime(, "HH:mm") "  " title "`n"
+    ; [k112] = the keystrokes this log saved, so deleting or renaming it in
+    ; the journal window can take exactly that off the counts (v3.17.0)
+    entry := FormatTime(, "HH:mm") "  " title (keys != "" ? "  [k" keys "]" : "") "`n"
     if mode != "counts" {
         body := StrReplace(StrReplace(Trim(text, " `r`n"), "`r`n", "`n"), "`n", "`n       ")
         entry .= "       " body "`n`n"
@@ -2153,6 +2838,7 @@ JournalFiles() {
 ; Called by end of shift: the next log starts a new shift
 JournalEnd() {
     try IniWrite 1, SavedFile, "Shift", "Ended"
+    CallPadEndShift()
     latest := JournalFind()
     if latest.open
         try FileAppend "=== Shift ended " FormatTime(, "HH:mm") " ===`n`n", latest.file, "UTF-8"
@@ -2167,8 +2853,9 @@ LastPos(text, needle) {
 }
 
 ; Counts the logs in the last shift of a journal file
-JournalStats(file) {
-    text := FileRead(file, "UTF-8")
+JournalStats(file, text := "") {
+    if text = ""
+        text := FileRead(file, "UTF-8")
     p := LastPos(text, "=== Shift started")
     if p > 0
         text := SubStr(text, p)
@@ -2182,7 +2869,7 @@ JournalStats(file) {
         ; a log's first line: the time at the very start, two spaces, its name
         if !RegExMatch(A_LoopField, "^(\d\d:\d\d) +(\S.*)$", &e)
             continue
-        name := Trim(e[2])
+        name := Trim(RegExReplace(Trim(e[2]), "\s*\[k-?\d+\]$"))
         if !counts.Has(name) {
             counts[name] := 0
             names.Push(name)
@@ -2244,37 +2931,222 @@ ShowJournal() {
         return
     }
     file := latest.file
-    head := "Shift started " st.started "`n"
-        . st.total " logs, " st.first " to " st.last
-        . (st.ended != "" ? "   (ended " st.ended ")" : latest.open ? "   (still going)" : "")
-
+    raw := FileRead(file, "UTF-8")
+    sp := LastPos(raw, "=== Shift started")
+    shiftText := sp > 0 ? SubStr(raw, sp) : raw      ; this shift's part of the file, as saved
+    dirty := false
     sv := SavedShift()
-    if sv.keys > 0
-        head .= "`nTime saved this shift: " SavedTime(sv.keys) " (" Commas(sv.keys) " keystrokes)"
+    summary := ""
     g := Gui("+AlwaysOnTop", "Shift journal  -  v" VERSION)
-    g.SetFont("s10", "Segoe UI")
-    g.AddText("w460", head)
-    g.SetFont("s10", "Consolas")
-    g.AddEdit("w460 r14 ReadOnly -WantReturn", st.list)
-    g.SetFont("s10", "Segoe UI")
-    g.AddButton("w112 Default", "Copy summary").OnEvent("Click", CopySummary)
-    g.AddButton("x+4 w112", "Open journal").OnEvent("Click", OpenIt)
-    g.AddButton("x+4 w112", "Time saved").OnEvent("Click", (*) => (g.Destroy(), ShowTimeSaved()))
-    g.AddButton("x+4 w112", "Close").OnEvent("Click", (*) => g.Destroy())
-    g.OnEvent("Escape", (*) => g.Destroy())
+    g.BackColor := "F4F7F7"
+    g.MarginX := 16, g.MarginY := 12
+    g.SetFont("s15 bold c0F766E", "Segoe UI")
+    g.AddText("w640", "Shift journal")
+    g.SetFont("s10 norm c1F2933", "Segoe UI")
+    headT := g.AddText("w640 y+2", "")
+    g.SetFont("s9 bold c0F766E")
+    g.AddText("w640 y+10", "WHAT YOU LOGGED")
+    g.SetFont("s10 norm c1F2933", "Consolas")
+    counts := g.AddEdit("w640 r5 ReadOnly -WantReturn -TabStop VScroll BackgroundWhite")
+    g.SetFont("s9 bold c0F766E", "Segoe UI")
+    g.AddText("w640 y+10", "EVERY LOG THIS SHIFT   (edit anything, then Save changes: removed logs come off the counts. [k12] = keystrokes that log saved, leave it on its line)")
+    g.SetFont("s10 norm c1F2933", "Consolas")
+    ed := g.AddEdit("w640 r16 Multi WantReturn VScroll BackgroundWhite")
+    g.SetFont("s10 norm c1F2933", "Segoe UI")
+    saveB := g.AddButton("xm y+12 w120 Default Disabled", "Save changes")
+    revB := g.AddButton("x+6 w100 Disabled", "Undo edits")
+    g.AddButton("x+6 w112", "Copy summary").OnEvent("Click", CopySummary)
+    g.AddButton("x+6 w112", "Copy shift text").OnEvent("Click", CopyText)
+    g.AddButton("x+6 w110", "Time saved").OnEvent("Click", (*) => (CloseIt(), ShowTimeSaved()))
+    g.AddButton("x+6 w80", "Close").OnEvent("Click", (*) => CloseIt())
+    saveB.OnEvent("Click", Save)
+    revB.OnEvent("Click", Undo)
+    ed.OnEvent("Change", (*) => MarkDirty(true))
+    g.OnEvent("Escape", (*) => CloseIt())
+    g.OnEvent("Close", (*) => CloseIt())
+    Fill()
     g.Show()
+    ; cursor at the end (newest logs), nothing selected so a stray key can't replace everything
+    ed.Focus()
+    n := StrLen(ed.Value)
+    SendMessage 0xB1, n, n, ed.Hwnd
+    SendMessage 0xB7, 0, 0, ed.Hwnd
 
+    ; Fills the window from the saved shift text
+    Fill() {
+        sv := SavedShift()
+        st := JournalStats(file)
+        h := "Shift started " st.started "`n" st.total " logs, " st.first " to " st.last
+            . (st.ended != "" ? "   (ended " st.ended ")" : latest.open ? "   (still going)" : "")
+        if sv.keys > 0
+            h .= "`nTime saved this shift: " SavedTime(sv.keys) " (" Commas(sv.keys) " keystrokes)"
+        headT.Text := h
+        counts.Value := st.list
+        ed.Value := StrReplace(shiftText, "`n", "`r`n")
+        summary := st.summary
+        MarkDirty(false)
+    }
+    MarkDirty(on) {
+        dirty := on
+        saveB.Enabled := on
+        revB.Enabled := on
+    }
+    Undo(*) {
+        ed.Value := StrReplace(shiftText, "`n", "`r`n")
+        MarkDirty(false)
+    }
     CopySummary(*) {
-        A_Clipboard := st.summary
-        g.Destroy()
+        if dirty
+            summary := JournalSummaryOf(StrReplace(ed.Value, "`r`n", "`n"))
+        A_Clipboard := summary
         Tip("Summary copied. Paste it with Ctrl+V.")
     }
-
-    OpenIt(*) {
+    CopyText(*) {
+        A_Clipboard := ed.Value
+        Tip("Shift text copied.")
+    }
+    ; Writes the edited text back. A log that came in while this window was
+    ; open is kept (it is added after your text); if the file changed in any
+    ; other way nothing is written.
+    Save(*) {
+        edited := StrReplace(ed.Value, "`r`n", "`n")
+        try {
+            cur := FileRead(file, "UTF-8")
+            cp := LastPos(cur, "=== Shift started")
+            curPrefix := cp > 0 ? SubStr(cur, 1, cp - 1) : ""
+            curShift := cp > 0 ? SubStr(cur, cp) : cur
+            tail := ""
+            if curShift == shiftText {
+            } else if SubStr(curShift, 1, StrLen(shiftText)) == shiftText {
+                tail := SubStr(curShift, StrLen(shiftText) + 1)
+            } else {
+                MsgBox "The journal file changed while this window was open (OneDrive or another program wrote to it), so your edits were not saved.`n`nUse Copy shift text to keep what you typed, close this window and open the journal again.", "Shift journal", "Icon!"
+                return
+            }
+            if edited != "" && SubStr(edited, -1) != "`n"
+                edited .= "`n"
+            f := FileOpen(file, "w", "UTF-8")
+            f.Write(curPrefix edited tail)
+            f.Close()
+            took := JournalApplyEdit(shiftText, edited, RegExMatch(file, "(\d{4}-\d\d-\d\d)\.txt$", &fd) ? fd[1] : FormatTime(, "yyyy-MM-dd"))
+            shiftText := edited tail
+        } catch as err {
+            MsgBox "Couldn't save the journal:`n" file "`n`n" err.Message, "Shift journal", "Icon!"
+            return
+        }
+        Activity("Shift journal edited and saved" (took.removed || took.added ? " (" took.removed " logs taken off the counts, " took.added " put on)" : ""))
+        Fill()
+        Tip("Journal saved" (took.removed || took.added ? ": " took.removed " taken off, " took.added " added to the counts" : ""))
+    }
+    CloseIt() {
+        if dirty {
+            r := MsgBox("Save your edits to the shift journal first?", "Shift journal", "YesNoCancel Icon?")
+            if r = "Cancel"
+                return
+            if r = "Yes" {
+                Save()
+                if dirty
+                    return
+            }
+        }
         g.Destroy()
-        Run 'notepad.exe "' file '"'
     }
 }
+
+; The logs in some journal text: [{head, name, keys, tagged}] in order
+JournalLogs(text) {
+    logs := []
+    p := LastPos(text, "=== Shift started")
+    if p > 0
+        text := SubStr(text, p)
+    Loop Parse text, "`n", "`r" {
+        if !RegExMatch(A_LoopField, "^(\d\d:\d\d) +(\S.*)$", &e)
+            continue
+        name := Trim(e[2]), keys := 0, tagged := false
+        if RegExMatch(name, "\s*\[k(-?\d+)\]$", &k) {
+            keys := Integer(k[1]), tagged := true
+            name := Trim(SubStr(name, 1, k.Pos - 1))
+        }
+        logs.Push({head: A_LoopField, name: name, keys: keys, tagged: tagged})
+    }
+    return logs
+}
+
+; Logs in `a` that have no match left in `b` (matched by their whole first line)
+LogsMissingFrom(a, b) {
+    left := Map()
+    for l in b
+        left[l.head] := (left.Has(l.head) ? left[l.head] : 0) + 1
+    miss := []
+    for l in a {
+        if left.Has(l.head) && left[l.head] > 0
+            left[l.head] -= 1
+        else
+            miss.Push(l)
+    }
+    return miss
+}
+
+; What a log saved: its [k] tag, or (an older journal) the average for its type
+LogKeys(l, day) {
+    if l.tagged
+        return l.keys
+    it := ItemRow(IniRead(SavedFile, "DayItems", day "|" l.name, ""))
+    if it.n < 1
+        it := ItemRow(IniRead(SavedFile, "ShiftItems", l.name, ""))
+    return it.n > 0 ? Round(it.keys / it.n) : 0
+}
+
+; The edit made in the journal window goes through to every count: Shift count,
+; this shift, Time saved (day, week, month, since the start) and the dashboard.
+; A log taken out comes off with its own keystrokes; one added by hand goes on
+; with whatever its [k] tag says (none = 0). Returns {removed, added}.
+JournalApplyEdit(oldText, newText, day) {
+    oldL := JournalLogs(oldText), newL := JournalLogs(newText)
+    gone := LogsMissingFrom(oldL, newL), came := LogsMissingFrom(newL, oldL)
+    for l in gone
+        AdjustCount(l.name, -1, -LogKeys(l, day), day)
+    for l in came
+        AdjustCount(l.name, 1, l.tagged ? l.keys : 0, day)
+    return {removed: gone.Length, added: came.Length}
+}
+
+; Adds dn logs and dkeys keystrokes (either can be negative, never below 0)
+; to the item in every tally
+AdjustCount(name, dn, dkeys, day) {
+    name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
+    try {
+        inShift := CountBump("ShiftItems", name, dn, dkeys)
+        CountBump("DayItems", day "|" name, dn, dkeys)
+        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys)
+        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        ; this shift's totals only when this shift's item tally had the log
+        ; (or, for an added log, while the shift is still going)
+        if dn < 0 ? inShift : !IniRead(SavedFile, "Shift", "Ended", 0) {
+            sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
+            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys)
+            IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+        }
+    }
+}
+
+; One "times,keystrokes" line: add dn / dkeys (clamped at 0, deleted at 0 times).
+; Returns whether the line had anything in it before.
+CountBump(section, key, dn, dkeys) {
+    it := ItemRow(IniRead(SavedFile, section, key, ""))
+    n := Max(0, it.n + dn), k := Max(0, it.keys + dkeys)
+    if n = 0 {
+        try IniDelete SavedFile, section, key
+    } else {
+        IniWrite n "," k, SavedFile, section, key
+    }
+    return it.n > 0
+}
+
+; The summary line for some journal text (Copy summary, for edited text)
+JournalSummaryOf(text) => JournalStats("", text).summary
+
 
 ; =====================================================================
 ;  ALERT GRID - clear all   Ctrl+Alt+A
@@ -2449,6 +3321,9 @@ ClearAlerts() {
     ; [AlertGrid] Pause= in settings.ini is the wait between clicks in ms
     ; (default 40; raise it if a click lands before the menu is up).
     gap := Integer(IniRead(SettingsFile, "AlertGrid", "Pause", "40"))
+    ; the grid is slow to take Ctrl+A: [AlertGrid] SelectWait= (ms) is the wait
+    ; before the right-click, so the whole list is selected (v3.13.0)
+    selWait := Integer(IniRead(SettingsFile, "AlertGrid", "SelectWait", "200"))
     SetMouseDelay 0
     SetKeyDelay 0
     attempts := 0
@@ -2458,7 +3333,7 @@ ClearAlerts() {
             Click px, py
             Sleep gap
             Send "^a"
-            Sleep gap
+            Sleep selWait
             Click px, py, "Right"
             Sleep gap * 2
             Click px + dx, py + dy
@@ -2649,6 +3524,8 @@ CountSaved(kind, keys, name := "") {
             name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
             it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
             IniWrite (it.n + 1) "," (it.keys + keys), SavedFile, "ShiftItems", name
+            di := ItemRow(IniRead(SavedFile, "DayItems", day "|" name, ""))
+            IniWrite (di.n + 1) "," (di.keys + keys), SavedFile, "DayItems", day "|" name
         }
         if kind != ""
             sh.%kind% += 1
@@ -2760,8 +3637,8 @@ ShowShiftCount() {
     g := Gui("+AlwaysOnTop", "Shift count  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
-    g.AddText("w480", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
-    lv := g.AddListView("w480 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved"])
+    g.AddText("w520", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
+    lv := g.AddListView("w520 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved"])
     report := "Watchlog shift count on " A_ComputerName " (" span ")`r`n"
     for it in items {
         lv.Add(, it.name, it.n, Commas(it.keys))
@@ -2773,7 +3650,8 @@ ShowShiftCount() {
     g.AddText("xm w480", "Total: " sum)
     g.AddButton("xm y+12 w120", "Start a new count").OnEvent("Click", NewCount)
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
-    g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.AddButton("x+8 yp w100", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
+    g.AddButton("x+8 yp w80 Default", "Close").OnEvent("Click", (*) => g.Destroy())
     g.OnEvent("Escape", (*) => g.Destroy())
     g.Show()
 
@@ -2814,7 +3692,8 @@ ShowTimeSaved() {
             . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
     }
     lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 120), lv.ModifyCol(6, 120)
-    g.AddButton("xm+232 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    g.AddButton("xm+142 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    g.AddButton("x+8 yp w110", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
     g.OnEvent("Escape", (*) => g.Destroy())
@@ -2827,6 +3706,282 @@ ShowTimeSaved() {
     }
 }
 
+
+
+; =====================================================================
+;  SHIFT DASHBOARD  (tray > Shift dashboard, Ctrl+Alt+Shift+D, or the
+;  button in Shift count / Time saved)
+;  Three tabs: this shift (tiles + logs by type), the last 7 days and the
+;  last 30 days. This shift can be copied as text or saved as a one-page
+;  sheet in Shift Reports (next to settings.ini) to print or hand over.
+;  Numbers only: log type names and counts, never log text, employee
+;  numbers, patron names, machine or alert numbers. Kept on this PC in
+;  time saved.ini ([DayItems], one line per day and log type; 400 days).
+;  "Alert clears" counts each Clear all (Ctrl+Alt+A / Caps Lock), not
+;  each alert.
+; =====================================================================
+^!+d:: ShowDashboard()
+
+; log / alert / other (logins, stamps and app switches aren't logs)
+ItemKind(name) {
+    if name = "Alert Grid clear"
+        return "alert"
+    if RegExMatch(name, "^(Login |Stamp |Switch to )")
+        return "other"
+    return "log"
+}
+
+; Drops [DayItems] lines older than 400 days (once, when Watchlog starts)
+TrimDayItems() {
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        cutoff := FormatTime(DateAdd(A_Now, -400, "Days"), "yyyy-MM-dd")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if bar && eq && bar < eq && StrCompare(SubStr(line, 1, bar - 1), cutoff) < 0
+                IniDelete SavedFile, "DayItems", SubStr(line, 1, eq - 1)
+        }
+    }
+}
+
+; This shift's items, most used first: [{name, n, keys}]
+ShiftItemList() {
+    items := []
+    try section := IniRead(SavedFile, "ShiftItems")
+    catch
+        return items
+    for line in StrSplit(section, "`n", "`r") {
+        if !(eq := InStr(line, "="))
+            continue
+        it := ItemRow(SubStr(line, eq + 1))
+        it.name := SubStr(line, 1, eq - 1)
+        items.Push(it)
+    }
+    return SortByCount(items)
+}
+
+; Biggest .n first (insertion sort, the lists are short)
+SortByCount(items) {
+    Loop items.Length - 1 {
+        i := A_Index + 1
+        cur := items[i], j := i - 1
+        while j >= 1 && items[j].n < cur.n {
+            items[j + 1] := items[j]
+            j -= 1
+        }
+        items[j + 1] := cur
+    }
+    return items
+}
+
+; Logs and alert clears from [DayItems] for days from..to (yyyy-MM-dd):
+; {logs, alerts, days: Map(day -> {logs, alerts}), types: sorted [{name, n}]}
+DashRange(from, to) {
+    r := {logs: 0, alerts: 0, days: Map(), types: []}
+    try section := IniRead(SavedFile, "DayItems")
+    catch
+        return r
+    tally := Map()
+    for line in StrSplit(section, "`n", "`r") {
+        bar := InStr(line, "|"), eq := InStr(line, "=")
+        if !bar || !eq || bar > eq
+            continue
+        day := SubStr(line, 1, bar - 1)
+        if StrCompare(day, from) < 0 || StrCompare(day, to) > 0
+            continue
+        name := SubStr(line, bar + 1, eq - bar - 1)
+        kind := ItemKind(name)
+        if kind = "other"
+            continue
+        n := ItemRow(SubStr(line, eq + 1)).n
+        if !r.days.Has(day)
+            r.days[day] := {logs: 0, alerts: 0}
+        if kind = "alert" {
+            r.days[day].alerts += n, r.alerts += n
+        } else {
+            r.days[day].logs += n, r.logs += n
+            tally[name] := (tally.Has(name) ? tally[name] : 0) + n
+        }
+    }
+    for name, n in tally
+        r.types.Push({name: name, n: n})
+    SortByCount(r.types)
+    return r
+}
+
+; Rows for the last `count` days, newest first: [{day, label, logs, alerts, keys}]
+DashDays(count) {
+    rng := DashRange(FormatTime(DateAdd(A_Now, -(count - 1), "Days"), "yyyy-MM-dd"), FormatTime(, "yyyy-MM-dd"))
+    rows := []
+    Loop count {
+        t := DateAdd(A_Now, -(A_Index - 1), "Days")
+        day := FormatTime(t, "yyyy-MM-dd")
+        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+        al := rng.days.Has(day) ? rng.days[day].alerts : 0
+        rows.Push({day: day, label: FormatTime(t, "ddd MMM d"), logs: d.log, alerts: al, keys: d.keys})
+    }
+    return {rows: rows, range: rng}
+}
+
+Bar(n, top, width := 22) => top > 0 && n > 0 ? RegExReplace(Format("{:" Max(1, Ceil(n / top * width)) "}", ""), " ", "█") : ""
+
+HtmlSafe(s) => StrReplace(StrReplace(StrReplace(s, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+
+; What the This shift tab shows: {logs, alerts, keys, span, items(log types)}
+ShiftFacts() {
+    f := {logs: 0, alerts: 0, keys: 0, span: "nothing counted yet", types: []}
+    sh := SavedShift()
+    f.logs := sh.log, f.keys := sh.keys
+    start := last := ""
+    try start := IniRead(SavedFile, "Shift", "Start", "")
+    try last := IniRead(SavedFile, "Shift", "Last", "")
+    for it in ShiftItemList() {
+        kind := ItemKind(it.name)
+        if kind = "alert"
+            f.alerts += it.n
+        else if kind = "log"
+            f.types.Push(it)
+    }
+    if start != "" && last != "" && (f.logs || f.alerts || f.keys) {
+        mins := DateDiff(last, start, "Minutes")
+        f.span := FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") " (" Format("{}h {:02}m", mins // 60, Mod(mins, 60)) ")"
+    }
+    return f
+}
+
+DashSummaryText(f, withTime) {
+    s := "Shift summary, " A_ComputerName ", " FormatTime(, "yyyy-MM-dd") " (" f.span ")`r`n"
+    s .= f.logs " logs, " f.alerts " Alert Grid clears" (withTime ? ", " SavedTime(f.keys) " of typing saved" : "") "`r`n"
+    for it in f.types
+        s .= "  " Format("{:4}", it.n) "  " it.name "`r`n"
+    return s
+}
+
+DashSheetHtml(f, withTime) {
+    top := f.types.Length ? f.types[1].n : 0
+    h := "<!doctype html><html><head><meta charset='utf-8'><title>Shift summary " FormatTime(, "yyyy-MM-dd") "</title><style>"
+        . "body{font-family:Segoe UI,Arial,sans-serif;margin:32px;color:#222;max-width:720px}"
+        . "h1{color:#0E746E;margin:0 0 4px}.sub{color:#666;margin-bottom:20px}"
+        . ".tiles{display:flex;gap:14px;margin-bottom:22px}.tile{flex:1;border:1px solid #cfd8d7;border-radius:8px;padding:12px;text-align:center}"
+        . ".tile b{display:block;font-size:28px;color:#0E746E}.tile span{color:#666;font-size:13px}"
+        . "table{border-collapse:collapse;width:100%}td{padding:5px 8px;border-bottom:1px solid #e3e8e8}"
+        . ".n{width:50px;text-align:right}.bar{background:#0E746E;height:12px;border-radius:3px}"
+        . "</style></head><body><h1>Shift summary</h1><div class='sub'>" HtmlSafe(A_ComputerName) " &middot; "
+        . FormatTime(, "dddd, MMMM d, yyyy") " &middot; " HtmlSafe(f.span) "</div><div class='tiles'>"
+        . "<div class='tile'><b>" f.logs "</b><span>logs</span></div>"
+        . "<div class='tile'><b>" f.alerts "</b><span>Alert Grid clears</span></div>"
+    if withTime
+        h .= "<div class='tile'><b>" StrReplace(StrReplace(SavedTime(f.keys), "about ", ""), "under a minute", "&lt;1 min") "</b><span>typing saved</span></div>"
+    h .= "</div><table>"
+    for it in f.types
+        h .= "<tr><td>" HtmlSafe(it.name) "</td><td class='n'>" it.n "</td><td style='width:45%'><div class='bar' style='width:" Round(it.n / top * 100) "%'></div></td></tr>"
+    return h "</table></body></html>"
+}
+
+ShowDashboard(tab := 1) {
+    global DashWin
+    if IsObject(DashWin)
+        try DashWin.Destroy()
+    f := ShiftFacts()
+    wk := DashDays(7), mo := DashDays(30)
+    prevRng := DashRange(FormatTime(DateAdd(A_Now, -59, "Days"), "yyyy-MM-dd"), FormatTime(DateAdd(A_Now, -30, "Days"), "yyyy-MM-dd"))
+    g := DashWin := Gui("+AlwaysOnTop", "Shift dashboard  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    tb := g.AddTab3("w600 h430", ["This shift", "Week", "Month"])
+
+    tb.UseTab(1)
+    y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
+    g.AddText("xm+12 y" y " w560 BackgroundTrans", "Logs by type (" f.span ")")
+    lv := g.AddListView("xm+12 y+6 w570 r11 -Multi NoSortHdr", ["Log type", "Times", ""])
+    top := f.types.Length ? f.types[1].n : 0
+    for it in f.types
+        lv.Add(, it.name, it.n, Bar(it.n, top))
+    lv.ModifyCol(1, 250), lv.ModifyCol(2, 55), lv.ModifyCol(3, 240)
+
+    for pair in [[2, wk, 7, "Last 7 days"], [3, mo, 30, "Last 30 days"]] {
+        tb.UseTab(pair[1])
+        d := pair[2]
+        logs := alerts := keys := used := best := 0
+        bestDay := ""
+        for r in d.rows {
+            logs += r.logs, alerts += r.alerts, keys += r.keys
+            if r.logs || r.alerts
+                used += 1
+            if r.logs > best
+                best := r.logs, bestDay := r.label
+        }
+        avg := used ? Round(logs / used) : 0
+        y := Tiles(g, [[logs, "logs"], [alerts, "alert clears"], [SavedTime(keys) = "under a minute" ? "<1 min" : StrReplace(SavedTime(keys), "about ", ""), "typing saved"], [used ? avg : "-", "logs per day worked"]])
+        if pair[1] = 3 {
+            prevLogs := 0
+            for day, v in prevRng.days
+                prevLogs += v.logs
+            note := "Busiest day: " (bestDay != "" ? bestDay " (" best " logs)" : "none yet")
+            note .= prevRng.logs || prevLogs ? "     Previous 30 days: " prevLogs " logs (counted by log type)" : ""
+            g.AddText("xm+12 y" y " w570 BackgroundTrans", note)
+        }
+        dl := g.AddListView("xm+12 " (pair[1] = 3 ? "y+6" : "y" y) " w570 r" (pair[1] = 2 ? 7 : 6) " -Multi NoSortHdr", ["Day", "Logs", "Alert clears", "Typing saved", ""])
+        mx := 0
+        for r in d.rows
+            mx := Max(mx, r.logs)
+        for r in d.rows
+            dl.Add(, r.label, r.logs, r.alerts, r.keys ? SavedTime(r.keys) : "", Bar(r.logs, mx, 16))
+        dl.ModifyCol(1, 110), dl.ModifyCol(2, 55), dl.ModifyCol(3, 90), dl.ModifyCol(4, 110), dl.ModifyCol(5, 170)
+        tl := g.AddListView("xm+12 y+8 w570 r" (pair[1] = 2 ? 5 : 4) " -Multi NoSortHdr", ["Top log types (" pair[4] ")", "Times"])
+        for it in d.range.types {
+            if A_Index > 20
+                break
+            tl.Add(, it.name, it.n)
+        }
+        tl.ModifyCol(1, 400), tl.ModifyCol(2, 70)
+    }
+    tb.UseTab()
+    tb.Value := tab
+    timeCB := g.AddCheckbox("xm Checked", "Include time saved in the copy and the sheet")
+    g.AddButton("xm y+8 w130", "Copy summary").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w130", "Save as a sheet").OnEvent("Click", SaveIt)
+    g.AddButton("x+8 yp w120", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := DashSummaryText(f, timeCB.Value)
+        Tip("Shift summary copied. Paste it with Ctrl+V.")
+    }
+    SaveIt(*) {
+        dir := HomeDir "\Shift Reports"
+        file := dir "\Shift summary " FormatTime(, "yyyy-MM-dd HHmm") ".html"
+        try {
+            DirCreate dir
+            FileAppend DashSheetHtml(f, timeCB.Value), file, "UTF-8"
+        } catch as e {
+            MsgBox "Couldn't save the sheet.`n`n" e.Message, "Shift dashboard", "Icon!"
+            return
+        }
+        Activity("Shift dashboard: sheet saved")
+        Run file
+    }
+}
+
+; A row of big numbers with a small label under each
+Tiles(g, tiles) {
+    ctrls := []
+    for i, t in tiles {
+        g.SetFont("s20 bold c0E746E", "Segoe UI")
+        c := g.AddText(i = 1 ? "xm+12 y+14 w135 Center BackgroundTrans" : "x+4 yp w135 Center BackgroundTrans", t[1])
+        ctrls.Push(c)
+    }
+    for i, t in tiles {
+        ctrls[i].GetPos(&x, &y, &w, &h)
+        g.SetFont("s9 norm c606060", "Segoe UI")
+        g.AddText("x" x " y" y + h " w135 Center BackgroundTrans", t[2])
+        bottom := y + h + 22
+    }
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    return bottom
+}
 
 
 ; =====================================================================
@@ -2858,7 +4013,7 @@ ShowTimeSaved() {
 ;  Ctrl+Alt+I = show the current window's title and program name
 ; =====================================================================
 LoadApps() {
-    taken := "QOIHPXRLEJKWAM"
+    taken := "QOIHPXRLEJKWAMN"
     problems := "", named := ""
     Loop 9 {
         sec := "App" A_Index
@@ -3080,7 +4235,7 @@ StartOfShift() {
         SplitPath p, , &dir
         ; a one-second gap between apps so the Java apps don't choke
         if started.Length
-            Sleep 1000
+            Sleep 500
         try Run p, dir
         catch {
             missing .= "   " target "`n"
@@ -3100,7 +4255,7 @@ StartOfShift() {
         while !WinExist(w) && A_TickCount < deadline
             Sleep 200
     }
-    Sleep 1500          ; let the apps finish drawing
+    Sleep 800           ; let the apps finish drawing
     if Cfg["SignInAfterStart"]
         SignInStarted(startedApps)
     Tip("Opening websites...", 0, true)
@@ -4302,14 +5457,52 @@ SetStartup(on) {
 ; =====================================================================
 ShowSecurity() {
     report := SecurityReport()
+    teal := "0F766E", ink := "1F2933", muted := "6B7280"
     g := Gui("+AlwaysOnTop", "Security and status  -  v" VERSION)
-    g.SetFont("s10", "Segoe UI")
-    g.AddText("w780", "What Watchlog keeps on this PC, where it is, and what it never keeps. Checked just now.")
-    g.SetFont("s9", "Consolas")
-    ; -TabStop: the report starts at the top, not all selected
-    g.AddEdit("w780 r30 ReadOnly -WantReturn -TabStop", report)
-    g.SetFont("s10", "Segoe UI")
-    g.AddButton("w150 Default", "Copy report").OnEvent("Click", CopyIt)
+    g.BackColor := "F4F7F7"
+    g.MarginX := 18, g.MarginY := 14
+    g.SetFont("s18 bold c" teal, "Segoe UI")
+    g.AddText("w800", "Security and status")
+    g.SetFont("s10 norm c" muted, "Segoe UI")
+    g.AddText("w800 y+0", "What Watchlog keeps on this PC, where it is, and what it never keeps. Checked just now.")
+    ; Traffic lights: green = fine, amber = look at it, red = fix it
+    good := "15803D", warn := "B45309", bad := "B91C1C"
+    lights := []
+    pw := PasswordInSettings()
+    lights.Push(pw ? [bad, "A password is typed into settings.ini. Press Ctrl+Alt+R and it is moved out."]
+        : [good, "No passwords in settings.ini. Saved passwords live in Windows Credential Manager only."])
+    lights.Push([InStr(VersionStatus(), "OUT OF DATE") ? bad : good, "Version v" VERSION ", check code " ProgramCode() ". " VersionStatus()])
+    od := !InStr(HomeDir, "OneDrive") ? "The Watchlog folder is not in OneDrive."
+        : ProcessExist("OneDrive.exe") ? "OneDrive is running, so this PC gets changes as they sync." : "OneDrive is NOT running, so this PC may have older files."
+    lights.Push([InStr(od, "NOT") ? warn : good, od])
+    lights.Push([good, "Makes no internet connections and sends nothing anywhere itself."])
+    conflicts := ""
+    Loop Files HomeDir "\settings-*.ini"
+        conflicts .= (conflicts = "" ? "" : ", ") A_LoopFileName
+    if conflicts != ""
+        lights.Push([warn, "OneDrive made copies of settings.ini: " conflicts ". Compare them, then delete them."])
+    g.SetFont("s10 norm c" ink, "Segoe UI")
+    for l in lights {
+        g.SetFont("s12 bold c" l[1], "Segoe UI")
+        g.AddText("x18 y+8 w22", Chr(0x25CF))
+        g.SetFont("s10 norm c" ink, "Segoe UI")
+        g.AddText("x42 yp+2 w776", l[2])
+    }
+    ; One tab for each part of the report
+    secs := SecuritySections(report)
+    names := []
+    for sc in secs
+        names.Push(sc.tab)
+    g.SetFont("s10 norm c" ink, "Segoe UI")
+    tabs := g.AddTab3("x18 y+14 w800 h330", names)
+    for sc in secs {
+        tabs.UseTab(A_Index)
+        g.SetFont("s10 norm c" ink, "Consolas")
+        g.AddEdit("x30 y+10 w776 h286 ReadOnly -WantReturn -TabStop VScroll BackgroundWhite", sc.body)
+    }
+    tabs.UseTab()
+    g.SetFont("s10 norm c" ink, "Segoe UI")
+    g.AddButton("x18 y+14 w150 Default", "Copy full report").OnEvent("Click", CopyIt)
     g.AddButton("x+6 w150", "Open activity log").OnEvent("Click", (*) => OpenActivity())
     g.AddButton("x+6 w150", "Settings...").OnEvent("Click", OpenSettings)
     g.AddButton("x+6 w150", "Close").OnEvent("Click", (*) => g.Destroy())
@@ -4325,6 +5518,28 @@ ShowSecurity() {
         g.Destroy()
         ShowSettings()
     }
+}
+
+; Splits the report into tabs: [{tab, body}]. A heading is a line of capital
+; letters after a blank line; the first block (before any heading) is Overview.
+SecuritySections(report) {
+    secs := [{tab: "Overview", body: ""}]
+    blank := false          ; the very first line (WATCHLOG v...) is not a heading
+    for line in StrSplit(report, "`n", "`r") {
+        if blank && RegExMatch(line, "^([A-Z][A-Z ]{3,}[A-Z])(\s|$)", &m) {
+            tab := Map("PASSWORDS", "Passwords", "TEMPLATES", "Templates", "SHIFT JOURNAL", "Journal"
+                , "EVERYTHING ELSE IT KEEPS", "Kept on this PC", "WHAT IT NEVER DOES", "Never", "TO CHECK", "To check")
+            secs.Push({tab: tab.Has(m[1]) ? tab[m[1]] : m[1], body: line "`r`n"})
+        } else if line = "" {
+            secs[secs.Length].body .= "`r`n"
+        } else if RegExMatch(line, "^Start with Windows") {
+            secs[1].body .= line "`r`n"
+        } else {
+            secs[secs.Length].body .= line "`r`n"
+        }
+        blank := line = ""
+    }
+    return secs
 }
 
 SecurityReport() {
@@ -4478,47 +5693,71 @@ CopyForSharing(out) {
 ^!h:: ShowCheatSheet()
 
 ShowCheatSheet() {
-    forms := "", quick := "", apps := ""
+    teal := "0F766E", ink := "1F2933", muted := "6B7280"
+    g := Gui("+AlwaysOnTop", "Shortcut Cheat Sheet  -  v" VERSION)
+    g.BackColor := "F4F7F7"
+    g.MarginX := 20, g.MarginY := 14
+    colW := 340, gap := 26
+    ; Three columns of sections. Each row is a shortcut and what it does.
+    forms := [], quick := [], apps := []
     for t in TemplateList {
-        line := "   " Format("{:-12}", t.trig) "  " t.name (t.repeat ? "  (Ctrl+Enter adds another)" : "") (t.src = "mine" ? "  (mine)" : "") "`n"
+        row := [t.trig, t.name (t.repeat ? "  (adds more)" : "") (t.src = "mine" ? "  (mine)" : "")]
         if t.form
-            forms .= line
+            forms.Push(row)
         else
-            quick .= line
+            quick.Push(row)
     }
     for l in LoginList
-        quick .= "   " Format("{:-12}", l.trig) "  Login: " l.user (l.win != "" ? "  (only in " l.win ")" : "") (l.remind ? "  (reminder after " l.remind " min)" : "") "`n"
+        quick.Push([l.trig, "Login: " l.user (l.win != "" ? "  (only in " l.win ")" : "")])
     for a in AppList
-        apps .= "   " a.key "  " a.name "`n"
+        apps.Push([a.key, a.name])
+    stamps := [[";t", "time"], [";dd", "date"], [";dt", "date and time"]]
+    keys := [["Space", "find a template"], ["N", "call pad  (also Numpad +)"], ["Q", "add a quick note"], ["O", "open notes"]
+        , ["J", "shift journal"], ["L", "start of shift"], ["Shift+L", "end of shift"], ["M", "Watchlog home"]
+        , ["E", "template editor"], ["I", "window info"], ["Shift+S", "save window layout"], ["W", "put windows back"]
+        , ["K", "log out of SDS"], ["A", "clear all Alert Grid alerts"], ["Shift+A", "teach Alert Grid the clicks"]
+        , ["Shift+Caps", "turn Caps Lock on"], ["P or X", "pause / resume"], ["R", "reload"], ["H", "this sheet"]]
 
-    text := "Can't remember one?  Ctrl+Alt+Space finds a template by name or any word.`n`n"
-        . "FORMS   (Tab = next box, Enter = insert, Esc = cancel)`n" forms
-        . "`nQUICK TEMPLATES`n" quick
-        . "`nSTAMPS`n   `;t  time        `;dd  date        `;dt  date + time`n"
-        . "`nAPPS   (Ctrl+Alt + letter)`n" apps
-        . "`nHOTKEYS   (Ctrl+Alt + letter)`n"
-        . "   Q  add note          O  open notes        J  shift journal`n"
-        . "   L  start of shift    Shift+L  end of shift (closes everything)`n"
-        . "   M  Watchlog home     E  template editor   Space  find a template`n"
-        . "   I  window info`n"
-        . "   Shift+S  save window layout    W  put the windows back`n"
-        . "   Shift+Caps Lock  turns Caps Lock on (plain Caps Lock only turns it off)`n"
-        . "   K  log out of SDS (properly, so the account doesn't lock)`n"
-        . "   A  clear all Alert Grid alerts    Shift+A  teach it the clicks (once per PC)`n"
-        . "   P / X  pause-resume  R  reload            H  this cheat sheet`n"
-        . "`nClick the teal Watchlog icon by the clock (or Ctrl+Alt+M) for the home window. Right-click it for the menu.`n"
-        . "`nv" VERSION " (" VERSION_DATE ")   Templates: " (Tpl.src = "local" ? "templates.txt in this folder" : "the team file")
-        . (Tpl.version != "" ? ", wording version " Tpl.version : "") (Tpl.mine ? ", plus " Tpl.mine " of yours" : "")
-        . "`nSettings are in:  " HomeDir
-
-    g := Gui("+AlwaysOnTop", "Shortcut Cheat Sheet  -  v" VERSION)
-    ; Fixed-width font so the shortcut columns line up
-    g.SetFont("s10", "Consolas")
-    g.AddText("+0x80", text)
-    g.SetFont("s10", "Segoe UI")
-    g.AddButton("Default w80", "OK").OnEvent("Click", (*) => g.Destroy())
+    g.SetFont("s20 bold c" teal, "Segoe UI")
+    g.AddText("x20 y10 w700", "Watchlog shortcuts")
+    g.SetFont("s10 norm c" muted, "Segoe UI")
+    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name or any word.   Forms: Tab = next box, Enter = insert, Esc = cancel.")
+    top := 78
+    x1 := 20, x2 := x1 + colW + gap, x3 := x2 + colW + gap
+    y1 := Section(x1, top, "FORMS", forms, 92)
+    y2 := Section(x2, top, "QUICK TEMPLATES AND LOGINS", quick, 92)
+    y2 := Section(x2, y2 + 14, "STAMPS", stamps, 92)
+    y3 := Section(x3, top, "HOTKEYS   (Ctrl+Alt + the key)", keys, 92)
+    y3 := Section(x3, y3 + 14, "APPS   (Ctrl+Alt + the key)", apps, 92)
+    bottom := Max(y1, y2, y3) + 14
+    g.SetFont("s9 norm c" muted, "Segoe UI")
+    foot := "Click the teal Watchlog icon by the clock (or Ctrl+Alt+M) for the home window; right-click it for the menu.`n"
+        . "v" VERSION " (" VERSION_DATE ")   Templates: " (Tpl.src = "local" ? "templates.txt in this folder" : "the team file")
+        . (Tpl.version != "" ? ", wording " Tpl.version : "") (Tpl.mine ? ", plus " Tpl.mine " of yours" : "")
+        . "   Settings: " HomeDir
+    g.AddText("x20 y" bottom " w" (colW * 3 + gap * 2), foot)
+    g.SetFont("s10 norm c" ink, "Segoe UI")
+    g.AddButton("x20 y" (bottom + 46) " Default w90", "OK").OnEvent("Click", (*) => g.Destroy())
     g.OnEvent("Escape", (*) => g.Destroy())
     g.Show()
+
+    ; One titled block of rows at (x, y); returns the y just below it
+    Section(x, y, title, rows, keyW) {
+        if !rows.Length
+            return y
+        g.SetFont("s9 bold c" teal, "Segoe UI")
+        g.AddText("x" x " y" y " w" colW, title)
+        g.AddText("x" x " y" (y + 20) " w" colW " h1 Background" teal)
+        y += 28
+        for r in rows {
+            g.SetFont("s10 bold c" teal, "Consolas")
+            g.AddText("x" x " y" y " w" keyW " h20 +0x4000", r[1])
+            g.SetFont("s10 norm c" ink, "Segoe UI")
+            g.AddText("x" (x + keyW + 4) " y" y " w" (colW - keyW - 4) " h20 +0x4000", r[2])
+            y += 22
+        }
+        return y
+    }
 }
 
 
@@ -5120,9 +6359,11 @@ BuildTrayMenu() {
     MenuItem(tm, "Find a template  (Ctrl+Alt+Space)", (*) => ShowPicker(), 0xE721)
     MenuItem(tm, "Cheat sheet  (Ctrl+Alt+H)", (*) => ShowCheatSheet(), 0xE8FD)
     MenuItem(tm, "Shift journal  (Ctrl+Alt+J)", (*) => ShowJournal(), 0xE8F1)
+    MenuItem(tm, "Call pad  (Numpad +)", (*) => ShowCallPad(), 0xE717)
     MenuItem(tm, "Quick notes  (Ctrl+Alt+O)", (*) => ShowNotes(), 0xE70B)
     MenuItem(tm, "Time saved", (*) => ShowTimeSaved(), 0xE916)
     MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
+    MenuItem(tm, "Shift dashboard  (Ctrl+Alt+Shift+D)", (*) => ShowDashboard(), 0xE9D9)
     tm.Add()
     MenuItem(tm, "Start of shift  (Ctrl+Alt+L)", (*) => StartOfShift(), 0xE768)
     MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
@@ -5153,6 +6394,7 @@ BuildTrayMenu() {
     MenuItem(more, (Cfg["SharedTemplates"] != "" ? "Edit team templates" : "Edit templates") " in Notepad", (*) => EditFile(Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile), 0xE8A5)
     MenuItem(more, "Edit my templates in Notepad", (*) => EditMine(), 0xE8A5)
     MenuItem(more, "Edit settings file", (*) => EditFile(SettingsFile), 0xE8A5)
+    MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
     MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
     MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
     more.Add()
@@ -5201,12 +6443,14 @@ ShowHome() {
     g.AddText("x+12 yp+11", "Press a button, or learn the shortcut shown on it.")
 
     Group("Logs", 0x0E746E, [
-        ["Find a template", "Ctrl+Alt+Space", 0xE721, () => ShowPicker(), true]
+        ["Call pad", "Numpad +", 0xE717, () => ShowCallPad(), true]
+        , ["Find a template", "Ctrl+Alt+Space", 0xE721, () => ShowPicker(), false]
         , ["Cheat sheet", "Ctrl+Alt+H", 0xE8FD, () => ShowCheatSheet(), false]
         , ["Shift journal", "Ctrl+Alt+J", 0xE8F1, () => ShowJournal(), false]
         , ["Quick notes", "Ctrl+Alt+O", 0xE70B, () => ShowNotes(), false]
         , ["Time saved", "this shift and before", 0xE916, () => ShowTimeSaved(), false]
-        , ["Shift count", "exact tally of this shift", 0xE9D2, () => ShowShiftCount(), false]])
+        , ["Shift count", "exact tally of this shift", 0xE9D2, () => ShowShiftCount(), false]
+        , ["Shift dashboard", "Ctrl+Alt+Shift+D", 0xE9D9, () => ShowDashboard(), false]])
 
     Group("Shift", 0xB86E00, [
         ["Start of shift", "Ctrl+Alt+L", 0xE768, () => StartOfShift(), false]
@@ -5595,6 +6839,8 @@ BoxParse(spec) {
             b.caps := true
         else if low = "upper"
             b.upper := true
+        else if low = "tidy"
+            b.keep.Push(opt)       ; bvs -> BVs (no tick box for it): kept as it is
         else if SubStr(opt, 1, 1) = "@" && b.list = ""
             b.list := SubStr(opt, 2)
         else if b.condWhen = "" && RegExMatch(opt, "i)^if\s+(.+?)\s*=\s*(.*)$", &cm)

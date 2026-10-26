@@ -3,11 +3,53 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.11.0 (Oct 25, 2026).
+Current version: v3.17.0 (Oct 26, 2026).
 
 ## Waiting to be built
 
-(Nothing right now.)
+- **Casino autocorrect in every program** (Jakob, Oct 26: "add it to the rest of the programs"). Today it only runs in the call pad and the log form boxes. Plan: an optional system-wide mode ([CallPad] Autocorrect=everywhere, plus a tick in Settings) that fixes a word when a space, Enter or punctuation follows it, in any window. Open points: it must stay out of password and login fields and out of Watchlog's own typing (logins, templates); in Citrix/iTrak a fix means Backspaces plus retyping, which can be slow or drop keys, so it needs its own test there; IT should hear about it (it watches typed words, stores nothing). Same autocorrect.txt list. Wait for the full test pass (docs checklist) before building.
+- Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
+- Shorthand for other logs (which ones, with his real examples).
+- Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
+- Optional quick insert when every form box is already filled (off by default).
+- Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.17.0 (Oct 26)
+- Edits in the shift journal count everywhere: each log carries a [k] tag with its exact keystrokes saved; removing, renaming or adding logs in Ctrl+Alt+J and pressing Save changes updates Shift count, this shift, Time saved and the dashboard. Old untagged logs use the type's average.
+
+## Done in v3.16.0 (Oct 26)
+- Shift dashboard (Ctrl+Alt+Shift+D, tray, buttons in Shift count / Time saved): This shift, Week and Month tabs, Copy summary, Save as a sheet (HTML in Shift Reports). Per-day log counts by type filed in time saved.ini [DayItems] (400 days). Numbers only. Wine-tested only; exe built.
+
+## Done in v3.15.0 (Oct 26)
+- Shift journal window (Ctrl+Alt+J) is editable, with Save changes / Undo edits, safe against logs arriving while it is open.
+- Cheat sheet (Ctrl+Alt+H) redrawn in three coloured columns.
+- Security and status redrawn: green/amber/red status lights and one tab per section.
+
+## Done in v3.14.2 (Oct 26, verification run)
+- Form autocorrect never ran before v3.14 (wrong control type check); fixed. Plurals for every fix. N/A expand only in Machine/NRT boxes, not Location. An old saved call no longer fills forms after a restart. The template editor keeps `tidy`. Copy boxes (Employee #, Employee type) no longer pick a number or job title out of the last log Watchlog pasted. settings.example.ini lists the Alert Grid, reminder beep, SDS sign-back-in and update folder settings.
+
+## Done in v3.14.1 (Oct 26)
+- Switching a fix off with # works while the pad is open.
+
+## Done in v3.14.0 (Oct 26)
+- From the first full test pass: ;mfill note tidy (bvs -> BVs), autocorrect in drop-down boxes and plurals (titos -> TITOs), N/A expand to NRT/ATM in machine boxes, ;firm default Operations Supervisor, unlocked logins in the cheat sheet, faster Ctrl+Alt+L, Quick Notes Notepad warning match fix.
+- Still open: autocorrect everywhere (above), the Notepad-only key problems (C2, C3, C4, C6, G8: retest elsewhere), R11 retest, and the skipped tests (H5, H10, H11, I5, K4, P5, P12, P13, P14, Q15, R12, S5).
+
+## Done in v3.13.1 (Oct 25)
+- Time saved counts the keys typed on the call pad (the pad's own typing is the cost, the boxes it fills are not counted twice).
+
+## Done in v3.13.0 (Oct 25)
+- Make a log copies the call to the clipboard and hides the pad; the next log's form fills from the saved call; after that log is inserted the call moves to Earlier calls and the pad is empty.
+- Machine fill shorthand: `n3 190800 bvs` -> NRT3 $190,800 (BVs), `a1 100000` -> ATM1 $100,000, `(BVs/Divert)`; several lines open ;mfill with every machine added automatically. New Note box on ;mfill (wording Oct 25, 2026 (3)).
+- Jackpot shorthand: `c2102 11421.11 win 3 cash` fills machine, amount (cents kept) and window in ;jack.
+- Alert Grid clear: waits [AlertGrid] SelectWait (default 200 ms) after Ctrl+A, for the Caps Lock clear that sometimes cleared only the top alert. Not confirmed fixed.
+
+## Done in v3.12.1 (Oct 25)
+- WAP and R4 taken out of the default autocorrect list.
+
+## Done in v3.12.0 (Oct 25)
+- Call pad: Numpad + (Ctrl+Alt+N backup) opens a jot pad, one hand, time stamped at the first key, Esc hides and keeps the text, Make a log (Ctrl+Enter) opens the finder and the forms fill machine, table, amount and alert # from the pad, Copy all, Paste into window, New call, Earlier calls this shift. Kept on this PC only, wiped at end of shift.
+- Casino autocorrect in the pad and the form boxes, from the SOP glossary acronyms (list in autocorrect.txt via tray > Advanced > Edit the autocorrect list). Jakob OK'd MEAL RAM WAN and the rest. Ctrl+Z undoes a fix.
 
 ## Done in v3.11.0 (Oct 25)
 - Shift count: exact per-item tally of one shift (templates by name, logins, stamps, Alert Grid clears, app switches) with keystrokes saved. Jakob said "build it".
