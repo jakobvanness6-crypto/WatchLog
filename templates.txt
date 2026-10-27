@@ -1,5 +1,7 @@
 # =====================================================================
 #  WATCHLOG - template wording
+#  Watchlog: Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+#  Used by permission only; see LICENCE.txt.
 #  Edit this file freely and save it. The script reloads by itself.
 #
 #  TEAM COPY
@@ -13,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 26, 2026 (1)
-# Program version: 3.19.0
+# Program version: 3.19.1
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.

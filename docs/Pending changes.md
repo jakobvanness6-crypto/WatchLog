@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.19.0 (Oct 27, 2026).
+Current version: v3.19.1 (Oct 27, 2026).
 
 ## Waiting to be built
 
@@ -13,6 +13,11 @@ Current version: v3.19.0 (Oct 27, 2026).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.19.1 (Oct 27)
+- Copyright and licence (step 1 of making Watchlog proprietary): "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved." and a short licence (permission only, no copying/sharing/changing/redistributing, provided as is). New About Watchlog window (tray menu and home window); the line also shows under the tutorial, in the version box, at the bottom of the cheat sheet and in Security and status; Copyright field in the exe's file properties; block at the top of README, QUICK START, templates.txt and Watchlog.ahk; LICENCE.txt in the zip, built into the exe and in Make a copy to share.
+- Release zip has only Watchlog.exe and the text files. The script version is in "for IT (on request)" in the project files, for Jakob to send IT directly.
+- Built with build/rebuild-resources.py (Python, swaps the resources in the v3.19.0 exe) because running AutoHotkey under Wine was blocked this time: not run or tested under Wine.
 
 ## Done in v3.19.0 (Oct 27)
 - Ctrl+Alt+D opens a new daily log in iTrak (a taught mouse click, or two if it takes a button and a menu line), Ctrl+Alt+Shift+I teaches it. Measured from inside the iTrak window, follows the nearest edge on resize, refuses when the window is too small or off screen, can be shared through the team folder (tray > iTrak). Settings > Alert Grid tab, tray, home tile, Security status and cheat sheet updated. Wine-tested with a fake iTrak (10 cases); the teach step and the real Citrix click can only be tried on a bay.

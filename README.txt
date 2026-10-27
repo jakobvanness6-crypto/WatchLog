@@ -1,7 +1,13 @@
 =======================================================================
-  WATCHLOG  v3.19.0  -  README
+  WATCHLOG  v3.19.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
+Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+Watchlog is used only with the copyright holder's permission. No
+copying, sharing, changing or redistributing it, in whole or in part,
+without written permission. Provided "as is", without warranty. The
+full licence is in LICENCE.txt (and tray menu > About Watchlog).
+
 
 Watchlog (called Log Templates before v3.0.1) runs quietly in the
 background: its icon, a white log page with an eye on a teal square,
@@ -54,7 +60,8 @@ keeps these files in Documents\Watchlog (on OneDrive). The script
 version keeps them next to Watchlog.ahk (for example
 Documents\AutoHotkey). Either way:
 
-  Watchlog.exe        The program (or Watchlog.ahk, the script version).
+  Watchlog.exe        The program (or Watchlog.ahk, the script version,
+                      which IT can have on request: see section 16).
                       You shouldn't need to edit it.
   Watchlog.ico        The icon. Without it the tray shows a green H.
   templates.txt       The wording of every template. Edit freely. (If
@@ -68,6 +75,8 @@ Documents\AutoHotkey). Either way:
   settings.example.ini  An example with no real usernames, to show others.
   QUICK START.txt     One page for someone new.
   README.txt          This file.
+  LICENCE.txt         The licence: who owns Watchlog and how it may be
+                      used.
 
 Elsewhere:
   LaunchWork.bat      Opens the work websites at the start of a shift
@@ -669,6 +678,7 @@ and the less-used items sit in sub-menus):
   Template editor               Same as Ctrl+Alt+E (section 12)
   Settings                      Section 14
   Tutorial                      The guided tour again
+  About Watchlog                Version, copyright and the licence
   Advanced >                    Security and status (15), Activity log
                                 (15), Make a copy to share (16), Edit
                                 templates / my templates / settings in
@@ -1147,6 +1157,14 @@ THE EXE (Watchlog.exe, v3.5.0 and later)
   to delete the saved passwords too, and keeps your settings and journal.
   It isn't code-signed, so Windows may say "Windows protected your PC"
   the first time: More info > Run anyway (or ask IT to allow it).
+
+THE SCRIPT VERSION (for IT, on request)
+  From v3.19.1 the release zip has only Watchlog.exe and its guides.
+  The readable script (Watchlog.ahk, with the icon, the two build files
+  and settings.example.ini) isn't handed out with it any more. If IT
+  wants to read or check it, ask Jakob: he sends it to them directly as
+  a separate "Watchlog vX script for IT" zip of the same version, under
+  the same licence. Don't post it in the team folder.
 
 YOUR OWN OTHER BAY PCs (script version)
   1. AutoHotkey v2 must be installed on that PC.

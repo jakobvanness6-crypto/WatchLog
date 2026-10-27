@@ -8,7 +8,13 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.10.0   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.19.1   (called Log Templates before v3.0.1)
+;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+;  Used only with the copyright holder's permission. No copying,
+;  sharing, changing or redistributing it, in whole or in part, without
+;  written permission. Provided "as is", without warranty. The full
+;  licence is in LICENCE.txt and in tray menu > About Watchlog.
+;
 ;  This is the program. You shouldn't need to edit it.
 ;  The first time it runs on a PC that had Log Templates, it moves
 ;  everything over to the new name by itself (see MOVING FROM LOG
@@ -26,8 +32,10 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.19.0"
-VERSION_DATE := "Oct 26, 2026"
+VERSION := "3.19.1"
+VERSION_DATE := "Oct 27, 2026"
+; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
+COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
 HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
@@ -213,7 +221,7 @@ AnnounceVersion() {
 
 ; Tray menu > the version line at the top
 ShowVersion() {
-    MsgBox "Watchlog v" VERSION "  (" VERSION_DATE ")`n`n" VersionStatus()
+    MsgBox "Watchlog v" VERSION "  (" VERSION_DATE ")`n" COPYRIGHT "`n`n" VersionStatus()
         . "`n`nProgram check code: " ProgramCode() "`n(The same code on two PCs means exactly the same program.)"
         . "`n`nRunning from:`n" A_ScriptFullPath
         . "`n`nTemplates: " TemplateSummary()
@@ -6155,6 +6163,7 @@ SecuritySections(report) {
 SecurityReport() {
     nl := "`r`n"
     r := "WATCHLOG v" VERSION " (" VERSION_DATE ")  -  security and status" nl
+    r .= COPYRIGHT " Used by permission only (tray menu > About Watchlog)." nl
     r .= "Checked " FormatTime(, "yyyy-MM-dd HH:mm") " on " A_ComputerName ", Windows user " A_UserName nl
     r .= "Program:   " A_ScriptFullPath nl
     r .= "Version:   v" VERSION ", program check code " ProgramCode() ". " VersionStatus() nl
@@ -6269,7 +6278,7 @@ CopyForSharing(out) {
     tplFrom := Tpl.src != "local" && FileExist(Tpl.file) ? Tpl.file : TemplatesFile
     files := [[A_ScriptFullPath, A_IsCompiled ? "Watchlog.exe" : "Watchlog.ahk"], [tplFrom, "templates.txt"]
         , [HomeDir "\QUICK START.txt", "QUICK START.txt"], [HomeDir "\README.txt", "README.txt"]
-        , [Cfg["LaunchWork"], "LaunchWork.bat"]]
+        , [HomeDir "\LICENCE.txt", "LICENCE.txt"], [Cfg["LaunchWork"], "LaunchWork.bat"]]
     if !A_IsCompiled
         files.Push([A_ScriptDir "\settings.example.ini", "settings.example.ini"], [IconFile, "Watchlog.ico"])
     try DirCreate out
@@ -6345,10 +6354,10 @@ ShowCheatSheet() {
     foot := "Click the teal Watchlog icon by the clock (or Ctrl+Alt+M) for the home window; right-click it for the menu.`n"
         . "v" VERSION " (" VERSION_DATE ")   Templates: " (Tpl.src = "local" ? "templates.txt in this folder" : "the team file")
         . (Tpl.version != "" ? ", wording " Tpl.version : "") (Tpl.mine ? ", plus " Tpl.mine " of yours" : "")
-        . "   Settings: " HomeDir
+        . "   Settings: " HomeDir "`n" COPYRIGHT
     g.AddText("x20 y" bottom " w" (colW * 3 + gap * 2), foot)
     g.SetFont("s10 norm c" ink, "Segoe UI")
-    g.AddButton("x20 y" (bottom + 46) " Default w90", "OK").OnEvent("Click", (*) => g.Destroy())
+    g.AddButton("x20 y" (bottom + 62) " Default w90", "OK").OnEvent("Click", (*) => g.Destroy())
     g.OnEvent("Escape", (*) => g.Destroy())
     g.Show()
 
@@ -6713,6 +6722,7 @@ InstallBuiltIns() {
             FileInstall "LaunchWork.bat", HomeDir "\LaunchWork.bat", 0
         FileInstall "README.txt", HomeDir "\README.txt", 1
         FileInstall "QUICK START.txt", HomeDir "\QUICK START.txt", 1
+        FileInstall "LICENCE.txt", HomeDir "\LICENCE.txt", 1
     } catch as e {
         Activity("Couldn't put the built-in files in " HomeDir ": " e.Message)
     }
@@ -6763,6 +6773,34 @@ UpdateExeFrom(f, v) {
 ;  A short guided tour with two practice boxes. Nothing typed here goes
 ;  in the shift journal or the time saved numbers.
 ; =====================================================================
+; Tray menu / home window > About Watchlog: version, owner and the licence
+LicenceText() {
+    return "WATCHLOG LICENCE`r`n`r`n"
+        . COPYRIGHT "`r`n`r`n"
+        . "Watchlog (the program and its guides) is not free or open software.`r`n`r`n"
+        . "1. You may use Watchlog only with the copyright holder's permission.`r`n`r`n"
+        . "2. You may not copy, share, sell, change, decompile, take apart or redistribute Watchlog, in whole or in part, or make anything from it, without the copyright holder's written permission.`r`n`r`n"
+        . "3. Permission can be withdrawn at any time. When it is, stop using Watchlog and delete your copies.`r`n`r`n"
+        . "4. Watchlog is provided `"as is`", without any warranty. The copyright holder is not liable for any loss or damage from using it. Always check an entry before you save it.`r`n`r`n"
+        . "Your own settings, logins and log entries are not part of Watchlog and aren't covered by this licence."
+}
+
+ShowAbout() {
+    g := Gui(, "About Watchlog")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 20, g.MarginY := 16
+    g.SetFont("s15 bold")
+    g.AddText("w520", "Watchlog v" VERSION)
+    g.SetFont("s10 norm")
+    g.AddText("w520 y+2", VERSION_DATE "`n" COPYRIGHT)
+    g.AddEdit("w520 r14 y+12 ReadOnly Multi -WantReturn", LicenceText())
+    b := g.AddButton("xm y+14 w100 Default", "Close")
+    b.OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+    b.Focus()
+}
+
 ShowTutorial(first := false) {
     global TutorialWin
     if IsObject(TutorialWin) {
@@ -6805,6 +6843,9 @@ ShowTutorial(first := false) {
     bNext := g.AddButton("x+8 w110 Default", "Next")
     bAdd := g.AddButton("x+8 w150", "Add logins...")
     bClose := g.AddButton("x+8 w120", "Close")
+    g.SetFont("s8 c707070")
+    g.AddText("xm y+12 w560", COPYRIGHT " Used by permission only: tray menu > About Watchlog has the licence.")
+    g.SetFont("s10 c000000")
     bBack.OnEvent("Click", (*) => Go(-1))
     bNext.OnEvent("Click", (*) => Go(1))
     bAdd.OnEvent("Click", (*) => ShowSettings())
@@ -7003,6 +7044,7 @@ BuildTrayMenu() {
     MenuItem(tm, "Template editor  (Ctrl+Alt+E)", (*) => ShowEditor(), 0xE70F)
     MenuItem(tm, "Settings", (*) => ShowSettings(), 0xE713)
     MenuItem(tm, "Tutorial", (*) => ShowTutorial(), 0xE7BE)
+    MenuItem(tm, "About Watchlog", (*) => ShowAbout(), 0xE946)
 
     more := Menu()
     MenuItem(more, "Security and status", (*) => ShowSecurity(), 0xE72E)
@@ -7089,6 +7131,7 @@ ShowHome() {
         , ["Settings", "logins, shift, updates", 0xE713, () => ShowSettings(), false]
         , ["Tutorial", "a two-minute tour", 0xE7BE, () => ShowTutorial(), false]
         , ["Security and status", "what's kept where", 0xE72E, () => ShowSecurity(), false]
+        , ["About Watchlog", "version, licence", 0xE946, () => ShowAbout(), false]
         , ["Save window layout", "Ctrl+Alt+Shift+S", 0xE74E, () => SaveLayout(), false]])
 
     ; How this PC is doing
