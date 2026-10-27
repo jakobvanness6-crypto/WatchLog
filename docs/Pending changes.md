@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.18.0 (Oct 26, 2026).
+Current version: v3.19.0 (Oct 27, 2026).
 
 ## Waiting to be built
 
@@ -13,6 +13,9 @@ Current version: v3.18.0 (Oct 26, 2026).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.19.0 (Oct 27)
+- Ctrl+Alt+D opens a new daily log in iTrak (a taught mouse click, or two if it takes a button and a menu line), Ctrl+Alt+Shift+I teaches it. Measured from inside the iTrak window, follows the nearest edge on resize, refuses when the window is too small or off screen, can be shared through the team folder (tray > iTrak). Settings > Alert Grid tab, tray, home tile, Security status and cheat sheet updated. Wine-tested with a fake iTrak (10 cases); the teach step and the real Citrix click can only be tried on a bay.
 
 ## Done in v3.18.0 (Oct 26)
 - Alert Grid clear works wherever Alert Grid is and whatever its size: spots measured from inside the window (old teach files change over by themselves), the clear-acknowledged button follows its nearest edge on resize, the teach asks which menu line "Acknowledge as received" is (also in Settings > Alert Grid) and the arrow keys pick it when the menu opens upward near the bottom of the screen or a menu click misses, and it refuses (clicks nothing) when Alert Grid is too small or off the screen. Tray > Alert Grid > Share my setup with the team puts the numbers in alertgrid.ini in the team folder (per screen scaling) for PCs that haven't been taught. Not done: UI Automation / Java Access Bridge, picture search. Wine-tested with a fake Alert Grid (11 cases pass); the real Java menu and arrow keys only on a bay.

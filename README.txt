@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.18.0  -  README
+  WATCHLOG  v3.19.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 
@@ -175,6 +175,27 @@ couple of seconds. No need to press anything.
                     A teach from an older version is changed over by itself the first
                     time. If Alert Grid is too small or off the screen it says so and
                     clicks nothing.
+  Ctrl+Alt+D        (v3.19.0) Opens a NEW DAILY LOG in iTrak. iTrak has no keyboard
+                    shortcut for it, so Watchlog brings the iTrak window (the Citrix
+                    window, title "iTrak - [Daily Log]") to the front, moves the mouse
+                    to the spot you taught and clicks (twice if it takes a button and
+                    a menu line), then puts the mouse back. You stay in iTrak, ready
+                    to type. It only clicks while iTrak really is in front.
+  Ctrl+Alt+Shift+I  Teach it that click, once per PC: it asks if opening a new daily
+                    log takes one click or two, then you hover over the button (and
+                    the menu line) and press F8 (nothing is clicked for you while
+                    teaching). The spot is measured from inside the iTrak window, so
+                    the window can be anywhere; a spot near the right or bottom edge
+                    follows that edge when the window is resized. If the window is
+                    too small or off the screen it says so and clicks nothing.
+                    settings.ini [ITrak]: Window= (part of the title, then ahk_exe,
+                    default "iTrak ahk_exe wfica32.exe"), Pause= (ms between the two
+                    clicks, default 300), RefuseIfResized=yes (don't click if the
+                    window isn't the size it was when taught). Numbers only are kept,
+                    in %LOCALAPPDATA%\Watchlog\itrak.ini.
+  Tray > iTrak > Share my setup with the team   (v3.19.0) puts this PC's iTrak click
+                    in itrak.ini in the team folder, filed by screen scaling, for PCs
+                    that haven't been taught. A PC's own teach always wins.
   Tray > Alert Grid > Share my setup with the team   (v3.18.0) puts this PC's taught
                     clicks (numbers only) in alertgrid.ini in the team folder, filed by
                     screen scaling. A PC that hasn't been taught uses them, so teammates
@@ -638,6 +659,8 @@ and the less-used items sit in sub-menus):
   Shift dashboard               Same as Ctrl+Alt+Shift+D (v3.16.0)
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
+  iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
+                                (Ctrl+Alt+Shift+I), Share my setup (v3.19.0)
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)

@@ -26,7 +26,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.18.0"
+VERSION := "3.19.0"
 VERSION_DATE := "Oct 26, 2026"
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
@@ -56,6 +56,7 @@ TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
 AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
+ITrakFile := DataDir "\itrak.ini"           ; where the iTrak new-daily-log click goes (numbers only), this PC only
 ; the keys kept in alertgrid.ini (all numbers, plus Basis=client from v3.18.0)
 ALERT_KEYS := ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY", "OkX", "OkY"
     , "ClearX", "ClearY", "GridW", "GridH", "MenuLine", "Basis"]
@@ -3714,6 +3715,259 @@ AlertColumn(x, y, bottom) {
 }
 
 ; =====================================================================
+;  ITRAK - new daily log   Ctrl+Alt+D
+;  iTrak has no keyboard shortcut for it, so Watchlog does the mouse
+;  click(s) for you: it brings iTrak (the Citrix window) to the front,
+;  moves to the spot you taught and clicks. Ctrl+Alt+Shift+I teaches it
+;  the spot once per PC: you hover over the "new daily log" button and
+;  press F8 (and over the menu line after it, if it takes two clicks).
+;  Only numbers are kept (%LOCALAPPDATA%\Watchlog\itrak.ini), measured
+;  from the inside of the iTrak window, so the window can be anywhere. A
+;  spot taught near the right or bottom edge follows that edge if the
+;  window is resized. Tray > iTrak > Share my setup with the team puts the
+;  numbers in itrak.ini in the team folder (per screen scaling) for PCs
+;  that haven't been taught. A PC's own teach always wins.
+; =====================================================================
+^!d:: ITrakNewLog()
+^!+i:: TeachITrak()
+
+; iTrak is a Citrix window (wfica32.exe) titled like
+; "iTrak - [Daily Log] - \\Remote". [ITrak] Window= in settings.ini changes
+; what it looks for (part of the title, then "ahk_exe ...")
+ITrakWin() {
+    SetTitleMatchMode 2
+    spec := Trim(IniRead(SettingsFile, "ITrak", "Window", "iTrak ahk_exe wfica32.exe"))
+    return WinExist(spec)
+}
+
+; itrak.ini in the team folder (beside the team templates file), or ""
+ITrakTeamFile() {
+    if Cfg["SharedTemplates"] = ""
+        return ""
+    SplitPath Cfg["SharedTemplates"], , &dir
+    return dir = "" ? "" : dir "\itrak.ini"
+}
+
+ITrakTeamSection() => "Clicks-" A_ScreenDPI
+
+; "here" (this PC's own teach), "team" (the team copy for this screen
+; scaling) or "" (not taught)
+ITrakTaught() {
+    global ITrakFile
+    try {
+        if FileExist(ITrakFile) && IniRead(ITrakFile, "Clicks", "X1", "") != ""
+            return "here"
+        f := ITrakTeamFile()
+        if f != "" && FileExist(f) && IniRead(f, ITrakTeamSection(), "X1", "") != ""
+            return "team"
+    }
+    return ""
+}
+
+; The taught spots as a Map (X1 Y1 X2 Y2 W H Clicks), or "" when none
+ITrakLoad() {
+    global ITrakFile
+    src := ITrakTaught()
+    if src = ""
+        return ""
+    f := src = "here" ? ITrakFile : ITrakTeamFile()
+    sec := src = "here" ? "Clicks" : ITrakTeamSection()
+    c := Map("Src", src)
+    try {
+        for k in ["X1", "Y1", "X2", "Y2", "W", "H", "Clicks"]
+            c[k] := Trim(IniRead(f, sec, k, ""))
+    } catch
+        return ""
+    for k in ["X1", "Y1", "W", "H"]
+        if !IsInteger(c[k])
+            return ""
+    c["Clicks"] := c["Clicks"] = "2" && IsInteger(c["X2"]) && IsInteger(c["Y2"]) ? 2 : 1
+    return c
+}
+
+; Where a spot taught inside the iTrak window (tx, ty, window w0 x h0 then)
+; is on the screen now. A spot in the right half keeps its distance from the
+; right edge when the window is resized, one in the bottom half from the
+; bottom edge. False when it falls outside the window as it is now.
+ITrakSpot(hwnd, tx, ty, w0, h0, &x, &y) {
+    WinGetClientPos &cx, &cy, &cw, &ch, "ahk_id " hwnd
+    if tx > w0 // 2
+        tx := cw - (w0 - tx)
+    if ty > h0 // 2
+        ty := ch - (h0 - ty)
+    x := cx + tx, y := cy + ty
+    return tx >= 0 && ty >= 0 && tx < cw && ty < ch
+}
+
+ITrakNewLog() {
+    c := ITrakLoad()
+    if !c {
+        MsgBox "iTrak's new daily log click hasn't been taught on this PC yet (and the team folder has none for this screen).`n`nPress Ctrl+Alt+Shift+I once and follow the steps.", "New iTrak daily log", "Icon!"
+        return
+    }
+    win := ITrakWin()
+    if !win {
+        Tip("iTrak isn't open.", 2000, true)
+        return
+    }
+    ; let go of Ctrl/Alt first so the click isn't a Ctrl+Alt+click (at most 250 ms)
+    held := A_TickCount + 250
+    while A_TickCount < held && (GetKeyState("Ctrl", "P") || GetKeyState("Alt", "P") || GetKeyState("Shift", "P"))
+        Sleep 10
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    wasActive := WinActive("ahk_id " win)
+    if WinGetMinMax("ahk_id " win) = -1
+        WinRestore "ahk_id " win
+    WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 2) || !WinActive("ahk_id " win) {
+        Tip("Couldn't bring iTrak to the front.", 2500, true)
+        return
+    }
+    if !wasActive
+        Sleep 300    ; Citrix needs a moment to take the keyboard and mouse
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    w0 := Integer(c["W"]), h0 := Integer(c["H"])
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    if StrLower(Trim(IniRead(SettingsFile, "ITrak", "RefuseIfResized", "no"))) ~= "^(yes|on|1|true)$" && (Abs(cw - w0) > 2 || Abs(ch - h0) > 2) {
+        Tip("The iTrak window isn't the size it was when taught (" cw "x" ch " now, " w0 "x" h0 " then). Put it back, or teach again.", 4000, true)
+        Activity("iTrak new daily log: not clicked (window " cw "x" ch ", taught at " w0 "x" h0 ")")
+        return
+    }
+    n := c["Clicks"]
+    loop n {
+        k := A_Index
+        if !ITrakSpot(win, Integer(c["X" k]), Integer(c["Y" k]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
+            Tip("The iTrak window is too small for the taught spot (or off the screen). Make it bigger, or teach again.", 4000, true)
+            Activity("iTrak new daily log: not clicked (spot " k " outside the window)")
+            MouseMove ox, oy, 0
+            return
+        }
+        if !WinActive("ahk_id " win) {
+            Tip("iTrak lost the front. Nothing more was clicked.", 3000, true)
+            Activity("iTrak new daily log: stopped before click " k " (iTrak lost the front)")
+            return
+        }
+        if k > 1
+            Sleep pause
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+    }
+    Sleep 60
+    MouseMove ox, oy, 0
+    Tip("New daily log", 1000)
+    Activity("iTrak: new daily log clicked (" n " click" (n = 1 ? "" : "s") ", window " cw "x" ch ")" (c["Src"] = "team" ? " (team setup)" : ""))
+    CountSaved("", 2, "iTrak new daily log")
+}
+
+TeachITrak() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachITrakRun()
+    catch as err
+        MsgBox "Teach iTrak stopped: " err.Message, "Teach iTrak", "Icon!"
+    TeachBusy := false
+}
+
+; Where the mouse is now, inside the iTrak window: sets &x &y, false when
+; it isn't over that window
+ITrakPoint(win, &x, &y) {
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &mx, &my
+    WinGetClientPos &cx, &cy, &cw, &ch, "ahk_id " win
+    x := mx - cx, y := my - cy
+    return x >= 0 && y >= 0 && x < cw && y < ch
+}
+
+TeachITrakRun() {
+    global ITrakFile
+    win := ITrakWin()
+    if !win {
+        MsgBox "Open iTrak first (the Daily Log window).", "Teach iTrak", "Icon!"
+        return
+    }
+    two := MsgBox("Does opening a new daily log in iTrak take TWO clicks (a button, then a line in a menu that opens)?`n`nYes = two clicks`nNo = one click", "Teach iTrak", "YesNo Icon?") = "Yes"
+    if MsgBox("This takes about a minute and you do it once on each PC (or once for the whole team, if you share it afterwards).`n`nAt " (two ? "two points" : "one point") " you hover the mouse over the right spot in iTrak and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching.`n`nStart?", "Teach iTrak", "YesNo Icon?") != "Yes"
+        return
+    SetTitleMatchMode 2
+    if !TeachWait("1 of " (two ? 2 : 1) "`nHover over the button that opens a new daily log in iTrak and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)   (Ctrl+Alt+Esc cancels)")
+        return
+    win := ITrakWin()
+    if !win || !ITrakPoint(win, &x1, &y1) {
+        MsgBox "That spot isn't inside the iTrak window. Nothing saved. Try again.", "Teach iTrak", "Icon!"
+        return
+    }
+    x2 := "", y2 := ""
+    if two {
+        if !TeachWait("2 of 2`nNow click that button, and when the menu is open hover over the line that starts the new daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+            return
+        win := ITrakWin()
+        if !win || !ITrakPoint(win, &x2, &y2) {
+            MsgBox "That spot isn't inside the iTrak window. Nothing saved. Try again.", "Teach iTrak", "Icon!"
+            return
+        }
+    }
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    try {
+        try FileDelete ITrakFile
+        IniWrite x1, ITrakFile, "Clicks", "X1"
+        IniWrite y1, ITrakFile, "Clicks", "Y1"
+        if two {
+            IniWrite x2, ITrakFile, "Clicks", "X2"
+            IniWrite y2, ITrakFile, "Clicks", "Y2"
+        }
+        IniWrite two ? 2 : 1, ITrakFile, "Clicks", "Clicks"
+        IniWrite cw, ITrakFile, "Clicks", "W"
+        IniWrite ch, ITrakFile, "Clicks", "H"
+        IniWrite A_ScreenDPI, ITrakFile, "Clicks", "DPI"
+    } catch {
+        MsgBox "Couldn't save the click to " ITrakFile, "Teach iTrak", "Icon!"
+        return
+    }
+    Activity("iTrak: new daily log taught (" x1 "," y1 (two ? "  then " x2 "," y2 : "") "  window " cw "x" ch ")")
+    MsgBox "Saved. Now click " (two ? "that line" : "the button") " yourself to finish.`n`nFrom now on Ctrl+Alt+D opens a new daily log, wherever iTrak is. To share it with the team's other PCs: tray > iTrak > Share my setup with the team.", "Teach iTrak"
+}
+
+; Puts this PC's taught iTrak click in itrak.ini in the team folder, under
+; this PC's screen scaling, so PCs that haven't been taught use it.
+; Numbers only. A PC's own teach always wins over the team copy.
+ShareITrakSetup() {
+    global ITrakFile
+    f := ITrakTeamFile()
+    if f = "" {
+        MsgBox "There's no team folder set up (the team templates file in Settings), so there's nowhere to share it.", "Share iTrak setup", "Icon!"
+        return
+    }
+    if ITrakTaught() != "here" {
+        MsgBox "iTrak isn't taught on this PC, so there's nothing of this PC's to share. Teach it first (Ctrl+Alt+Shift+I).", "Share iTrak setup", "Icon!"
+        return
+    }
+    c := ITrakLoad()
+    if !c
+        return
+    scale := Round(A_ScreenDPI / 96 * 100)
+    if MsgBox("Share this PC's iTrak click with the team?`n`nIt goes in " f " for screens at " scale "% scaling. PCs that haven't been taught use it; a PC that has been taught keeps its own.`n`nOnly click positions are saved (numbers).", "Share iTrak setup", "YesNo Icon?") != "Yes"
+        return
+    sec := ITrakTeamSection()
+    try {
+        for k in ["X1", "Y1", "X2", "Y2", "W", "H", "Clicks"] {
+            if c[k] != ""
+                IniWrite c[k], f, sec, k
+            else
+                try IniDelete f, sec, k
+        }
+    } catch as e {
+        MsgBox "Couldn't write to the team folder:`n" e.Message "`n`nIf OneDrive is syncing, try again in a moment.", "Share iTrak setup", "Icon!"
+        return
+    }
+    Activity("iTrak: shared this PC's click with the team (" scale "% scaling)")
+    MsgBox "Shared. PCs that haven't been taught now use this click (once OneDrive has synced the team folder).`n`nThe iTrak window should be about the same size on those PCs (maximised is best).", "Share iTrak setup"
+}
+
+; =====================================================================
 ;  UPDATES FROM THE TEAM FOLDER
 ;  Whoever looks after the tool puts the new Watchlog.ahk (and
 ;  Watchlog.ico) in the same SharePoint folder as the team templates.
@@ -4051,7 +4305,7 @@ ShowTimeSaved() {
 ItemKind(name) {
     if name = "Alert Grid clear"
         return "alert"
-    if RegExMatch(name, "^(Login |Stamp |Switch to )")
+    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new )")
         return "other"
     return "log"
 }
@@ -5340,6 +5594,15 @@ ShowSettings(welcome := false, startTab := 1) {
     g.AddText("xs y+14", "'Acknowledge as received' is menu line:")
     lineE := g.AddEdit("x+6 yp-3 w40 Number", AlertMenuLine())
     g.AddText("x+6 yp+3", "(1 = top; for the arrow keys when the menu opens upward)")
+    g.SetFont("s10 bold")
+    g.AddText("xs y+22", "iTrak: new daily log (Ctrl+Alt+D)")
+    g.SetFont("s10 norm")
+    itTaught := ITrakTaught()
+    g.SetFont("s10 c" (itTaught != "" ? "2E7D32" : "B86E00"))
+    g.AddText("xs y+6 w" W, itTaught = "here" ? "●  The click is taught on this PC." : itTaught = "team" ? "●  Using the team's shared setup." : "●  The click isn't taught on this PC yet.")
+    g.SetFont("s10 c000000")
+    g.AddButton("xs y+6 w240", itTaught = "here" ? "Teach the iTrak click again..." : "Teach the iTrak click...").OnEvent("Click", TeachITrakNow)
+    g.AddButton("x+8 w240", "Share it with the team...").OnEvent("Click", (*) => ShareITrakSetup())
 
     ; ---- Updates
     tabs.UseTab(5)
@@ -5568,6 +5831,11 @@ ShowSettings(welcome := false, startTab := 1) {
     TeachNow(*) {
         Close()
         SetTimer TeachAlerts, -300
+    }
+
+    TeachITrakNow(*) {
+        Close()
+        SetTimer TeachITrak, -300
     }
 
     Save(*) {
@@ -6058,6 +6326,7 @@ ShowCheatSheet() {
         , ["J", "shift journal"], ["L", "start of shift"], ["Shift+L", "end of shift"], ["M", "Watchlog home"]
         , ["E", "template editor"], ["I", "window info"], ["Shift+S", "save window layout"], ["W", "put windows back"]
         , ["K", "log out of SDS"], ["A", "clear all Alert Grid alerts"], ["Shift+A", "teach Alert Grid the clicks"]
+        , ["D", "new daily log in iTrak"], ["Shift+I", "teach iTrak the click"]
         , ["Shift+Caps", "turn Caps Lock on"], ["P or X", "pause / resume"], ["R", "reload"], ["H", "this sheet"]]
 
     g.SetFont("s20 bold c" teal, "Segoe UI")
@@ -6716,6 +6985,12 @@ BuildTrayMenu() {
     MenuItem(ag, "Share my setup with the team", (*) => ShareAlertSetup(), 0xE72D)
     MenuItem(tm, "Alert Grid", ag, 0xEA8F)
 
+    itm := Menu()
+    MenuItem(itm, "New daily log  (Ctrl+Alt+D)", (*) => ITrakNewLog(), 0xE710)
+    MenuItem(itm, "Teach the click  (Ctrl+Alt+Shift+I)", (*) => TeachITrak(), 0xE7C9)
+    MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
+    MenuItem(tm, "iTrak", itm, 0xE8F1)
+
     WinMenu := Menu()
     MenuItem(WinMenu, "Save window layout  (Ctrl+Alt+Shift+S)", (*) => SaveLayout(), 0xE74E)
     MenuItem(WinMenu, "Put windows back  (Ctrl+Alt+W)", (*) => RestoreLayout(), 0xE7C4)
@@ -6800,6 +7075,7 @@ ShowHome() {
         , ["End of shift", "Ctrl+Alt+Shift+L", 0xE7E8, () => EndOfShift(), false]
         , ["Log out of SDS", "Ctrl+Alt+K", 0xE72E, () => SDSLogout(), false]
         , ["Clear Alert Grid", "Ctrl+Alt+A or Caps Lock", 0xE894, () => ClearAlerts(), true]
+        , ["New iTrak daily log", "Ctrl+Alt+D", 0xE710, () => ITrakNewLog(), true]
         , ["Put windows back", "Ctrl+Alt+W", 0xE7C4, () => RestoreLayout(), false]])
 
     logins := []
@@ -6830,6 +7106,10 @@ ShowHome() {
     Status(taught != "" ? "2E7D32" : "B86E00", taught = "here" ? "Alert Grid clicks are taught on this PC"
         : taught = "team" ? "Alert Grid clicks: using the team's shared setup"
         : "Alert Grid clicks aren't taught on this PC yet (Settings > Alert Grid)")
+    it := ITrakTaught()
+    Status(it != "" ? "2E7D32" : "B86E00", it = "here" ? "iTrak new daily log is taught on this PC"
+        : it = "team" ? "iTrak new daily log: using the team's shared setup"
+        : "iTrak new daily log isn't taught on this PC yet (Ctrl+Alt+Shift+I)")
     sh := SavedShift()
     Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")
         . ", " SavedTime(sh.keys) " saved")
