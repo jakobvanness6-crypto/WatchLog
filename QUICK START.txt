@@ -1,7 +1,13 @@
 =======================================================================
-  WATCHLOG  v3.17.0  -  QUICK START  (one page)
+  WATCHLOG  v3.19.1  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
+Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+Watchlog is used only with the copyright holder's permission. No
+copying, sharing, changing or redistributing it, in whole or in part,
+without written permission. Provided "as is", without warranty. The
+full licence is in LICENCE.txt (and tray menu > About Watchlog).
+
 
 WHAT IT DOES
   Type a short code like ;jack in iTrak and it becomes the full log
@@ -28,8 +34,8 @@ SET IT UP  (about 2 minutes, once per PC)
      there even when the network is slow.
   To see the tutorial again: tray icon > Tutorial.  To remove Watchlog:
   Settings > Apps > Watchlog > Uninstall (your settings are kept).
-  (The script version, Watchlog.ahk in the "Script version" folder,
-  still works if AutoHotkey v2 is installed. IT may prefer it.)
+  (IT can ask Jakob for the readable script version, Watchlog.ahk.
+  It isn't in this folder.)
 
 
 USE IT

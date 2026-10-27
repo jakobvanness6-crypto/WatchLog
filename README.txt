@@ -1,7 +1,13 @@
 =======================================================================
-  WATCHLOG  v3.17.0  -  README
+  WATCHLOG  v3.19.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
+Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+Watchlog is used only with the copyright holder's permission. No
+copying, sharing, changing or redistributing it, in whole or in part,
+without written permission. Provided "as is", without warranty. The
+full licence is in LICENCE.txt (and tray menu > About Watchlog).
+
 
 Watchlog (called Log Templates before v3.0.1) runs quietly in the
 background: its icon, a white log page with an eye on a teal square,
@@ -54,7 +60,8 @@ keeps these files in Documents\Watchlog (on OneDrive). The script
 version keeps them next to Watchlog.ahk (for example
 Documents\AutoHotkey). Either way:
 
-  Watchlog.exe        The program (or Watchlog.ahk, the script version).
+  Watchlog.exe        The program (or Watchlog.ahk, the script version,
+                      which IT can have on request: see section 16).
                       You shouldn't need to edit it.
   Watchlog.ico        The icon. Without it the tray shows a green H.
   templates.txt       The wording of every template. Edit freely. (If
@@ -68,6 +75,8 @@ Documents\AutoHotkey). Either way:
   settings.example.ini  An example with no real usernames, to show others.
   QUICK START.txt     One page for someone new.
   README.txt          This file.
+  LICENCE.txt         The licence: who owns Watchlog and how it may be
+                      used.
 
 Elsewhere:
   LaunchWork.bat      Opens the work websites at the start of a shift
@@ -155,12 +164,51 @@ couple of seconds. No need to press anything.
                     nothing, so when Alert Grid is open it clears all the alerts (same
                     as Ctrl+Alt+A). Caps Lock still turns itself off when it is on.
                     [AlertGrid] CapsLockClears=no in settings.ini turns this off.
-                    [AlertGrid] SelectWait= (v3.13.0, default 200) is the pause in ms after
-                    Ctrl+A before the right-click; raise it if only the top alert clears.
+                    v3.17.1: it waits for you to let go of Ctrl/Alt/Caps Lock first, holds
+                    Ctrl+A properly, watches the list turn blue and presses Ctrl+A again
+                    if it didn't take, so it no longer clears only the top alert.
+                    [AlertGrid] SelectWait= is now the longest it waits for that (ms,
+                    default 120). With a single alert (nothing under it
+                    to turn blue) it waits only about 0.04 s (v3.17.3). v3.17.4-6 trimmed every wait so a clear
+                    stays quick when alerts are arriving many a second.
   Ctrl+Alt+Shift+A  Teach it the clicks, once per PC: clear alerts by hand and press
-                    F8 (or Ctrl+Alt+Shift+A again if F8 needs the Fn key) over a row,
+                    F8 (or Ctrl+Alt+Shift+A again if F8 needs the Fn key) over the top row,
                     the menu item, Submit, the final OK and the little button that clears the
-                    acknowledged alerts (Ctrl+Alt+Esc cancels).
+                    acknowledged alerts (Ctrl+Alt+Esc cancels). Last it asks which line
+                    of the right-click menu "Acknowledge as received" is (1 = top).
+                    v3.18.0: Alert Grid can be anywhere and any size, maximised or not.
+                    The spots are measured from inside the Alert Grid window, the
+                    clear-acknowledged button keeps up with the edge it sits by when
+                    the window is resized, and when Alert Grid is low on the screen
+                    (the menu opens upward) it picks the menu line with the arrow keys.
+                    A teach from an older version is changed over by itself the first
+                    time. If Alert Grid is too small or off the screen it says so and
+                    clicks nothing.
+  Ctrl+Alt+D        (v3.19.0) Opens a NEW DAILY LOG in iTrak. iTrak has no keyboard
+                    shortcut for it, so Watchlog brings the iTrak window (the Citrix
+                    window, title "iTrak - [Daily Log]") to the front, moves the mouse
+                    to the spot you taught and clicks (twice if it takes a button and
+                    a menu line), then puts the mouse back. You stay in iTrak, ready
+                    to type. It only clicks while iTrak really is in front.
+  Ctrl+Alt+Shift+I  Teach it that click, once per PC: it asks if opening a new daily
+                    log takes one click or two, then you hover over the button (and
+                    the menu line) and press F8 (nothing is clicked for you while
+                    teaching). The spot is measured from inside the iTrak window, so
+                    the window can be anywhere; a spot near the right or bottom edge
+                    follows that edge when the window is resized. If the window is
+                    too small or off the screen it says so and clicks nothing.
+                    settings.ini [ITrak]: Window= (part of the title, then ahk_exe,
+                    default "iTrak ahk_exe wfica32.exe"), Pause= (ms between the two
+                    clicks, default 300), RefuseIfResized=yes (don't click if the
+                    window isn't the size it was when taught). Numbers only are kept,
+                    in %LOCALAPPDATA%\Watchlog\itrak.ini.
+  Tray > iTrak > Share my setup with the team   (v3.19.0) puts this PC's iTrak click
+                    in itrak.ini in the team folder, filed by screen scaling, for PCs
+                    that haven't been taught. A PC's own teach always wins.
+  Tray > Alert Grid > Share my setup with the team   (v3.18.0) puts this PC's taught
+                    clicks (numbers only) in alertgrid.ini in the team folder, filed by
+                    screen scaling. A PC that hasn't been taught uses them, so teammates
+                    don't have to teach. A PC's own teach always wins.
   Ctrl+Alt+O        Show all your quick notes in a window that is always up to
                     date (Open in Notepad button inside). v3.7.1
                     (Ctrl+Alt+T used to find notes by tag. It was
@@ -620,13 +668,17 @@ and the less-used items sit in sub-menus):
   Shift dashboard               Same as Ctrl+Alt+Shift+D (v3.16.0)
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
+  iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
+                                (Ctrl+Alt+Shift+I), Share my setup (v3.19.0)
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
-                                clicks (Ctrl+Alt+Shift+A)
+                                clicks (Ctrl+Alt+Shift+A), Share my setup
+                                with the team (v3.18.0)
   Windows >                     Save window layout, Put windows back,
                                 Caps Lock guard (ticked = on)
   Template editor               Same as Ctrl+Alt+E (section 12)
   Settings                      Section 14
   Tutorial                      The guided tour again
+  About Watchlog                Version, copyright and the licence
   Advanced >                    Security and status (15), Activity log
                                 (15), Make a copy to share (16), Edit
                                 templates / my templates / settings in
@@ -910,8 +962,10 @@ a PC. Since v3.10.0 it has tabs:
                   waits for the programs (LaunchWait), LaunchWork.bat,
                   the Google account (ChromeAccount), and what end of
                   shift closes ([EndOfShift] Close)
-  Alert Grid      taught on this PC or not, a Teach button, Caps Lock
-                  clears (CapsLockClears), wait between clicks (Pause)
+  Alert Grid      taught on this PC, using the team's setup, or not; Teach
+                  and Share buttons, Caps Lock clears (CapsLockClears), wait
+                  between clicks (Pause), the menu line of "Acknowledge as
+                  received" (for the arrow keys)
   Updates         your own update folder ([Updates] Folder), and what
                   version is waiting there
   General         shift journal (what's saved, when old files go), the
@@ -1103,6 +1157,14 @@ THE EXE (Watchlog.exe, v3.5.0 and later)
   to delete the saved passwords too, and keeps your settings and journal.
   It isn't code-signed, so Windows may say "Windows protected your PC"
   the first time: More info > Run anyway (or ask IT to allow it).
+
+THE SCRIPT VERSION (for IT, on request)
+  From v3.19.1 the release zip has only Watchlog.exe and its guides.
+  The readable script (Watchlog.ahk, with the icon, the two build files
+  and settings.example.ini) isn't handed out with it any more. If IT
+  wants to read or check it, ask Jakob: he sends it to them directly as
+  a separate "Watchlog vX script for IT" zip of the same version, under
+  the same licence. Don't post it in the team folder.
 
 YOUR OWN OTHER BAY PCs (script version)
   1. AutoHotkey v2 must be installed on that PC.
