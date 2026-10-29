@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.19.1  -  README
+  WATCHLOG  v3.19.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -184,6 +184,9 @@ couple of seconds. No need to press anything.
                     A teach from an older version is changed over by itself the first
                     time. If Alert Grid is too small or off the screen it says so and
                     clicks nothing.
+                    v3.19.2: after the clear button there's one more click, the box that
+                    says there are no more alerts. It's step 6 of the teach (re-teach once:
+                    an older teach still works but skips that click).
   Ctrl+Alt+D        (v3.19.0) Opens a NEW DAILY LOG in iTrak. iTrak has no keyboard
                     shortcut for it, so Watchlog brings the iTrak window (the Citrix
                     window, title "iTrak - [Daily Log]") to the front, moves the mouse
@@ -344,6 +347,11 @@ were typing.
         B2345 (Defective)
     If the boxes are empty when you press Insert, that last one is
     skipped. The shift journal counts it as one log.
+  - Several tables on one line (;open, ;auto, v3.19.3): pick a table,
+    press "Add another" (or Ctrl+Enter) and pick the next. The table box
+    starts empty and clears each time; Insert pastes one line:
+        BJ205, BJ206 and RO204 Opened.
+    A table added twice is only listed once.
 
 
 -----------------------------------------------------------------------
@@ -359,8 +367,9 @@ Forms (open a form):
   ;face         Facial recognition alert: alert #, result, match %
   ;start        Start of shift, Bay (remembers last bay)
   ;end          End of shift, Bay (remembers last bay)
-  ;open         Table opened: table
-  ;auto         Table closed and auto-close started: table
+  ;open         Table opened: table (Ctrl+Enter adds another, same line)
+  ;auto         Table closed and auto-close started: table (Ctrl+Enter
+                adds another, same line)
   ;cards        Card change on a table
   ;fill         Table fill: table and amount (Ctrl+Enter adds another table)
   ;mfill        Machine fill: NRT or ATM and amount (Ctrl+Enter adds another)
@@ -882,6 +891,9 @@ Blanks (any of these makes the template a form):
   {repeat}                     at the end of a form: adds an "Add
                                another" button (several in one log,
                                one per line)
+  {Table: @tables | several}   with {repeat}: Add another adds to this
+                               box instead, all on one line
+                               ("BJ205, BJ206 and RO204 Opened.")
   Combine options with |, e.g. {Employee #: clip | blank=XXXXXXX}
   The same blank used twice in one template is one box that fills both.
 
@@ -1116,6 +1128,10 @@ WINDOW LAYOUT (v3.7.0)
   - Windows are matched by program, in the order they sit on the screen, so
     two Chrome windows go back to the first and second spots saved.
     Minimised windows and Watchlog's own windows are left alone.
+  - SDS and Alert Grid are the same program (Java), so since v3.19.3 the
+    layout also notes which one each window is (from the start of its
+    title; the title itself isn't kept) and they can't swap spots. A
+    layout saved before v3.19.3 asks once to be saved again.
   - W is no longer free for an app hotkey ([AppN] Key=W is skipped).
 
 CAPS LOCK GUARD (v3.7.0)

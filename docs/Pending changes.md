@@ -3,16 +3,26 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.19.1 (Oct 27, 2026).
+Current version: v3.19.3 (Oct 29, 2026).
 
 ## Waiting to be built
 
-- **Casino autocorrect in every program** (Jakob, Oct 26: "add it to the rest of the programs"). Today it only runs in the call pad and the log form boxes. Plan: an optional system-wide mode ([CallPad] Autocorrect=everywhere, plus a tick in Settings) that fixes a word when a space, Enter or punctuation follows it, in any window. Open points: it must stay out of password and login fields and out of Watchlog's own typing (logins, templates); in Citrix/iTrak a fix means Backspaces plus retyping, which can be slow or drop keys, so it needs its own test there; IT should hear about it (it watches typed words, stores nothing). Same autocorrect.txt list. Wait for the full test pass (docs checklist) before building.
 - Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
 - Shorthand for other logs (which ones, with his real examples).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Shipped without a version (templates.txt only)
+- Oct 29: ;open and ;auto got {repeat} (one table per line); replaced the same day by v3.19.3's one-line list.
+
+## Done in v3.19.3 (Oct 29)
+- Start of shift no longer puts SDS where Alert Grid goes. Both are the same Java program (javaw.exe) and the layout matched them by front-to-back order, so after the start of shift sign-in left SDS in front it took Alert Grid's spot. Save window layout now notes which one each Java window is (Alert Grid, SDS or other, from the start of its title; the title isn't saved) and Put windows back matches on that. A layout saved before v3.19.3 still works the old way and asks once to be saved again (Ctrl+Alt+Shift+S).
+- Several tables on one line: ;open and ;auto take Add another (Ctrl+Enter) and paste "BJ205, BJ206 and RO204 Opened." New box option | several (README, template options). The table box starts empty; a table added twice is listed once.
+- Tested under Wine with fake SDS and Alert Grid windows (the old matching swapped them, the new one doesn't) and the forms. The real Bally windows only on a bay.
+
+## Done in v3.19.2 (Oct 29)
+- Alert Grid teach has a new step 6 (the casino added a click that says there are no more alerts, last in the sequence, after the clear-acknowledged button). Hover over the box's button and press F8. Saved as NoMoreX/NoMoreY (+ NoMoreBox, the box's title, when it's a separate box; measured from that box) in alertgrid.ini and included in Share my setup with the team. Old teaches work and skip the click until re-taught. Waits up to 0.8 s for the box, so no extra delay when it isn't there. Built without running AutoHotkey (not run under Wine).
 
 ## Done in v3.19.1 (Oct 27)
 - Copyright and licence (step 1 of making Watchlog proprietary): "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved." and a short licence (permission only, no copying/sharing/changing/redistributing, provided as is). New About Watchlog window (tray menu and home window); the line also shows under the tutorial, in the version box, at the bottom of the cheat sheet and in Security and status; Copyright field in the exe's file properties; block at the top of README, QUICK START, templates.txt and Watchlog.ahk; LICENCE.txt in the zip, built into the exe and in Make a copy to share.

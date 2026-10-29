@@ -15,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 26, 2026 (1)
-# Program version: 3.19.1
+# Program version: 3.19.3
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -76,6 +76,9 @@
 #    Put {repeat} at the end of a form line and the form gets an
 #    "Add another" button (or press Ctrl+Enter). Fill in one, add
 #    another, and Insert pastes them all as one log, one per line.
+#    Add | several to a box to keep it all on one line instead: Add
+#    another adds to that box's list ({Table: @tables | several}
+#    gives "BJ205, BJ206 and RO204 Opened.").
 #
 #  SHARED LISTS
 #    A line starting with @ is a list you can use in any blank. Change
@@ -122,8 +125,8 @@
 # ----- TABLES --------------------------------------------------------
 
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes.
-;open (Table opening) = {Table: @tables | blank=XXXXX} Opened.
-;auto (Auto-close) = {Table: @tables | blank=XXXXX} Closed and Auto-Close started.
+;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat}
+;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat}
 ;cards (Card change) = Card change on {Table: @tables}.
 ;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat}
 ;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat}

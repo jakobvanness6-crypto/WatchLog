@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.19.1   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.19.3   (called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.19.1"
-VERSION_DATE := "Oct 27, 2026"
+VERSION := "3.19.3"
+VERSION_DATE := "Oct 29, 2026"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
@@ -67,7 +67,7 @@ AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (num
 ITrakFile := DataDir "\itrak.ini"           ; where the iTrak new-daily-log click goes (numbers only), this PC only
 ; the keys kept in alertgrid.ini (all numbers, plus Basis=client from v3.18.0)
 ALERT_KEYS := ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY", "OkX", "OkY"
-    , "ClearX", "ClearY", "GridW", "GridH", "MenuLine", "Basis"]
+    , "ClearX", "ClearY", "NoMoreX", "NoMoreY", "NoMoreBox", "GridW", "GridH", "MenuLine", "Basis"]
 CallPadFile := DataDir "\call pad.txt"            ; the call pad text, this PC only, wiped at end of shift
 CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, this PC only
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
@@ -1395,6 +1395,8 @@ ParseField(spec, last := Map()) {
             f.remember := true, f.nextStep := true
         } else if low = "pick" {
             pick := true
+        } else if low = "several" {
+            f.several := true           ; Add another adds to this box, on the same line (v3.19.3)
         } else if low = "caps" {
             f.caps := true
         } else if low = "tidy" {
@@ -1467,6 +1469,22 @@ FillTemplate(text, fields, vals) {
     }
     out .= SubStr(text, pos)
     return FixArticles(out)
+}
+
+; ["BJ205", "BJ206", "RO204"] -> "BJ205, BJ206 and RO204"
+JoinList(items) {
+    out := ""
+    for i, it in items
+        out .= (i = 1 ? "" : i = items.Length ? " and " : ", ") it
+    return out
+}
+
+; Empties a form box (a pick-only list ends with nothing picked)
+ClearBox(c) {
+    if c.Type = "DDL"
+        c.Choose(0)
+    else
+        c.Text := ""
 }
 
 ; "a/an employee" -> "an employee", "a/an guest" -> "a guest"
@@ -1581,6 +1599,19 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
         ctrls.Push(c)
         starts.Push({text: c.Text, choose: n})
     }
+    ; "several" boxes (v3.19.3): Add another adds to this box's list on the
+    ; same line ("BJ205, BJ206 and RO204 Opened.") instead of a new line.
+    ; They start empty, so a box left empty at the end is skipped.
+    multi := Map()
+    for i, f in fields {
+        if !f.HasOwnProp("several")
+            continue
+        multi[i] := []
+        ClearBox(ctrls[i])
+        starts[i].text := "", starts[i].choose := 0
+    }
+    if multi.Count
+        repeat := true
     ; Boxes the call pad can fill (machine, table, amount, alert #)
     hints := PadHints()
     padUsed := 0, padRows := [], padMarks := Map()
@@ -1701,9 +1732,13 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
 
     ShowPreview() {
         out := ""
-        for entry in done
-            out .= entry "`r`n"
-        out .= build(Collect(false))
+        if multi.Count {
+            out := build(Joined(Collect(false)))
+        } else {
+            for entry in done
+                out .= entry "`r`n"
+            out .= build(Collect(false))
+        }
         out := StrReplace(StrReplace(out, "`r`n", "`n"), "`n", "`r`n")
         ; Only redraw when it changed (saves flicker while typing)
         if out != lastPreview
@@ -1812,7 +1847,40 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
         return n
     }
 
+    ; The "several" boxes as one list each: what was added so far plus
+    ; what's in the box now ("BJ205, BJ206 and RO204")
+    Joined(vals) {
+        for i, list in multi {
+            all := list.Clone()
+            if Trim(ctrls[i].Text) != "" && !HasVal(all, vals[i])
+                all.Push(vals[i])
+            vals[i] := all.Length ? JoinList(all) : fields[i].ph
+        }
+        return vals
+    }
+
     AddAnother(*) {
+        if multi.Count {
+            vals := Collect(false)
+            most := 0, box := ""
+            for i, list in multi {
+                if box = ""
+                    box := ctrls[i]
+                v := Trim(ctrls[i].Text)
+                if v != "" {
+                    typed += StrLen(v) + 1
+                    if !HasVal(list, vals[i])
+                        list.Push(vals[i])
+                    ClearBox(ctrls[i])
+                }
+                most := Max(most, list.Length)
+            }
+            Changed()
+            if most
+                g.Title := title "  (" most " added)"
+            box.Focus()
+            return
+        }
         if Untouched() {
             first.Focus()
             return
@@ -1833,14 +1901,20 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
     }
 
     Submit(*) {
-        ; With "Add another", a last set of boxes left empty is skipped
-        if !(done.Length && Untouched()) {
-            typed += TypedNow()
-            done.Push(build(Collect()))
-        }
         out := ""
-        for entry in done
-            out .= (A_Index > 1 ? "`n" : "") entry
+        if multi.Count {
+            ; "several" boxes: one log, the list on one line
+            typed += TypedNow()
+            out := build(Joined(Collect()))
+        } else {
+            ; With "Add another", a last set of boxes left empty is skipped
+            if !(done.Length && Untouched()) {
+                typed += TypedNow()
+                done.Push(build(Collect()))
+            }
+            for entry in done
+                out .= (A_Index > 1 ? "`n" : "") entry
+        }
         SetForm("")
         g.Destroy()
         ; what was typed on the call pad for this call, plus the + key and Ctrl+Enter
@@ -3370,11 +3444,11 @@ TeachRun() {
         MsgBox "Open Alert Grid first, with at least one alert in the list.", "Teach Alert Grid", "Icon!"
         return
     }
-    if MsgBox("This takes about a minute and you do it once on each PC (or once for the whole team, if you share it afterwards).`n`nYou will clear the alerts by hand, and at five points hover the mouse over the right spot and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels).`n`nAlert Grid needs at least one alert in the list. Start?", "Teach Alert Grid", "YesNo Icon?") != "Yes"
+    if MsgBox("This takes about a minute and you do it once on each PC (or once for the whole team, if you share it afterwards).`n`nYou will clear the alerts by hand, and at six points hover the mouse over the right spot and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels).`n`nAlert Grid needs at least one alert in the list. Start?", "Teach Alert Grid", "YesNo Icon?") != "Yes"
         return
     CoordMode "Mouse", "Screen"
     SetTitleMatchMode "RegEx"
-    if !TeachWait("1 of 5`nHover over the TOP alert row in Alert Grid and press F8 (or Ctrl+Alt+Shift+A)   (Ctrl+Alt+Esc cancels)")
+    if !TeachWait("1 of 6`nHover over the TOP alert row in Alert Grid and press F8 (or Ctrl+Alt+Shift+A)   (Ctrl+Alt+Esc cancels)")
         return
     MouseGetPos &sx, &sy, &hwnd
     grid := AlertGridWin()
@@ -3385,11 +3459,11 @@ TeachRun() {
     ; inside the window, so the frame (maximised or not) doesn't matter (v3.18.0)
     WinGetClientPos &gx, &gy, &gw, &gh, "ahk_id " grid
     rowx := sx - gx, rowy := sy - gy
-    if !TeachWait("2 of 5`nNow press Ctrl+A, right-click the row, hover over 'Acknowledge as received' and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+    if !TeachWait("2 of 6`nNow press Ctrl+A, right-click the row, hover over 'Acknowledge as received' and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
         return
     MouseGetPos &mx, &my
     dx := mx - sx, dy := my - sy
-    if !TeachWait("3 of 5`nClick 'Acknowledge as received'. When the Acknowledge box shows, hover over Submit and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+    if !TeachWait("3 of 6`nClick 'Acknowledge as received'. When the Acknowledge box shows, hover over Submit and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
         return
     MouseGetPos &bx, &by
     dlg := WinExist("^Acknowledge$ ahk_exe javaw.exe")
@@ -3409,14 +3483,14 @@ TeachRun() {
         IniWrite gh, AlertFile, "Clicks", "GridH"
         IniWrite "client", AlertFile, "Clicks", "Basis"
         ; an older teach's OK and clear button spots don't belong with these
-        for k in ["OkX", "OkY", "ClearX", "ClearY"]
+        for k in ["OkX", "OkY", "ClearX", "ClearY", "NoMoreX", "NoMoreY", "NoMoreBox"]
             try IniDelete AlertFile, "Clicks", k
     } catch {
         MsgBox "Couldn't save the clicks to " AlertFile, "Teach Alert Grid", "Icon!"
         return
     }
     Activity("Alert Grid: clicks taught (row " rowx "," rowy "  menu " dx "," dy "  submit " bx - ax "," by - ay "  window " gw "x" gh ")")
-    if !TeachWait("4 of 5`nNow click Submit. When the 'Acknowledgement Successful' box shows, hover over its OK button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+    if !TeachWait("4 of 6`nNow click Submit. When the 'Acknowledgement Successful' box shows, hover over its OK button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
         return
     MouseGetPos &kx, &ky
     ok := WinExist("^Alert Grid$ ahk_exe javaw.exe")
@@ -3430,7 +3504,7 @@ TeachRun() {
         IniWrite ky - oy, AlertFile, "Clicks", "OkY"
     }
     Activity("Alert Grid: OK button taught (" kx - ox "," ky - oy ")")
-    if !TeachWait("5 of 5`nClick OK. Then hover over the little button that clears the acknowledged alerts and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+    if !TeachWait("5 of 6`nClick OK. Then hover over the little button that clears the acknowledged alerts and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
         return
     MouseGetPos &cx, &cy
     grid := AlertGridWin()
@@ -3446,6 +3520,33 @@ TeachRun() {
         IniWrite gh, AlertFile, "Clicks", "GridH"
     }
     Activity("Alert Grid: clear-acknowledged button taught (" cx - gx "," cy - gy ")")
+    ; step 6 (v3.19.2): the box that says there are no more alerts
+    if !TeachWait("6 of 6`nNow click that button. When the box about there being no more alerts shows, hover over its button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet; Ctrl+Alt+Esc skips this step)")
+        return AlertTeachDone()
+    MouseGetPos &nx, &ny, &nwin
+    nt := nwin ? WinGetTitle("ahk_id " nwin) : ""
+    try {
+        if SubStr(nt, 1, 12) = "Alert Grid (" {
+            ; the button is inside Alert Grid itself
+            grid := AlertGridWin()
+            WinGetClientPos &gx, &gy, &gw, &gh, "ahk_id " grid
+            IniWrite nx - gx, AlertFile, "Clicks", "NoMoreX"
+            IniWrite ny - gy, AlertFile, "Clicks", "NoMoreY"
+            try IniDelete AlertFile, "Clicks", "NoMoreBox"
+            Activity("Alert Grid: no-more-alerts button taught inside the window (" nx - gx "," ny - gy ")")
+        } else if nt != "" {
+            WinGetPos &wx, &wy, , , "ahk_id " nwin
+            IniWrite nx - wx, AlertFile, "Clicks", "NoMoreX"
+            IniWrite ny - wy, AlertFile, "Clicks", "NoMoreY"
+            IniWrite nt, AlertFile, "Clicks", "NoMoreBox"
+            Activity("Alert Grid: no-more-alerts box taught (" nt ", button " nx - wx "," ny - wy ")")
+        } else
+            MsgBox "That box wasn't open. This step isn't saved.", "Teach Alert Grid", "Icon!"
+    }
+    AlertTeachDone()
+}
+
+AlertTeachDone() {
     MsgBox "Saved. Now click that button yourself to finish.", "Teach Alert Grid"
     AskMenuLine()
     MsgBox "All done. From now on Ctrl+Alt+A does all of it, wherever Alert Grid is and whatever its size.`n`nSo teammates' PCs don't have to be taught: tray > Alert Grid > Share my setup with the team.", "Teach Alert Grid"
@@ -3662,6 +3763,24 @@ ClearAlerts() {
                     Sleep gap
                 } else
                     Activity("Alert Grid: the clear-acknowledged button spot is outside the window now (skipped it)")
+            }
+            ; the box (or button) that says there are no more alerts (v3.19.2).
+            ; Only if it was taught; an older teach skips it.
+            if IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
+                if c["NoMoreBox"] != "" {
+                    SetTitleMatchMode 3
+                    nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 0.8)
+                    SetTitleMatchMode "RegEx"
+                    if nb {
+                        WinActivate "ahk_id " nb
+                        WinGetPos &nbx, &nby, , , "ahk_id " nb
+                        Click nbx + Integer(c["NoMoreX"]), nby + Integer(c["NoMoreY"])
+                        WinWaitClose "ahk_id " nb, , 1
+                    }
+                } else if WinExist("ahk_id " grid) && AlertSpot(c, grid, "NoMoreX", "NoMoreY", false, &nmx, &nmy) {
+                    Click nmx, nmy
+                    Sleep gap
+                }
             }
         }
     }
@@ -6411,6 +6530,12 @@ TogglePause() {
 ;  no contents. Windows are matched by program, in the order they sit
 ;  on screen, so two Chrome windows go back to the first and second
 ;  spots saved. Watchlog's own windows and minimised windows are left alone.
+;  v3.19.3: SDS and Alert Grid are both javaw.exe (Java), so front-to-back
+;  order alone let them swap spots (the start of shift sign-in brings SDS
+;  to the front). Each Java window is now also saved as AlertGrid, SDS or
+;  Java (from the start of its title; the title itself isn't saved) and
+;  matched on that. Layouts saved before v3.19.3 still work the old way
+;  and ask to be saved again.
 ; =====================================================================
 #HotIf
 ^!+s:: SaveLayout()
@@ -6431,6 +6556,19 @@ LayoutSkip(hwnd) {
     return false
 }
 
+; Which Bally app a Java window is, so SDS and Alert Grid can't swap
+; spots (both are javaw.exe). "" for every other program.
+LayoutKind(hwnd, exe) {
+    if exe != "javaw.exe"
+        return ""
+    t := WinGetTitle("ahk_id " hwnd)
+    if RegExMatch(t, "i)^Alert Grid\b")
+        return "AlertGrid"
+    if RegExMatch(t, "i)^SDS\b")
+        return "SDS"
+    return "Java"
+}
+
 SaveLayout() {
     try DirCreate DataDir
     try FileDelete LayoutFile
@@ -6447,14 +6585,17 @@ SaveLayout() {
             if mm = -1
                 continue                         ; minimised: leave alone
             WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+            kind := LayoutKind(hwnd, exe)
         } catch
             continue
-        seen[exe] := seen.Has(exe) ? seen[exe] + 1 : 1
+        key := exe "|" kind
+        seen[key] := seen.Has(key) ? seen[key] + 1 : 1
         n += 1
         sec := "W" n
         try {
             IniWrite exe, LayoutFile, sec, "exe"
-            IniWrite seen[exe], LayoutFile, sec, "nth"
+            IniWrite kind, LayoutFile, sec, "kind"
+            IniWrite seen[key], LayoutFile, sec, "nth"
             IniWrite x, LayoutFile, sec, "x"
             IniWrite y, LayoutFile, sec, "y"
             IniWrite w, LayoutFile, sec, "w"
@@ -6467,6 +6608,7 @@ SaveLayout() {
         }
     }
     try IniWrite n, LayoutFile, "Layout", "count"
+    try IniWrite 2, LayoutFile, "Layout", "format"
     Activity("Window layout saved: " n " windows")
     Tip("Saved where " n " windows are.", 2500, true)
 }
@@ -6481,26 +6623,34 @@ RestoreLayout(auto := false) {
     }
     prev := WinExist("A")
     count := Integer(IniRead(LayoutFile, "Layout", "count", "0"))
-    byExe := Map()
+    ; Saved before v3.19.3: Java windows (SDS, Alert Grid) were saved by
+    ; program only, so they're matched the old way until it's saved again
+    old := IniRead(LayoutFile, "Layout", "format", "1") != "2"
+    byKey := Map()
+    oldJava := false
     for hwnd in WinGetList() {
         try {
             if LayoutSkip(hwnd)
                 continue
             exe := WinGetProcessName("ahk_id " hwnd)
+            key := exe "|" (old ? "" : LayoutKind(hwnd, exe))
         } catch
             continue
-        if !byExe.Has(exe)
-            byExe[exe] := []
-        byExe[exe].Push(hwnd)
+        if old && exe = "javaw.exe"
+            oldJava := true
+        if !byKey.Has(key)
+            byKey[key] := []
+        byKey[key].Push(hwnd)
     }
     moved := 0
     loop count {
         sec := "W" A_Index
         exe := IniRead(LayoutFile, sec, "exe", "")
+        key := exe "|" (old ? "" : IniRead(LayoutFile, sec, "kind", ""))
         nth := Integer(IniRead(LayoutFile, sec, "nth", "1"))
-        if exe = "" || !byExe.Has(exe) || byExe[exe].Length < nth
+        if exe = "" || !byKey.Has(key) || byKey[key].Length < nth
             continue
-        hwnd := byExe[exe][nth]
+        hwnd := byKey[key][nth]
         x := Integer(IniRead(LayoutFile, sec, "x", "0"))
         y := Integer(IniRead(LayoutFile, sec, "y", "0"))
         w := Integer(IniRead(LayoutFile, sec, "w", "800"))
@@ -6520,8 +6670,13 @@ RestoreLayout(auto := false) {
     }
     if auto && prev && WinExist("ahk_id " prev)
         try WinActivate "ahk_id " prev
-    Activity("Window layout put back: " moved " of " count " windows" (auto ? " (after start of shift)" : ""))
-    if !auto
+    Activity("Window layout put back: " moved " of " count " windows" (auto ? " (after start of shift)" : "") (old ? " (layout saved before v3.19.3)" : ""))
+    ; once per old layout file: SDS and Alert Grid could still swap
+    if oldJava && IniRead(LayoutFile, "Layout", "asked", "0") != "1" {
+        try IniWrite 1, LayoutFile, "Layout", "asked"
+        MsgBox "Watchlog now tells SDS and Alert Grid apart when it puts your windows back, but your layout was saved before that.`n`n"
+            . "Put SDS and Alert Grid where they belong, then press Ctrl+Alt+Shift+S to save your layout again. You only need to do this once.", "Watchlog", "Iconi"
+    } else if !auto
         Tip("Put " moved " windows back.", 2500, true)
 }
 
@@ -7506,8 +7661,8 @@ BoxParse(spec) {
             b.caps := true
         else if low = "upper"
             b.upper := true
-        else if low = "tidy"
-            b.keep.Push(opt)       ; bvs -> BVs (no tick box for it): kept as it is
+        else if low = "tidy" || low = "several"
+            b.keep.Push(opt)       ; bvs -> BVs, several (no tick box for them): kept as they are
         else if SubStr(opt, 1, 1) = "@" && b.list = ""
             b.list := SubStr(opt, 2)
         else if b.condWhen = "" && RegExMatch(opt, "i)^if\s+(.+?)\s*=\s*(.*)$", &cm)
