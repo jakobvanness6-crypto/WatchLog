@@ -3,15 +3,33 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.20.3 (Oct 30, 2026).
+Current version: v3.22.0 (Oct 30, 2026).
 
 ## Waiting to be built
+
+- **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Waiting on Location, Topic, Reference and End Time click for those three.
+- **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
+
 
 - Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
 - Shorthand for other logs (which ones, with his real examples).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.22.0 (Oct 30)
+- Dark look with a blue accent in every window (Jakob: "I like a dark colour scheme", blue or forest green, my pick: blue). Built as a WGui class that remaps the colours each window asks for; Customize > "Dark look" turns it off ([Look] Dark=no). Tabs show as a row of buttons.
+- Home window: three panels at the top (logs, logins, typing saved this shift).
+- Interior, Exterior and Parking Officer/Supervisor full-entry logs (six, in templates.txt, no End Time click).
+- Docs brought up to v3.22.0: README, QUICK START, the plain Overview, the IT Summary and the one-page Summary (Word and PDF). The "(with screenshots)" overview was NOT redone (needs new screenshots).
+- Not tested on a real Windows PC: only under Wine, which draws buttons and lists light. The dark buttons, list headers and scroll bars rely on Windows' own dark mode, so check them on the bay.
+
+## Done in v3.21.0 (Oct 30)
+- The Start full-entry log also clicks End Time's Now button (Jakob asked; goes out with this build).
+- Customize Watchlog (tray menu and a Customize button on the home window): screens for the full-entry daily logs (add, edit, copy, delete, try), the shortcut keys (21 of them can be changed; pause, reload, app keys and form keys stay), the programs opened and closed at the start and end of shift, the shared lists (opens the template editor on that tab), the autocorrect words, and the speed and timing values; logins, reminders, Caps Lock, journal and updates open Settings on the right tab.
+- The tray menu, home window and cheat sheet show the shortcut keys you picked.
+- Saving from these screens applies right away, with no automatic restart (the hotkey screen restarts Watchlog).
+- Not tested: pressing the shortcut keys (Wine can't fire hotkeys), so a changed key is checked only for being registered.
 
 ## Done in v3.20.3 (Oct 30)
 - Start of shift full-entry log: "start" in the Ctrl+Alt+F list. Surveillance, Duty, NA, synopsis "Start of Shift Bay (bay) Operator". It always asks which bay (offering the last one) and keeps the answer for the shift; the End log and ;end then use it without asking. It leaves End Time alone (add `| end` to its line in templates.txt if you want the Now click too).
@@ -357,3 +375,10 @@ Added Oct 16 (templates.txt only): `;selfex` Self-exclusion and `;found` Abandon
 - Templates fire instantly; `;count` renamed `;countstep`; clashing triggers are refused with a message.
 - App hotkeys: Ctrl+Alt+T Teams, U Outlook, Y Spotify, G Chrome.
 - Ctrl+Alt+T find notes by tag removed.
+
+## Queued (Jakob 2026-10-30, build only when he says "build it")
+Six full-entry logs, none click End Time Now, Reference NA:
+- +Interior Officer / +Interior Supervisor: Back of House - Non Sensitive | Call - Radio | NA | Security Officer (or Supervisor) performed interior door check
+- +Exterior Officer / +Exterior Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed exterior door check
+- +Parking Officer / +Parking Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed parking lot patrol
+(templates.txt only, no version bump.)

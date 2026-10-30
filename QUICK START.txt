@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.20.3  -  QUICK START  (one page)
+  WATCHLOG  v3.22.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.

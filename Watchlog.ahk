@@ -32,8 +32,10 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.21.0"
-VERSION_DATE := "Oct 29, 2026"
+VERSION := "3.22.0"
+VERSION_DATE := "Oct 30, 2026"
+; Colours of the dark look (see LOOK at the end of the file)
+global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
@@ -399,6 +401,8 @@ LoadSettings() {
     Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
     ; The plain Caps Lock key (which does nothing with the guard on) clears the Alert Grid alerts
     Cfg["CapsClearsAlerts"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "AlertGrid", "CapsLockClears", "yes"))), "^(no|off|0|false)$")
+    ; Dark look for every Watchlog window (Customize Watchlog turns it off)
+    Cfg["Dark"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Look", "Dark", "yes"))), "^(no|off|0|false)$")
     ; Minutes after an SDS login to sign back into SDS by itself (0 = off)
     sr := Trim(IniRead(SettingsFile, "SDS", "ResignMinutes", "62"))
     Cfg["SdsResign"] := IsInteger(sr) && sr >= 0 && sr <= 600 ? Integer(sr) : 62
@@ -770,7 +774,7 @@ ShowLoginReminder(rec) {
     if Cfg["SdsResign"] && (InStr(rec.win, "SDS") || IsSdsLogin(rec))
         return
     CloseReminder()
-    g := Gui("+AlwaysOnTop +ToolWindow", "Login reminder")
+    g := WGui("+AlwaysOnTop +ToolWindow", "Login reminder")
     g.SetFont("s11", "Segoe UI")
     g.MarginX := 16, g.MarginY := 12
     g.AddText(, "Time to log in again  (" rec.remind " minutes since the last one)`n`n      " rec.trig "      " rec.user)
@@ -1690,7 +1694,7 @@ SetForm(v) {
 
 FormPaste(title, fields, build, repeat := false, trigLen := 0) {
     target := WinExist("A")
-    g := Gui("+AlwaysOnTop +ToolWindow", title)
+    g := WGui("+AlwaysOnTop +ToolWindow", title)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     ctrls := [], starts := [], labs := []
@@ -2245,7 +2249,7 @@ ShowNotes() {
         NotesWin.Show()
         return
     }
-    g := Gui("+Resize", "Quick notes  -  v" VERSION)
+    g := WGui("+Resize", "Quick notes  -  v" VERSION)
     g.SetFont("s10", "Consolas")
     g.AddEdit("vText w560 r20 ReadOnly -WantReturn")
     g.SetFont("s10", "Segoe UI")
@@ -2342,7 +2346,7 @@ ShowCallPad() {
     }
     LoadCallPad()
     LoadAutocorrect()
-    g := Gui("+AlwaysOnTop +ToolWindow", "Call pad  -  v" VERSION)
+    g := WGui("+AlwaysOnTop +ToolWindow", "Call pad  -  v" VERSION)
     g.MarginX := 12, g.MarginY := 10
     g.SetFont("s10 c606060", "Segoe UI")
     g.AddText("vStamp w290", "")
@@ -3141,7 +3145,7 @@ ShowJournal() {
     dirty := false
     sv := SavedShift()
     summary := ""
-    g := Gui("+AlwaysOnTop", "Shift journal  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Shift journal  -  v" VERSION)
     g.BackColor := "F4F7F7"
     g.MarginX := 16, g.MarginY := 12
     g.SetFont("s15 bold c0F766E", "Segoe UI")
@@ -4190,7 +4194,7 @@ ShowEntryPick() {
         return
     }
     target := WinExist("A")
-    g := Gui("+AlwaysOnTop +ToolWindow", "Full-entry daily log")
+    g := WGui("+AlwaysOnTop +ToolWindow", "Full-entry daily log")
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     g.AddText(, "Type the first letters, then Enter. It opens a new daily log in iTrak and fills it in.")
@@ -4807,7 +4811,7 @@ ShowShiftCount() {
     for it in items
         total += it.n, keysTotal += it.keys
     span := live && start != "" && last != "" ? "from " FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") : "nothing counted yet"
-    g := Gui("+AlwaysOnTop", "Shift count  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Shift count  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     g.AddText("w520", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
@@ -4852,7 +4856,7 @@ ShowTimeSaved() {
         , ["Last 7 days", SavedSince(FormatTime(DateAdd(A_Now, -6, "Days"), "yyyy-MM-dd"))]
         , ["Last 30 days", SavedSince(FormatTime(DateAdd(A_Now, -29, "Days"), "yyyy-MM-dd"))]
         , ["Since " (first != "" ? FormatTime(StrReplace(first, "-") "000000", "MMM d, yyyy") : "the start"), SavedSince("")]]
-    g := Gui("+AlwaysOnTop", "Time saved  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Time saved  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     g.AddText("w560", "Keystrokes Watchlog saved you: what went in, minus what you typed. Time is worked out at 40 words a minute.")
@@ -5058,7 +5062,7 @@ ShowDashboard(tab := 1) {
     f := ShiftFacts()
     wk := DashDays(7), mo := DashDays(30)
     prevRng := DashRange(FormatTime(DateAdd(A_Now, -59, "Days"), "yyyy-MM-dd"), FormatTime(DateAdd(A_Now, -30, "Days"), "yyyy-MM-dd"))
-    g := DashWin := Gui("+AlwaysOnTop", "Shift dashboard  -  v" VERSION)
+    g := DashWin := WGui("+AlwaysOnTop", "Shift dashboard  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     tb := g.AddTab3("w600 h430", ["This shift", "Week", "Month"])
@@ -5929,7 +5933,7 @@ ShowPicker() {
     target := WinExist("A")
     found := {rows: []}         ; template numbers in the order they're listed
 
-    g := Gui("+AlwaysOnTop", "Find a template  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Find a template  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.AddText("w560", "Type part of a name, a shortcut, or any word from the log:")
     box := g.AddEdit("w560")
@@ -6117,7 +6121,7 @@ ShowSettings(welcome := false, startTab := 1) {
     clickGap := IniRead(SettingsFile, "AlertGrid", "Pause", "40")
     W := 640
 
-    g := Gui("+AlwaysOnTop", (welcome ? "Welcome to Watchlog" : "Watchlog settings") "  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", (welcome ? "Welcome to Watchlog" : "Watchlog settings") "  -  v" VERSION)
     SetSettingsWin(g)
     g.BackColor := "FFFFFF"     ; the same white as the tab pages
     g.SetFont("s10", "Segoe UI")
@@ -6301,7 +6305,7 @@ ShowSettings(welcome := false, startTab := 1) {
             return
         }
         cur := row ? st.logins[row] : {trig: ";", user: "", win: "", remind: 0, pw: ""}
-        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Login " cur.trig : "Add a login")
+        d := WGui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Login " cur.trig : "Add a login")
         d.SetFont("s10", "Segoe UI")
         d.AddText("w420", "Shortcut you'll type. Start it with `; so it never fires while you're typing normally:")
         tb := d.AddEdit("w420", cur.trig)
@@ -6663,7 +6667,7 @@ SetStartup(on) {
 ShowSecurity() {
     report := SecurityReport()
     teal := "0F766E", ink := "1F2933", muted := "6B7280"
-    g := Gui("+AlwaysOnTop", "Security and status  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Security and status  -  v" VERSION)
     g.BackColor := "F4F7F7"
     g.MarginX := 18, g.MarginY := 14
     g.SetFont("s18 bold c" teal, "Segoe UI")
@@ -6900,7 +6904,7 @@ CopyForSharing(out) {
 
 ShowCheatSheet() {
     teal := "0F766E", ink := "1F2933", muted := "6B7280"
-    g := Gui("+AlwaysOnTop", "Shortcut Cheat Sheet  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Shortcut Cheat Sheet  -  v" VERSION)
     g.BackColor := "F4F7F7"
     g.MarginX := 20, g.MarginY := 14
     colW := 340, gap := 26
@@ -7407,7 +7411,7 @@ LicenceText() {
 }
 
 ShowAbout() {
-    g := Gui(, "About Watchlog")
+    g := WGui(, "About Watchlog")
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 20, g.MarginY := 16
     g.SetFont("s15 bold")
@@ -7449,7 +7453,7 @@ ShowTutorial(first := false) {
             , practice: false, logins: false, start: true, check: "", done: ""}
     ]
     st := {i: 1}
-    g := Gui(, "Watchlog tutorial")
+    g := WGui(, "Watchlog tutorial")
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 20, g.MarginY := 16
     g.SetFont("s15 bold")
@@ -7607,6 +7611,8 @@ MenuItem(m, name, fn, glyph := 0) {
 ; A big button with a picture on the left and one or two lines of text
 IconButton(g, opt, text, glyph, color, fn) {
     b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
+    if LookOn()
+        color := Integer("0x" LookText(Format("{:06X}", color)))
     if glyph && (h := GlyphIcon(glyph, color, 24))
         SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
     b.OnEvent("Click", fn)
@@ -7710,7 +7716,7 @@ ShowCustomize() {
         try WinActivate "ahk_id " CustomWin.Hwnd
         return
     }
-    g := Gui("+AlwaysOnTop", "Customize Watchlog  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Customize Watchlog  -  v" VERSION)
     CustomWin := g
     g.BackColor := "FFFFFF"
     g.MarginX := 20, g.MarginY := 16
@@ -7731,11 +7737,19 @@ ShowCustomize() {
         g.AddButton("xm y+10 w220 h36", it[1]).OnEvent("Click", Open.Bind(it[3]))
         g.AddText("x+14 yp+8 w330", it[2])
     }
-    g.AddButton("xm y+22 w120 Default", "Close").OnEvent("Click", Close)
+    darkCB := g.AddCheckbox("xm y+22" (Cfg["Dark"] ? " Checked" : ""), "Dark look  (applies to windows opened from now on)")
+    darkCB.OnEvent("Click", SetDark)
+    g.AddButton("xm y+14 w120 Default", "Close").OnEvent("Click", Close)
     g.OnEvent("Escape", Close)
     g.OnEvent("Close", Close)
     g.Show()
 
+    SetDark(*) {
+        Cfg["Dark"] := darkCB.Value ? true : false
+        try IniWrite(Cfg["Dark"] ? "yes" : "no", SettingsFile, "Look", "Dark")
+        NoteOwnWrites()
+        Tip("Saved. Windows you open from now on use the " (Cfg["Dark"] ? "dark" : "light") " look.", 2500, true)
+    }
     Open(fn, *) {
         Close()
         fn()
@@ -7826,7 +7840,7 @@ ShowHotkeyEditor() {
         try WinActivate "ahk_id " HotkeyWin.Hwnd
         return
     }
-    g := Gui("+AlwaysOnTop", "Shortcut keys")
+    g := WGui("+AlwaysOnTop", "Shortcut keys")
     HotkeyWin := g
     g.BackColor := "FFFFFF"
     g.SetFont("s10", "Segoe UI")
@@ -7922,7 +7936,7 @@ ShowShiftEditor() {
     apps := []
     for a in Cfg["StartApps"]
         apps.Push({path: a.path, win: a.win})
-    g := Gui("+AlwaysOnTop", "Start and end of shift")
+    g := WGui("+AlwaysOnTop", "Start and end of shift")
     ShiftEdWin := g
     g.BackColor := "FFFFFF"
     g.SetFont("s10", "Segoe UI")
@@ -7967,7 +7981,7 @@ ShowShiftEditor() {
             return
         }
         cur := row ? apps[row] : {path: "", win: ""}
-        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit program" : "Add a program")
+        d := WGui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit program" : "Add a program")
         d.SetFont("s10", "Segoe UI")
         d.AddText("w520", "The program or batch file to open (a * means any version):")
         pe := d.AddEdit("w420 r1", cur.path)
@@ -8075,7 +8089,7 @@ ShowAutoEditor() {
     }
     pairs := AutoParse(FileExist(AutoFile) ? FileRead(AutoFile, "UTF-8") : AutoDefault())
     shown := []
-    g := Gui("+AlwaysOnTop", "Autocorrect words")
+    g := WGui("+AlwaysOnTop", "Autocorrect words")
     AutoEdWin := g
     g.BackColor := "FFFFFF"
     g.SetFont("s10", "Segoe UI")
@@ -8128,7 +8142,7 @@ ShowAutoEditor() {
         g.Opt("+OwnDialogs")
         idx := row ? shown[row] : 0
         cur := idx ? pairs[idx] : {w: "", r: "", on: true}
-        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit a word" : "Add a word")
+        d := WGui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit a word" : "Add a word")
         d.SetFont("s10", "Segoe UI")
         d.AddText("w380", "When I type (one word, no spaces):")
         we := d.AddEdit("w380 r1", cur.w)
@@ -8250,7 +8264,7 @@ ShowTimingEditor() {
         , {sec: "ITrak", key: "Pause", def: 300, label: "iTrak: wait between clicks", note: "Between the clicks that open a new daily log."}
         , {sec: "ITrak", key: "EntryWait", def: 8000, label: "iTrak: most it waits for a new log", note: "How long a full-entry log waits for the new form to open."}
         , {sec: "ITrak", key: "EntrySettle", def: 600, label: "iTrak: wait once the form is open", note: "Raise it if the first field is missed."}]
-    g := Gui("+AlwaysOnTop", "Speed and timing")
+    g := WGui("+AlwaysOnTop", "Speed and timing")
     TimingWin := g
     g.BackColor := "FFFFFF"
     g.SetFont("s10", "Segoe UI")
@@ -8323,7 +8337,7 @@ ShowEntryEditor() {
     work := []
     for e in Entries
         work.Push({name: e.name, loc: e.loc, topic: e.topic, ref: e.ref, syn: e.syn, end: e.end, src: e.src})
-    g := Gui("+AlwaysOnTop", "Full-entry daily logs")
+    g := WGui("+AlwaysOnTop", "Full-entry daily logs")
     EntryEdWin := g
     g.BackColor := "FFFFFF"
     g.SetFont("s10", "Segoe UI")
@@ -8371,7 +8385,7 @@ ShowEntryEditor() {
             return
         }
         cur := row ? work[row] : {name: "", loc: "", topic: "", ref: "", syn: "", end: false, src: Tpl.src = "local" ? "main" : "mine"}
-        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit " cur.name : "Add a full-entry log")
+        d := WGui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit " cur.name : "Add a full-entry log")
         d.SetFont("s10", "Segoe UI")
         d.AddText("w520", "Name (what you type in the list):")
         ne := d.AddEdit("w520 r1", cur.name)
@@ -8588,13 +8602,21 @@ ShowHome() {
     }
     target := WorkWindow()
     W := 180, gap := 8, per := 5
-    g := Gui("-MinimizeBox", "Watchlog  -  v" VERSION)
+    g := WGui("-MinimizeBox", "Watchlog  -  v" VERSION)
     g.BackColor := "F7FAFA"
     g.MarginX := 18, g.MarginY := 14
     g.SetFont("s18 bold c0E746E", "Segoe UI")
     g.AddText("xm", "Watchlog")
     g.SetFont("s10 norm c606060")
     g.AddText("x+12 yp+11", "Press a button, or learn the shortcut shown on it.")
+
+    cardY := 0
+    sh0 := SavedShift()
+    fullW := per * W + (per - 1) * gap
+    cardW := (fullW - 2 * 12) // 3
+    Card(1, sh0.log, "logs this shift")
+    Card(2, sh0.login, sh0.login = 1 ? "login this shift" : "logins this shift")
+    Card(3, SavedTime(sh0.keys), "typing saved this shift")
 
     Group("Logs", 0x0E746E, [
         ["Call pad", "Numpad +", 0xE717, () => ShowCallPad(), true]
@@ -8622,7 +8644,6 @@ ShowHome() {
         , ["Save window layout", HK("savelayout"), 0xE74E, () => SaveLayout(), false]])
 
     ; How this PC is doing
-    fullW := per * W + (per - 1) * gap
     g.AddText("xm y+18 w" fullW " h1 0x10")
     Status(OutOfDate() ? "C62828" : "2E7D32", "Watchlog v" VERSION
         . (OutOfDate() ? ": UPDATE NEEDED, the team is on v" Tpl.program
@@ -8664,6 +8685,21 @@ ShowHome() {
             pos := Mod(i - 1, per) = 0 ? "xm y+6" : "x+" gap " yp"
             IconButton(g, pos " w" W " h52", t[1] "`n" t[2], t[3], color, Go.Bind(t[4], t[5]))
         }
+    }
+
+    ; A number with a caption under it, on a panel
+    Card(i, big, small) {
+        if i = 1 {
+            panel := g.AddText("xm y+14 w" cardW " h66 Background" LookCard(), "")
+            panel.GetPos(&px, &cardY)
+        } else
+            panel := g.AddText("x" (g.MarginX + (i - 1) * (cardW + 12)) " y" cardY " w" cardW " h66 Background" LookCard(), "")
+        panel.GetPos(&px, &py)
+        g.SetFont("s20 bold c0E746E", "Segoe UI")
+        g.AddText("x" (px + 14) " y" (py + 4) " w" (cardW - 28) " h34 BackgroundTrans", big)
+        g.SetFont("s9 norm c606060", "Segoe UI")
+        g.AddText("x" (px + 14) " y" (py + 40) " w" (cardW - 28) " BackgroundTrans", small)
+        g.SetFont("s10 norm c202020")
     }
 
     Status(color, text) {
@@ -9175,7 +9211,7 @@ ShowEditor(startTab := 1) {
     ed := {doc: "", which: canTeam ? 1 : 2, cur: 0, rows: [], dirty: false, saved: false, teamOk: false, curList: 0
         , loading: false, boxes: [], others: {trigs: [], what: ""}}
 
-    g := Gui("+AlwaysOnTop", "Template editor  -  v" VERSION)
+    g := WGui("+AlwaysOnTop", "Template editor  -  v" VERSION)
     EditorWin := g
     g.BackColor := "FFFFFF"     ; the same white as the tab pages
     g.SetFont("s10", "Segoe UI")
@@ -9785,7 +9821,7 @@ ShowEditor(startTab := 1) {
 ; The box form: what a box is called, what goes in it, and the extras.
 ; done(code) gets the finished box, like {Amount: money | thousands}.
 BoxForm(owner, b, listNames, inUse, done) {
-    d := Gui("+AlwaysOnTop +Owner" owner.Hwnd, b.name = "" ? "Add a box" : "Box: " b.name)
+    d := WGui("+AlwaysOnTop +Owner" owner.Hwnd, b.name = "" ? "Add a box" : "Box: " b.name)
     d.SetFont("s10", "Segoe UI")
     d.MarginX := 16, d.MarginY := 12
     d.AddText("w520", "Name (shown above the box on the form):")
@@ -9952,4 +9988,140 @@ MakeMineFile() {
     }
     WatchTimes[MyTemplatesFile] := FileTimeOf(MyTemplatesFile)
     return true
+}
+
+
+; =====================================================================
+;  LOOK  (v3.22.0)  -  the dark theme with a blue accent
+;  Every window is made with WGui instead of Gui. It works out the colours
+;  from the ones the window asks for (dark text becomes light, white
+;  panels become dark, the old teal becomes the blue accent), so the
+;  windows stay readable either way. Customize > "Dark look" turns it off
+;  ([Look] Dark=no in settings.ini).
+; =====================================================================
+
+LookOn() => Cfg.Has("Dark") && Cfg["Dark"]
+
+; The panel colour behind the numbers on the home window
+LookCard() => LookOn() ? "262C34" : "E3EEEE"
+
+LookRGB(c) {
+    if !RegExMatch(c, "i)^[0-9A-F]{6}$")
+        return ""
+    v := Integer("0x" c)
+    return [v >> 16, (v >> 8) & 255, v & 255]
+}
+
+LookLum(rgb) => (0.299 * rgb[1] + 0.587 * rgb[2] + 0.114 * rgb[3]) / 255
+
+; A text colour for the dark look
+LookText(c) {
+    if !LookOn() || (rgb := LookRGB(c)) = ""
+        return c
+    mx := Max(rgb[1], rgb[2], rgb[3]), mn := Min(rgb[1], rgb[2], rgb[3])
+    lum := LookLum(rgb)
+    if mx - mn < 40
+        return lum < 0.3 ? LOOK_FG : lum < 0.7 ? LOOK_MUTED : c
+    if rgb[1] + 40 < rgb[2] && rgb[1] + 40 < rgb[3] && Abs(rgb[2] - rgb[3]) < 40     ; the old teal
+        return LOOK_ACCENT
+    if rgb[3] > rgb[1] + 60 && rgb[3] > rgb[2]                                        ; blues
+        return "7DB8FF"
+    return Format("{:02X}{:02X}{:02X}", rgb[1] + (255 - rgb[1]) * 0.5, rgb[2] + (255 - rgb[2]) * 0.5, rgb[3] + (255 - rgb[3]) * 0.5)
+}
+
+; A window colour for the dark look: the light backgrounds turn dark
+LookBack(c) {
+    if !LookOn() || (rgb := LookRGB(c)) = ""
+        return c
+    return LookLum(rgb) > 0.8 ? LOOK_BG : c
+}
+
+; "s10 norm c606060" -> the same with the colour fixed
+LookFontOpts(o) {
+    if !LookOn()
+        return o
+    out := "", pos := 1
+    while RegExMatch(o, "i)(?<![A-Za-z0-9])c([0-9A-F]{6})(?![A-Za-z0-9])", &m, pos) {
+        out .= SubStr(o, pos, m.Pos - pos) "c" LookText(m[1])
+        pos := m.Pos + m.Len
+    }
+    return out SubStr(o, pos)
+}
+
+LookInit() {
+    static done := false
+    if done || !LookOn()
+        return
+    done := true
+    try {
+        ux := DllCall("GetModuleHandle", "Str", "uxtheme", "Ptr")
+        DllCall(DllCall("GetProcAddress", "Ptr", ux, "Ptr", 135, "Ptr"), "Int", 2)      ; dark controls and menus
+        DllCall(DllCall("GetProcAddress", "Ptr", ux, "Ptr", 136, "Ptr"))
+    }
+}
+
+LookTheme(hwnd, name) {
+    try DllCall("uxtheme\SetWindowTheme", "Ptr", hwnd, "Str", name, "Ptr", 0)
+}
+
+; Dark title bar, then dark controls
+LookWindow(g) {
+    if !LookOn()
+        return
+    try {
+        v := Buffer(4, 0)
+        NumPut("Int", 1, v)
+        DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g.Hwnd, "Int", 20, "Ptr", v, "Int", 4)
+        DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g.Hwnd, "Int", 19, "Ptr", v, "Int", 4)
+    }
+    for hwnd, c in g
+        try LookControl(c)
+}
+
+LookControl(c) {
+    switch c.Type, false {
+        case "Edit", "ListBox", "TreeView":
+            c.Opt("+Background" LOOK_FIELD)
+            LookTheme(c.Hwnd, "DarkMode_Explorer")
+        case "ComboBox", "DDL":
+            c.Opt("+Background" LOOK_FIELD)
+            LookTheme(c.Hwnd, "DarkMode_CFD")
+        case "ListView":
+            bgr := (v) => ((v & 255) << 16) | (v & 0xFF00) | (v >> 16)
+            SendMessage(0x1001, 0, bgr(Integer("0x" LOOK_FIELD)), c)       ; background
+            SendMessage(0x1026, 0, bgr(Integer("0x" LOOK_FIELD)), c)       ; text background
+            SendMessage(0x1024, 0, bgr(Integer("0x" LOOK_FG)), c)          ; text
+            LookTheme(c.Hwnd, "DarkMode_Explorer")
+            if hdr := SendMessage(0x101F, 0, 0, c)
+                LookTheme(hdr, "DarkMode_ItemsView")
+        case "Button", "CheckBox", "Radio", "GroupBox":
+            LookTheme(c.Hwnd, "DarkMode_Explorer")
+    }
+}
+
+class WGui extends Gui {
+    __New(o?, t?, e?) {
+        super.__New(o?, t?, e?)
+        if LookOn() {
+            LookInit()
+            super.BackColor := LOOK_BG
+            super.SetFont("c" LOOK_FG)
+        }
+        SetTimer(LookWindow.Bind(this), -60)           ; once more, for anything added after Show
+    }
+    SetFont(o := "", f := "") {
+        if o = "" && f = "" && LookOn()
+            return super.SetFont("c" LOOK_FG)
+        return super.SetFont(LookFontOpts(o), f)
+    }
+    BackColor {
+        get => super.BackColor
+        set => super.BackColor := LookBack(value)
+    }
+    AddTab2(o := "", p := "") => super.AddTab2(LookOn() ? o " Buttons" : o, p)
+    AddTab3(o := "", p := "") => super.AddTab3(LookOn() ? o " Buttons" : o, p)
+    Show(o?) {
+        LookWindow(this)
+        return super.Show(o?)
+    }
 }
