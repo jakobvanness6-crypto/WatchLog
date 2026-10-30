@@ -141,6 +141,12 @@
 +End = Surveillance | Duty | NA | End of Shift Bay {Bay} Operator | end
 +Garbage Sweep = Cage ManTrap | Security Escort | M6 (972,973) | Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep.
 +Card Destruction = Card Destruction Room | Card Destruction | M6 (750,751,749) | Security Officers entered Card Destruction Room for Card Destruction.
++Interior Officer = Back of House - Non Sensitive | Call - Radio | NA | Security Officer performed interior door check
++Interior Supervisor = Back of House - Non Sensitive | Call - Radio | NA | Security Supervisor performed interior door check
++Exterior Officer = Parking Lot | Call - Radio | NA | Security Officer performed exterior door check
++Exterior Supervisor = Parking Lot | Call - Radio | NA | Security Supervisor performed exterior door check
++Parking Officer = Parking Lot | Call - Radio | NA | Security Officer performed parking lot patrol
++Parking Supervisor = Parking Lot | Call - Radio | NA | Security Supervisor performed parking lot patrol
 
 
 # ----- TABLES --------------------------------------------------------
