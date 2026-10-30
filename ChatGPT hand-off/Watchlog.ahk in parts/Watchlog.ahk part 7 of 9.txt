@@ -1,4 +1,65 @@
-; ===== Watchlog.ahk PART 7 of 9 (lines 7088-8148 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 7 of 9 (lines 7215-8342 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; Writes the logins as [Login1] ... [Login9] (no passwords), and removes
+; the older single login under [User]
+WriteLogins(logins) {
+    for key in ["LoginTrigger", "LoginUser", "LoginPassword"]
+        try IniDelete SettingsFile, "User", key
+    Loop 9 {
+        sec := "Login" A_Index
+        if A_Index > logins.Length {
+            try IniDelete SettingsFile, sec
+            continue
+        }
+        l := logins[A_Index]
+        IniWrite l.trig, SettingsFile, sec, "Trigger"
+        IniWrite l.user, SettingsFile, sec, "User"
+        IniSetOrDelete(sec, "Window", l.win)
+        IniSetOrDelete(sec, "Remind", l.remind ? l.remind : "")
+        try IniDelete SettingsFile, sec, "Password"
+    }
+}
+
+IniSetOrDelete(sec, key, val) {
+    if val != ""
+        IniWrite val, SettingsFile, sec, key
+    else
+        try IniDelete SettingsFile, sec, key
+}
+
+; Deletes the saved password of every login that's gone (unless another
+; login still uses the same username)
+RemovePasswords(newLogins) {
+    keep := Map()
+    keep.CaseSense := false
+    for x in newLogins
+        keep[x.user] := true
+    for l in LoginList {
+        if keep.Has(l.user)
+            continue
+        keep[l.user] := true
+        if CredExists(l.user) && CredRemove(l.user)
+            Activity("Password deleted from this PC for " l.user " (login removed)")
+    }
+}
+
+
+; =====================================================================
+;  START WITH WINDOWS  (Settings > Windows)
+;  A shortcut in your Startup folder (shell:startup) opens the script
+;  when you sign in to Windows.
+; =====================================================================
+StartupShortcuts() {
+    found := []
+    Loop Files A_Startup "\*.lnk" {
+        try {
+            FileGetShortcut A_LoopFileFullPath, &target, , &args
+            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName)
+                found.Push(A_LoopFileFullPath)
+        }
+    }
+    return found
+}
+
 SetStartup(on) {
     have := StartupShortcuts()
     if on && !have.Length {
@@ -1047,6 +1108,12 @@ BuildTrayMenu() {
     MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
     MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
     MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
+    more.Add()
+    MenuItem(more, "Back up my settings and templates now", (*) => BackupNow(), 0xE74E)
+    MenuItem(more, "Restore from a backup...", (*) => ShowRestore(), 0xE777)
+    MenuItem(more, "Go back to the previous version...", (*) => GoBackVersion(), 0xE72B)
+    if SkippedVersion() != ""
+        MenuItem(more, "Offer the skipped update again (v" SkippedVersion() ")", (*) => ClearSkippedVersion(), 0xE896)
     more.Add()
     MenuItem(more, "Pause all shortcuts  (Ctrl+Alt+P)", (*) => TogglePause(), 0xE769)
     MenuItem(more, "Reload Watchlog  (Ctrl+Alt+R)", (*) => Reload(), 0xE72C)

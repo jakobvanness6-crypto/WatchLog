@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.27.3"
+VERSION := "3.28.0"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -101,6 +101,7 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "itrakteach", key: "^!+i", label: "teach iTrak the click", fn: (*) => TeachITrak()}
     , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
     , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
+    , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
 
@@ -113,6 +114,7 @@ PickHwnd := 0
 TeachBusy := false       ; true while the Alert Grid teach step runs
 NotesWin := ""           ; the quick notes window while it's open
 PadShort := ""           ; a shorthand line being run from the call pad (v3.26.0)
+LastRun := ""            ; the last full-entry log that was filled in: {e, syn} (v3.28.0)
 Cancelled := ""          ; the last form closed with Esc: its title, boxes and time (v3.27.0)
 InErr := false
 LeftOnClip := ""         ; the last log Watchlog left on the clipboard (not your own copy)
@@ -179,6 +181,7 @@ LoadTemplates()
 LoadApps()
 RegisterHotkeys()
 CheckScale()
+DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 StartWatching()
@@ -4792,7 +4795,7 @@ SavedBay() {
 ; few letters, Enter, the click), the full length of the Reference and
 ; the Synopsis plus a click each, and the 2 for the new-log click.
 RunEntry(e, useOpen := false) {
-    global EntryFields
+    global EntryFields, LastRun
     f := EntryLoad()
     if !f {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
@@ -4877,6 +4880,7 @@ RunEntry(e, useOpen := false) {
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
     vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
+    LastRun := {e: e, syn: syn}
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
     keys := 2
     for k in EntryFields {
@@ -5103,6 +5107,190 @@ ShareITrakSetup() {
 }
 
 ; =====================================================================
+;  SAFEGUARDS: repeat the last log, backups, going back (v3.28.0)
+; =====================================================================
+; Does the last full-entry log again (a new daily log with the same boxes)
+RepeatLastLog() {
+    if !IsObject(LastRun) {
+        Tip("No log to repeat yet: make one with a code word, the call pad or " HK("entrypick") " first.", 3500, true)
+        return
+    }
+    ne := {}
+    for k, v in LastRun.e.OwnProps()
+        ne.%k% := v
+    ne.syn := LastRun.syn
+    Activity("Repeat last log: " ne.name)
+    RunEntry(ne)
+}
+
+; The files a backup holds: the ones in the Watchlog folder and the numbers
+; taught on this PC (no passwords: those live in Windows' Credential Manager)
+BackupSources() {
+    list := []
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt"]
+        if FileExist(HomeDir "\" n)
+            list.Push([HomeDir "\" n, "home - " n])
+    if DirExist(DataDir)
+        loop files DataDir "\*.ini"
+            list.Push([A_LoopFileFullPath, "data - " A_LoopFileName])
+    return list
+}
+
+; Copies them into DataDir\Backups\<folder>. Returns the number copied.
+BackupInto(folder) {
+    n := 0
+    try {
+        DirCreate DataDir "\Backups\" folder
+        for it in BackupSources() {
+            try {
+                FileCopy it[1], DataDir "\Backups\" folder "\" it[2], true
+                n += 1
+            }
+        }
+    }
+    return n
+}
+
+; Once a day (the first start of the day): keeps the last 14 backup folders
+DailyBackup() {
+    today := FormatTime(, "yyyy-MM-dd")
+    if DirExist(DataDir "\Backups\" today)
+        return
+    n := BackupInto(today)
+    Activity("Backup of " n " settings and template files made (" today ")")
+    names := []
+    loop files DataDir "\Backups\*", "D"
+        names.Push(A_LoopFileName)
+    if names.Length > 14 {
+        names := SortNames(names)
+        loop names.Length - 14
+            try DirDelete DataDir "\Backups\" names[A_Index], true
+    }
+}
+
+; Names in order, oldest first (the folder names start with the date)
+SortNames(names) {
+    txt := ""
+    for nm in names
+        txt .= nm "`n"
+    return StrSplit(Sort(RTrim(txt, "`n")), "`n")
+}
+
+BackupNow() {
+    n := BackupInto(FormatTime(, "yyyy-MM-dd HHmmss") " (made by hand)")
+    Activity("Backup made by hand: " n " files")
+    MsgBox "Backed up " n " files (your templates, settings, autocorrect list and the taught clicks).`n`nPasswords are not in it: Windows keeps those.", "Watchlog backup", "Iconi"
+}
+
+ShowRestore() {
+    names := []
+    if DirExist(DataDir "\Backups")
+        loop files DataDir "\Backups\*", "D"
+            names.Push(A_LoopFileName)
+    if !names.Length {
+        MsgBox "There are no backups yet. One is made the first time Watchlog starts each day.", "Watchlog restore", "Iconi"
+        return
+    }
+    names := SortNames(names)
+    g := Gui("+AlwaysOnTop", "Restore from a backup")
+    g.SetFont("s10")
+    g.AddText("w420", "Pick a backup. Your templates, settings, autocorrect list and taught clicks go back to how they were then. What you have now is backed up first, so this can be undone.")
+    lb := g.AddListBox("w420 r10")
+    shown := []
+    loop names.Length {
+        nm := names[names.Length - A_Index + 1]
+        shown.Push(nm)
+        lb.Add([nm])
+    }
+    lb.Choose(1)
+    g.AddButton("w120 Default", "Restore").OnEvent("Click", Go)
+    g.AddButton("x+10 w120", "Cancel").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+    Go(*) {
+        if !lb.Value
+            return
+        pick := shown[lb.Value]
+        g.Destroy()
+        if MsgBox("Restore the backup " pick "?`n`nWatchlog reloads afterwards.", "Watchlog restore", "YesNo Icon? Default2") != "Yes"
+            return
+        BackupInto(FormatTime(, "yyyy-MM-dd HHmmss") " (before restore)")
+        n := 0
+        loop files DataDir "\Backups\" pick "\*" {
+            if SubStr(A_LoopFileName, 1, 7) = "home - "
+                dest := HomeDir "\" SubStr(A_LoopFileName, 8)
+            else if SubStr(A_LoopFileName, 1, 7) = "data - "
+                dest := DataDir "\" SubStr(A_LoopFileName, 8)
+            else
+                continue
+            try {
+                FileCopy A_LoopFileFullPath, dest, true
+                n += 1
+            }
+        }
+        Activity("Restored " n " files from the backup " pick)
+        MsgBox "Restored " n " files. Watchlog reloads now.", "Watchlog restore", "Iconi T4"
+        Reload
+    }
+}
+
+; The newer version that was skipped when going back (not offered again)
+SkippedVersion() {
+    try return IniRead(LastUsedFile, "Updates", "Skip", "")
+    return ""
+}
+
+ClearSkippedVersion() {
+    try IniDelete LastUsedFile, "Updates", "Skip"
+    BuildTrayMenu()
+    Tip("The newer version will be offered again.", 2500, true)
+}
+
+; Puts back the copy Watchlog kept when it last updated
+GoBackVersion() {
+    ext := A_IsCompiled ? "exe" : "ahk"
+    best := "", bestV := ""
+    loop files DataDir "\Watchlog v* (backup)." ext {
+        if RegExMatch(A_LoopFileName, "^Watchlog v([\d.]+) \(backup\)", &m) && VerCompare(m[1], VERSION) < 0
+            && (bestV = "" || VerCompare(m[1], bestV) > 0)
+            best := A_LoopFileFullPath, bestV := m[1]
+    }
+    if best = "" {
+        MsgBox "There is no earlier version kept on this PC. Watchlog keeps the old one each time it updates.", "Watchlog", "Iconi"
+        return
+    }
+    if MsgBox("Go back from v" VERSION " to v" bestV "?`n`nWatchlog restarts on the older version, and v" VERSION " won't be offered again until you choose 'Offer the skipped update again' (tray > Advanced).", "Watchlog", "YesNo Icon? Default2") != "Yes"
+        return
+    keep := DataDir "\Watchlog v" VERSION " (backup)." ext
+    try {
+        try IniWrite VERSION, LastUsedFile, "Updates", "Skip"
+        if A_IsCompiled {
+            try FileDelete keep
+            FileMove A_ScriptFullPath, keep, 1
+            try FileCopy best, A_ScriptFullPath, 1
+            catch as err {
+                try FileMove keep, A_ScriptFullPath, 1
+                throw err
+            }
+        } else {
+            FileCopy A_ScriptFullPath, keep, true
+            FileCopy best, A_ScriptFullPath, true
+        }
+    } catch as err {
+        try IniDelete LastUsedFile, "Updates", "Skip"
+        Activity("Going back to v" bestV " failed: " err.Message)
+        MsgBox "Couldn't go back: " err.Message, "Watchlog", "Icon!"
+        return
+    }
+    Activity("Went back from v" VERSION " to v" bestV)
+    if A_IsCompiled {
+        Run '"' A_ScriptFullPath '"'
+        ExitApp
+    }
+    Reload
+}
+
+; =====================================================================
 ;  UPDATES FROM THE TEAM FOLDER
 ;  Whoever looks after the tool puts the new Watchlog.ahk (and
 ;  Watchlog.ico) in the same SharePoint folder as the team templates.
@@ -5144,7 +5332,7 @@ ProgramVersionOf(f) {
 ; True when the team folder has a newer Watchlog than this one
 UpdateWaiting() {
     v := TeamProgramVersion()
-    return v != "" && VerCompare(v, VERSION) > 0
+    return v != "" && v != SkippedVersion() && VerCompare(v, VERSION) > 0
 }
 
 CheckForUpdate() {
@@ -8133,6 +8321,12 @@ BuildTrayMenu() {
     MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
     MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
     MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
+    more.Add()
+    MenuItem(more, "Back up my settings and templates now", (*) => BackupNow(), 0xE74E)
+    MenuItem(more, "Restore from a backup...", (*) => ShowRestore(), 0xE777)
+    MenuItem(more, "Go back to the previous version...", (*) => GoBackVersion(), 0xE72B)
+    if SkippedVersion() != ""
+        MenuItem(more, "Offer the skipped update again (v" SkippedVersion() ")", (*) => ClearSkippedVersion(), 0xE896)
     more.Add()
     MenuItem(more, "Pause all shortcuts  (Ctrl+Alt+P)", (*) => TogglePause(), 0xE769)
     MenuItem(more, "Reload Watchlog  (Ctrl+Alt+R)", (*) => Reload(), 0xE72C)

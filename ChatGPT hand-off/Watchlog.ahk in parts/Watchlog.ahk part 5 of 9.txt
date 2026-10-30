@@ -1,168 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 4771-5924 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
-EntryPickMove(d) {
-    lb := EntryPickWin.lb
-    n := SendMessage(0x18B, 0, 0, lb.Hwnd)      ; LB_GETCOUNT
-    if n < 1
-        return
-    i := lb.Value + d
-    lb.Choose(Max(1, Min(n, i)))
-}
-
-; The bay entered at the start of this shift (last 14 hours), or "" when none
-SavedBay() {
-    try {
-        v := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
-        at := IniRead(LastUsedFile, "LastUsed", "Bay.at", "")
-        if v != "" && IsTimeStamp(at) && DateDiff(A_Now, at, "Hours") < 14
-            return v
-    }
-    return ""
-}
-
-; Fills a new daily log. Keys counted as saved: 5 for each drop-down (a
-; few letters, Enter, the click), the full length of the Reference and
-; the Synopsis plus a click each, and the 2 for the new-log click.
-RunEntry(e, useOpen := false) {
-    global EntryFields
-    f := EntryLoad()
-    if !f {
-        MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
-        return
-    }
-    syn := e.syn
-    ; {Bay?}: always asks which bay (start of shift), offering the last one,
-    ; and keeps the answer for the rest of the shift (v3.20.3)
-    if InStr(syn, "{Bay?}") {
-        last := ""
-        try last := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
-        ib := InputBox("Which bay are you on?`n`nKept for the rest of the shift.", "Watchlog - " e.name, "w320 h160", last)
-        if ib.Result != "OK" || Trim(ib.Value) = ""
-            return
-        bay := Trim(ib.Value)
-        try {
-            if !DirExist(DataDir)
-                DirCreate DataDir
-            IniWrite bay, LastUsedFile, "LastUsed", "Bay"
-            IniWrite A_Now, LastUsedFile, "LastUsed", "Bay.at"
-        }
-        syn := StrReplace(syn, "{Bay?}", bay)
-    }
-    if InStr(syn, "{Bay}") {
-        bay := SavedBay()
-        if bay = "" {
-            ib := InputBox("Which bay are you on? (Start of shift keeps it for the rest of the shift.)", "Watchlog - " e.name, "w320 h140")
-            if ib.Result != "OK" || Trim(ib.Value) = ""
-                return
-            bay := Trim(ib.Value)
-            try {
-                if !DirExist(DataDir)
-                    DirCreate DataDir
-                IniWrite bay, LastUsedFile, "LastUsed", "Bay"
-                IniWrite A_Now, LastUsedFile, "LastUsed", "Bay.at"
-            }
-        }
-        syn := StrReplace(syn, "{Bay}", bay)
-    }
-    ; a code word (useOpen) fills the daily log that is already open (the one in
-    ; front if there are several), and opens a new one only when none is (v3.24.0)
-    win := 0
-    if useOpen {
-        ents := EntryWins()
-        act := WinExist("A")
-        if ents.Has(act)
-            win := act
-        else
-            for h in ents {
-                win := h
-                break
-            }
-    }
-    if !win {
-        before := EntryWins()
-        if !ITrakNewLog(false)
-            return
-        ; wait (at most EntryWait ms) for the NEW Daily Log Entry window
-        wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "8000"))
-        deadline := A_TickCount + wait
-        while !win && A_TickCount < deadline {
-            for h in EntryWins()
-                if !before.Has(h)
-                    win := h
-            if !win
-                Sleep 100
-        }
-        if !win {
-            Tip("The new daily log window didn't open. Nothing was filled in.", 4000, true)
-            Activity("Full-entry log " e.name ": no new Daily Log Entry window appeared within " wait " ms")
-            return
-        }
-        Sleep Integer(IniRead(SettingsFile, "ITrak", "EntrySettle", "600"))      ; let it finish drawing
-    }
-    try WinActivate "ahk_id " win
-    if !WinWaitActive("ahk_id " win, , 3) {
-        Tip("Couldn't bring the daily log to the front. Nothing was filled in.", 4000, true)
-        Activity("Full-entry log " e.name ": couldn't activate the Daily Log Entry window")
-        return
-    }
-    w0 := Integer(f["W"]), h0 := Integer(f["H"])
-    CoordMode "Mouse", "Screen"
-    MouseGetPos &ox, &oy
-    vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
-    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
-    keys := 2
-    for k in EntryFields {
-        if vals[k] = ""
-            continue
-        if !ITrakSpot(win, Integer(f[k "X"]), Integer(f[k "Y"]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
-            Tip("The iTrak window is too small for the " k " spot (or off the screen). Stopped.", 4000, true)
-            Activity("Full-entry log " e.name ": stopped before " k " (spot outside the window)")
-            return
-        }
-        if !WinActive("ahk_id " win) {
-            Tip("iTrak lost the front. Stopped before " k ".", 3000, true)
-            Activity("Full-entry log " e.name ": stopped before " k " (iTrak lost the front)")
-            return
-        }
-        MouseMove x, y, 0
-        Sleep 60
-        Click
-        Sleep pause
-        if k = "Synopsis" {
-            Paste(vals[k], true)
-            keys += StrLen(vals[k]) + 1
-        } else if k = "Reference" {
-            EntryType vals[k]
-            keys += StrLen(vals[k]) + 1
-        } else {
-            EntryType vals[k]
-            Sleep 250           ; let the list narrow down to the one option
-            SendInput "{Enter}"
-            keys += 5
-        }
-        Sleep 120
-    }
-    ; End Time's Now button, for logs that end with | end (the log is complete)
-    if e.end {
-        if !f.Has("EndNowX") {
-            Tip("End Time's Now button isn't taught yet: press Ctrl+Alt+Shift+F to teach it.", 5000, true)
-            Activity("Full-entry log " e.name ": End Time Now not clicked (not taught; run Ctrl+Alt+Shift+F again)")
-        } else if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), w0, h0, &x, &y) && AlertOnScreen(x, y) && WinActive("ahk_id " win) {
-            Sleep 300
-            MouseMove x, y, 0
-            Sleep 60
-            Click
-            keys += 1
-            Sleep 120
-        } else
-            Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
-    }
-    MouseMove ox, oy, 0
-    Tip("Filled in: " e.name, 1500)
-    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
-    CountSaved("log", keys, "Full log: " e.name)
-    Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
-}
-
+; ===== Watchlog.ahk PART 5 of 9 (lines 4939-6034 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Types text key by key (what Citrix handles best), a little slower than normal
 EntryType(text) {
     SetKeyDelay 20, 10
@@ -334,6 +170,190 @@ ShareITrakSetup() {
 }
 
 ; =====================================================================
+;  SAFEGUARDS: repeat the last log, backups, going back (v3.28.0)
+; =====================================================================
+; Does the last full-entry log again (a new daily log with the same boxes)
+RepeatLastLog() {
+    if !IsObject(LastRun) {
+        Tip("No log to repeat yet: make one with a code word, the call pad or " HK("entrypick") " first.", 3500, true)
+        return
+    }
+    ne := {}
+    for k, v in LastRun.e.OwnProps()
+        ne.%k% := v
+    ne.syn := LastRun.syn
+    Activity("Repeat last log: " ne.name)
+    RunEntry(ne)
+}
+
+; The files a backup holds: the ones in the Watchlog folder and the numbers
+; taught on this PC (no passwords: those live in Windows' Credential Manager)
+BackupSources() {
+    list := []
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt"]
+        if FileExist(HomeDir "\" n)
+            list.Push([HomeDir "\" n, "home - " n])
+    if DirExist(DataDir)
+        loop files DataDir "\*.ini"
+            list.Push([A_LoopFileFullPath, "data - " A_LoopFileName])
+    return list
+}
+
+; Copies them into DataDir\Backups\<folder>. Returns the number copied.
+BackupInto(folder) {
+    n := 0
+    try {
+        DirCreate DataDir "\Backups\" folder
+        for it in BackupSources() {
+            try {
+                FileCopy it[1], DataDir "\Backups\" folder "\" it[2], true
+                n += 1
+            }
+        }
+    }
+    return n
+}
+
+; Once a day (the first start of the day): keeps the last 14 backup folders
+DailyBackup() {
+    today := FormatTime(, "yyyy-MM-dd")
+    if DirExist(DataDir "\Backups\" today)
+        return
+    n := BackupInto(today)
+    Activity("Backup of " n " settings and template files made (" today ")")
+    names := []
+    loop files DataDir "\Backups\*", "D"
+        names.Push(A_LoopFileName)
+    if names.Length > 14 {
+        names := SortNames(names)
+        loop names.Length - 14
+            try DirDelete DataDir "\Backups\" names[A_Index], true
+    }
+}
+
+; Names in order, oldest first (the folder names start with the date)
+SortNames(names) {
+    txt := ""
+    for nm in names
+        txt .= nm "`n"
+    return StrSplit(Sort(RTrim(txt, "`n")), "`n")
+}
+
+BackupNow() {
+    n := BackupInto(FormatTime(, "yyyy-MM-dd HHmmss") " (made by hand)")
+    Activity("Backup made by hand: " n " files")
+    MsgBox "Backed up " n " files (your templates, settings, autocorrect list and the taught clicks).`n`nPasswords are not in it: Windows keeps those.", "Watchlog backup", "Iconi"
+}
+
+ShowRestore() {
+    names := []
+    if DirExist(DataDir "\Backups")
+        loop files DataDir "\Backups\*", "D"
+            names.Push(A_LoopFileName)
+    if !names.Length {
+        MsgBox "There are no backups yet. One is made the first time Watchlog starts each day.", "Watchlog restore", "Iconi"
+        return
+    }
+    names := SortNames(names)
+    g := Gui("+AlwaysOnTop", "Restore from a backup")
+    g.SetFont("s10")
+    g.AddText("w420", "Pick a backup. Your templates, settings, autocorrect list and taught clicks go back to how they were then. What you have now is backed up first, so this can be undone.")
+    lb := g.AddListBox("w420 r10")
+    shown := []
+    loop names.Length {
+        nm := names[names.Length - A_Index + 1]
+        shown.Push(nm)
+        lb.Add([nm])
+    }
+    lb.Choose(1)
+    g.AddButton("w120 Default", "Restore").OnEvent("Click", Go)
+    g.AddButton("x+10 w120", "Cancel").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+    Go(*) {
+        if !lb.Value
+            return
+        pick := shown[lb.Value]
+        g.Destroy()
+        if MsgBox("Restore the backup " pick "?`n`nWatchlog reloads afterwards.", "Watchlog restore", "YesNo Icon? Default2") != "Yes"
+            return
+        BackupInto(FormatTime(, "yyyy-MM-dd HHmmss") " (before restore)")
+        n := 0
+        loop files DataDir "\Backups\" pick "\*" {
+            if SubStr(A_LoopFileName, 1, 7) = "home - "
+                dest := HomeDir "\" SubStr(A_LoopFileName, 8)
+            else if SubStr(A_LoopFileName, 1, 7) = "data - "
+                dest := DataDir "\" SubStr(A_LoopFileName, 8)
+            else
+                continue
+            try {
+                FileCopy A_LoopFileFullPath, dest, true
+                n += 1
+            }
+        }
+        Activity("Restored " n " files from the backup " pick)
+        MsgBox "Restored " n " files. Watchlog reloads now.", "Watchlog restore", "Iconi T4"
+        Reload
+    }
+}
+
+; The newer version that was skipped when going back (not offered again)
+SkippedVersion() {
+    try return IniRead(LastUsedFile, "Updates", "Skip", "")
+    return ""
+}
+
+ClearSkippedVersion() {
+    try IniDelete LastUsedFile, "Updates", "Skip"
+    BuildTrayMenu()
+    Tip("The newer version will be offered again.", 2500, true)
+}
+
+; Puts back the copy Watchlog kept when it last updated
+GoBackVersion() {
+    ext := A_IsCompiled ? "exe" : "ahk"
+    best := "", bestV := ""
+    loop files DataDir "\Watchlog v* (backup)." ext {
+        if RegExMatch(A_LoopFileName, "^Watchlog v([\d.]+) \(backup\)", &m) && VerCompare(m[1], VERSION) < 0
+            && (bestV = "" || VerCompare(m[1], bestV) > 0)
+            best := A_LoopFileFullPath, bestV := m[1]
+    }
+    if best = "" {
+        MsgBox "There is no earlier version kept on this PC. Watchlog keeps the old one each time it updates.", "Watchlog", "Iconi"
+        return
+    }
+    if MsgBox("Go back from v" VERSION " to v" bestV "?`n`nWatchlog restarts on the older version, and v" VERSION " won't be offered again until you choose 'Offer the skipped update again' (tray > Advanced).", "Watchlog", "YesNo Icon? Default2") != "Yes"
+        return
+    keep := DataDir "\Watchlog v" VERSION " (backup)." ext
+    try {
+        try IniWrite VERSION, LastUsedFile, "Updates", "Skip"
+        if A_IsCompiled {
+            try FileDelete keep
+            FileMove A_ScriptFullPath, keep, 1
+            try FileCopy best, A_ScriptFullPath, 1
+            catch as err {
+                try FileMove keep, A_ScriptFullPath, 1
+                throw err
+            }
+        } else {
+            FileCopy A_ScriptFullPath, keep, true
+            FileCopy best, A_ScriptFullPath, true
+        }
+    } catch as err {
+        try IniDelete LastUsedFile, "Updates", "Skip"
+        Activity("Going back to v" bestV " failed: " err.Message)
+        MsgBox "Couldn't go back: " err.Message, "Watchlog", "Icon!"
+        return
+    }
+    Activity("Went back from v" VERSION " to v" bestV)
+    if A_IsCompiled {
+        Run '"' A_ScriptFullPath '"'
+        ExitApp
+    }
+    Reload
+}
+
+; =====================================================================
 ;  UPDATES FROM THE TEAM FOLDER
 ;  Whoever looks after the tool puts the new Watchlog.ahk (and
 ;  Watchlog.ico) in the same SharePoint folder as the team templates.
@@ -375,7 +395,7 @@ ProgramVersionOf(f) {
 ; True when the team folder has a newer Watchlog than this one
 UpdateWaiting() {
     v := TeamProgramVersion()
-    return v != "" && VerCompare(v, VERSION) > 0
+    return v != "" && v != SkippedVersion() && VerCompare(v, VERSION) > 0
 }
 
 CheckForUpdate() {
@@ -1073,83 +1093,5 @@ SwitchTo(name, match, runTarget := "") {
                 OfferLogin(name)
         }
     }
-}
-
-; The window each Bally app shows, so Ctrl+Alt+L can skip it if it's already open
-DefaultStartWindow(path) {
-    if InStr(path, "AlertGridUI")
-        return "Alert Grid ahk_exe javaw.exe"
-    if InStr(path, "SDSUI")
-        return "SDS ahk_exe javaw.exe"
-    if InStr(path, "CMPDesktop")
-        return "ahk_exe CMPDesktop.exe"
-    return ""
-}
-
-; Turns a path with * in it into a real one, picking the newest version:
-; C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
-;   -> C:\BallyTechnologies\CMPDesktop15_14_2\CMPDesktop\CMPDesktop.exe
-; Returns "" if nothing matches. Paths without * come back unchanged.
-ResolvePath(path) {
-    if !RegExMatch(path, "[*?]")
-        return path
-    parts := StrSplit(path, "\")
-    return ResolveParts(parts[1], parts, 2)
-}
-
-ResolveParts(base, parts, i) {
-    if i > parts.Length
-        return FileExist(base) ? base : ""
-    part := parts[i]
-    if !RegExMatch(part, "[*?]")
-        return ResolveParts(base "\" part, parts, i + 1)
-    found := []
-    Loop Files base "\" part, (i = parts.Length ? "FD" : "D")
-        found.Push(A_LoopFileName)
-    ; newest version first (15_14_2 is newer than 15_9)
-    if found.Length > 1 {
-        Loop found.Length - 1 {
-            Loop found.Length - A_Index {
-                j := A_Index
-                if VerCompare(VersionOf(found[j]), VersionOf(found[j + 1])) < 0 {
-                    tmp := found[j], found[j] := found[j + 1], found[j + 1] := tmp
-                }
-            }
-        }
-    }
-    for name in found {
-        r := ResolveParts(base "\" name, parts, i + 1)
-        if r != ""
-            return r
-    }
-    return ""
-}
-
-; "CMPDesktop15_14_2" -> "15.14.2"
-VersionOf(name) {
-    v := "", pos := 1
-    while pos := RegExMatch(name, "\d+", &m, pos) {
-        v .= (v = "" ? "" : ".") m[0]
-        pos += m.Len
-    }
-    return v = "" ? "0" : v
-}
-
-; (set up by RegisterHotkeys, see HotkeyDefs)
-WindowInfo() {
-    title := WinGetTitle("A")
-    exe := WinGetProcessName("A")
-    A_Clipboard := "Title: " title "  |  Program: " exe
-    Tip("Title: " title "`nProgram: " exe "`n(Copied to clipboard)", 5000)
-}
-
-
-; True if Edge has a window open
-; (it can run in the background with no window, which doesn't count)
-BrowserOpen() {
-    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe msedge.exe")
-        if SafeTitle(id) != ""
-            return true
-    return false
 }
 

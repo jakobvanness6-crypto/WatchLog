@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 1 of 9 (lines 1-1057 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 1 of 9 (lines 1-1088 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ; Speed: AutoHotkey pauses 100 ms after every window switch by default,
@@ -33,7 +33,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.27.3"
+VERSION := "3.28.0"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -102,6 +102,7 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "itrakteach", key: "^!+i", label: "teach iTrak the click", fn: (*) => TeachITrak()}
     , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
     , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
+    , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
 
@@ -114,6 +115,7 @@ PickHwnd := 0
 TeachBusy := false       ; true while the Alert Grid teach step runs
 NotesWin := ""           ; the quick notes window while it's open
 PadShort := ""           ; a shorthand line being run from the call pad (v3.26.0)
+LastRun := ""            ; the last full-entry log that was filled in: {e, syn} (v3.28.0)
 Cancelled := ""          ; the last form closed with Esc: its title, boxes and time (v3.27.0)
 InErr := false
 LeftOnClip := ""         ; the last log Watchlog left on the clipboard (not your own copy)
@@ -180,6 +182,7 @@ LoadTemplates()
 LoadApps()
 RegisterHotkeys()
 CheckScale()
+DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 StartWatching()
@@ -1055,4 +1058,32 @@ Run3=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
 [EndOfShift]
 ; Programs Ctrl+Alt+Shift+L closes (separate with commas)
 Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe
+
+; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
+; Add more as [App3], [App4] ... up to [App9].
+; Taken keys: Q O I H P X R L E J K W A M N
+; Built in already: T Teams, U Outlook, Y Spotify, G Edge. To change one,
+; add an [AppN] with the same Name and a new Key (Key=none turns it off).
+[App1]
+Name=SDS
+Key=S
+Path=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
+Window=SDS ahk_exe javaw.exe
+
+[App2]
+Name=CMP
+Key=C
+Path=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
+Window=ahk_exe CMPDesktop.exe
+
+; LOGINS are added in tray menu > Settings. They're saved below as
+; [Login1] ... [Login9]: Trigger, User, and optionally Window (only
+; works in that program) and Remind (minutes until a log-in-again
+; reminder).
+    )"
+    FileAppend text "`n", SettingsFile, "UTF-16"
+    FirstRun := true
+    Activity("First run on this PC: new settings.ini made in " HomeDir)
+}
+
 

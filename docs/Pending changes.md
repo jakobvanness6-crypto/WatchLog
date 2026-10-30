@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.27.3 (Oct 30, 2026): SDS hourly sign-in fix on top of the first safeguards batch (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.28.0 (Oct 30, 2026): safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -98,7 +98,7 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
 
-## Done in v3.27.3 (Oct 30)
+## Done in v3.28.0 (Oct 30)
 - Fix: the hourly SDS sign-in stopped with "no saved login is locked to SDS". It now brings SDS back and retries, then falls back to the login whose Only in names SDS, and logs the logins' triggers and windows if it still can't.
 
 ## Done in v3.27.0 (Oct 30)

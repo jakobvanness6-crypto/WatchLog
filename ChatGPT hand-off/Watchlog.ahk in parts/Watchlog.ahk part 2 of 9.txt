@@ -1,32 +1,4 @@
-; ===== Watchlog.ahk PART 2 of 9 (lines 1058-2290 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
-; Add more as [App3], [App4] ... up to [App9].
-; Taken keys: Q O I H P X R L E J K W A M N
-; Built in already: T Teams, U Outlook, Y Spotify, G Edge. To change one,
-; add an [AppN] with the same Name and a new Key (Key=none turns it off).
-[App1]
-Name=SDS
-Key=S
-Path=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
-Window=SDS ahk_exe javaw.exe
-
-[App2]
-Name=CMP
-Key=C
-Path=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
-Window=ahk_exe CMPDesktop.exe
-
-; LOGINS are added in tray menu > Settings. They're saved below as
-; [Login1] ... [Login9]: Trigger, User, and optionally Window (only
-; works in that program) and Remind (minutes until a log-in-again
-; reminder).
-    )"
-    FileAppend text "`n", SettingsFile, "UTF-16"
-    FirstRun := true
-    Activity("First run on this PC: new settings.ini made in " HomeDir)
-}
-
-
+; ===== Watchlog.ahk PART 2 of 9 (lines 1089-2342 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; =====================================================================
 ;  TEMPLATES
 ;  Read from the team's shared file when one is set in Settings (on
@@ -1230,5 +1202,54 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         if padUsed
             CallPadUsed()
     }
+}
+
+; Moves to the next (dir = 1) or previous (dir = -1) box in the open form
+FormMove(dir) {
+    ctrls := CurForm.ctrls
+    focused := ControlGetFocus("ahk_id " CurForm.hwnd)
+    idx := 0
+    for i, c in ctrls {
+        if c.Hwnd = focused || DllCall("IsChild", "Ptr", c.Hwnd, "Ptr", focused)
+            idx := i
+    }
+    idx += dir
+    if idx < 1
+        idx := ctrls.Length
+    else if idx > ctrls.Length
+        idx := 1
+    ctrls[idx].Focus()
+}
+
+; Templates fire as soon as the trigger is typed. A Space or Enter pressed
+; out of habit in the next half second is ignored, so it can't add a stray
+; space or submit a form before you've filled it in.
+#HotIf A_TickCount - JustFired < 500
+Space:: return
+Enter:: return
+NumpadEnter:: return
+#HotIf
+
+; Esc closes the login reminder from any window while it's showing
+#HotIf IsObject(ReminderGui)
+Esc:: CloseReminder()
+#HotIf
+
+; Tab / Shift+Tab / Enter only do this while a form is the active window
+#HotIf IsObject(CurForm) && WinActive("ahk_id " CurForm.hwnd)
+Tab:: FormMove(1)
++Tab:: FormMove(-1)
+Enter:: CurForm.submit()
+NumpadEnter:: CurForm.submit()
++Enter:: CurForm.submit()
++NumpadEnter:: CurForm.submit()
+^Enter:: FormMore()
+^NumpadEnter:: FormMore()
+#HotIf
+
+; Ctrl+Enter in a form that has "Add another"
+FormMore() {
+    if IsObject(CurForm.more)
+        CurForm.more()
 }
 

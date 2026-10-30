@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 4 of 9 (lines 3702-4770 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 4 of 9 (lines 3705-4938 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; The logs in some journal text: [{head, name, keys, tagged}] in order
 JournalLogs(text) {
     logs := []
@@ -1066,5 +1066,170 @@ ShowEntryPick() {
         try WinActivate "ahk_id " target
         RunEntry(e)
     }
+}
+
+EntryPickMove(d) {
+    lb := EntryPickWin.lb
+    n := SendMessage(0x18B, 0, 0, lb.Hwnd)      ; LB_GETCOUNT
+    if n < 1
+        return
+    i := lb.Value + d
+    lb.Choose(Max(1, Min(n, i)))
+}
+
+; The bay entered at the start of this shift (last 14 hours), or "" when none
+SavedBay() {
+    try {
+        v := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
+        at := IniRead(LastUsedFile, "LastUsed", "Bay.at", "")
+        if v != "" && IsTimeStamp(at) && DateDiff(A_Now, at, "Hours") < 14
+            return v
+    }
+    return ""
+}
+
+; Fills a new daily log. Keys counted as saved: 5 for each drop-down (a
+; few letters, Enter, the click), the full length of the Reference and
+; the Synopsis plus a click each, and the 2 for the new-log click.
+RunEntry(e, useOpen := false) {
+    global EntryFields, LastRun
+    f := EntryLoad()
+    if !f {
+        MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
+        return
+    }
+    syn := e.syn
+    ; {Bay?}: always asks which bay (start of shift), offering the last one,
+    ; and keeps the answer for the rest of the shift (v3.20.3)
+    if InStr(syn, "{Bay?}") {
+        last := ""
+        try last := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
+        ib := InputBox("Which bay are you on?`n`nKept for the rest of the shift.", "Watchlog - " e.name, "w320 h160", last)
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        bay := Trim(ib.Value)
+        try {
+            if !DirExist(DataDir)
+                DirCreate DataDir
+            IniWrite bay, LastUsedFile, "LastUsed", "Bay"
+            IniWrite A_Now, LastUsedFile, "LastUsed", "Bay.at"
+        }
+        syn := StrReplace(syn, "{Bay?}", bay)
+    }
+    if InStr(syn, "{Bay}") {
+        bay := SavedBay()
+        if bay = "" {
+            ib := InputBox("Which bay are you on? (Start of shift keeps it for the rest of the shift.)", "Watchlog - " e.name, "w320 h140")
+            if ib.Result != "OK" || Trim(ib.Value) = ""
+                return
+            bay := Trim(ib.Value)
+            try {
+                if !DirExist(DataDir)
+                    DirCreate DataDir
+                IniWrite bay, LastUsedFile, "LastUsed", "Bay"
+                IniWrite A_Now, LastUsedFile, "LastUsed", "Bay.at"
+            }
+        }
+        syn := StrReplace(syn, "{Bay}", bay)
+    }
+    ; a code word (useOpen) fills the daily log that is already open (the one in
+    ; front if there are several), and opens a new one only when none is (v3.24.0)
+    win := 0
+    if useOpen {
+        ents := EntryWins()
+        act := WinExist("A")
+        if ents.Has(act)
+            win := act
+        else
+            for h in ents {
+                win := h
+                break
+            }
+    }
+    if !win {
+        before := EntryWins()
+        if !ITrakNewLog(false)
+            return
+        ; wait (at most EntryWait ms) for the NEW Daily Log Entry window
+        wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "8000"))
+        deadline := A_TickCount + wait
+        while !win && A_TickCount < deadline {
+            for h in EntryWins()
+                if !before.Has(h)
+                    win := h
+            if !win
+                Sleep 100
+        }
+        if !win {
+            Tip("The new daily log window didn't open. Nothing was filled in.", 4000, true)
+            Activity("Full-entry log " e.name ": no new Daily Log Entry window appeared within " wait " ms")
+            return
+        }
+        Sleep Integer(IniRead(SettingsFile, "ITrak", "EntrySettle", "600"))      ; let it finish drawing
+    }
+    try WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 3) {
+        Tip("Couldn't bring the daily log to the front. Nothing was filled in.", 4000, true)
+        Activity("Full-entry log " e.name ": couldn't activate the Daily Log Entry window")
+        return
+    }
+    w0 := Integer(f["W"]), h0 := Integer(f["H"])
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
+    LastRun := {e: e, syn: syn}
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    keys := 2
+    for k in EntryFields {
+        if vals[k] = ""
+            continue
+        if !ITrakSpot(win, Integer(f[k "X"]), Integer(f[k "Y"]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
+            Tip("The iTrak window is too small for the " k " spot (or off the screen). Stopped.", 4000, true)
+            Activity("Full-entry log " e.name ": stopped before " k " (spot outside the window)")
+            return
+        }
+        if !WinActive("ahk_id " win) {
+            Tip("iTrak lost the front. Stopped before " k ".", 3000, true)
+            Activity("Full-entry log " e.name ": stopped before " k " (iTrak lost the front)")
+            return
+        }
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        Sleep pause
+        if k = "Synopsis" {
+            Paste(vals[k], true)
+            keys += StrLen(vals[k]) + 1
+        } else if k = "Reference" {
+            EntryType vals[k]
+            keys += StrLen(vals[k]) + 1
+        } else {
+            EntryType vals[k]
+            Sleep 250           ; let the list narrow down to the one option
+            SendInput "{Enter}"
+            keys += 5
+        }
+        Sleep 120
+    }
+    ; End Time's Now button, for logs that end with | end (the log is complete)
+    if e.end {
+        if !f.Has("EndNowX") {
+            Tip("End Time's Now button isn't taught yet: press Ctrl+Alt+Shift+F to teach it.", 5000, true)
+            Activity("Full-entry log " e.name ": End Time Now not clicked (not taught; run Ctrl+Alt+Shift+F again)")
+        } else if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), w0, h0, &x, &y) && AlertOnScreen(x, y) && WinActive("ahk_id " win) {
+            Sleep 300
+            MouseMove x, y, 0
+            Sleep 60
+            Click
+            keys += 1
+            Sleep 120
+        } else
+            Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
+    }
+    MouseMove ox, oy, 0
+    Tip("Filled in: " e.name, 1500)
+    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
+    CountSaved("log", keys, "Full log: " e.name)
+    Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
 }
 

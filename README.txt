@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.27.3  -  README
+  WATCHLOG  v3.28.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.27.3 (Documents, or the program folder).
+                      v3.28.0 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -234,6 +234,7 @@ couple of seconds. No need to press anything.
                     Now button once the log is filled (the End log does); {Bay} in a
                     synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
                     asks which bay and keeps the answer for the shift (v3.20.3).
+  Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.28.0)
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
                     run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
                     on each (nothing is clicked for you). The daily log form is its own window
@@ -874,7 +875,7 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
-SDS SIGN-IN FIX  (v3.27.3)
+SDS SIGN-IN FIX  (v3.28.0)
   The hourly SDS sign-in could stop with "no saved login is locked to SDS" when something else
   took the keyboard a moment after SDS came to the front. It now brings SDS back and tries
   again, then uses the login whose Only in names SDS (or the one last typed into SDS), even
@@ -900,6 +901,23 @@ SAFEGUARDS  (v3.27.0)
     puts it back (Esc again, without changing anything, throws it away). Kept in memory only.
   - An unexpected error now shows a short plain box ("That didn't finish, but Watchlog is
     still running") with the line number, instead of AutoHotkey's error window.
+
+MORE SAFEGUARDS  (v3.28.0)
+  - Repeat the last log: Ctrl+Alt+Shift+R opens a new daily log in iTrak and fills it in with
+    the same boxes as the last full-entry log (code word, call pad shorthand or Ctrl+Alt+F).
+    Change the key in Customize > Shortcut keys.
+  - Backups: the first start of each day Watchlog copies your templates.txt, my-templates.txt,
+    settings.ini, autocorrect list and the taught click files (no passwords: Windows keeps
+    those) to %LOCALAPPDATA%\Watchlog\Backups\<date>. The last 14 are kept. Tray > Advanced >
+    Back up my settings and templates now makes one by hand.
+  - Tray > Advanced > Restore from a backup... puts a backup back (what you have now is
+    backed up first) and reloads.
+  - Tray > Advanced > Go back to the previous version... puts back the copy Watchlog kept
+    when it last updated and restarts on it. That newer version isn't offered again until
+    you choose "Offer the skipped update again" (same menu).
+  - Alert Grid (v3.27.3): the check that Alert Grid is in front now retries for 2 seconds, and
+    the "no more alerts" click waits at least 250 ms for its box.
+  Built, NOT run (the sandbox can't run AutoHotkey).
 
 SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
   Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and

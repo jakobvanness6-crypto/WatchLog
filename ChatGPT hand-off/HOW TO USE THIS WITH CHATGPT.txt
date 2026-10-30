@@ -7,7 +7,7 @@ WHAT TO UPLOAD (start a new chat, attach both files)
        wording, the example settings, the build files, and the text of
        the docs I made for my supervisor, manager and IT.
   2. Watchlog.ahk
-       The whole program (v3.27.3, about 10,600 lines).
+       The whole program (v3.28.0, about 10,800 lines).
 
   If ChatGPT won't take Watchlog.ahk as a file (or says it's too long),
   use the folder "Watchlog.ahk in parts" instead: upload or paste the 9 parts one at a time, in order. Before pasting part 1, say:

@@ -1,4 +1,82 @@
-; ===== Watchlog.ahk PART 6 of 9 (lines 5925-7087 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 9 (lines 6035-7214 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; The window each Bally app shows, so Ctrl+Alt+L can skip it if it's already open
+DefaultStartWindow(path) {
+    if InStr(path, "AlertGridUI")
+        return "Alert Grid ahk_exe javaw.exe"
+    if InStr(path, "SDSUI")
+        return "SDS ahk_exe javaw.exe"
+    if InStr(path, "CMPDesktop")
+        return "ahk_exe CMPDesktop.exe"
+    return ""
+}
+
+; Turns a path with * in it into a real one, picking the newest version:
+; C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
+;   -> C:\BallyTechnologies\CMPDesktop15_14_2\CMPDesktop\CMPDesktop.exe
+; Returns "" if nothing matches. Paths without * come back unchanged.
+ResolvePath(path) {
+    if !RegExMatch(path, "[*?]")
+        return path
+    parts := StrSplit(path, "\")
+    return ResolveParts(parts[1], parts, 2)
+}
+
+ResolveParts(base, parts, i) {
+    if i > parts.Length
+        return FileExist(base) ? base : ""
+    part := parts[i]
+    if !RegExMatch(part, "[*?]")
+        return ResolveParts(base "\" part, parts, i + 1)
+    found := []
+    Loop Files base "\" part, (i = parts.Length ? "FD" : "D")
+        found.Push(A_LoopFileName)
+    ; newest version first (15_14_2 is newer than 15_9)
+    if found.Length > 1 {
+        Loop found.Length - 1 {
+            Loop found.Length - A_Index {
+                j := A_Index
+                if VerCompare(VersionOf(found[j]), VersionOf(found[j + 1])) < 0 {
+                    tmp := found[j], found[j] := found[j + 1], found[j + 1] := tmp
+                }
+            }
+        }
+    }
+    for name in found {
+        r := ResolveParts(base "\" name, parts, i + 1)
+        if r != ""
+            return r
+    }
+    return ""
+}
+
+; "CMPDesktop15_14_2" -> "15.14.2"
+VersionOf(name) {
+    v := "", pos := 1
+    while pos := RegExMatch(name, "\d+", &m, pos) {
+        v .= (v = "" ? "" : ".") m[0]
+        pos += m.Len
+    }
+    return v = "" ? "0" : v
+}
+
+; (set up by RegisterHotkeys, see HotkeyDefs)
+WindowInfo() {
+    title := WinGetTitle("A")
+    exe := WinGetProcessName("A")
+    A_Clipboard := "Title: " title "  |  Program: " exe
+    Tip("Title: " title "`nProgram: " exe "`n(Copied to clipboard)", 5000)
+}
+
+
+; True if Edge has a window open
+; (it can run in the background with no window, which doesn't count)
+BrowserOpen() {
+    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe msedge.exe")
+        if SafeTitle(id) != ""
+            return true
+    return false
+}
+
 ; =====================================================================
 ;  START OF SHIFT  -  Ctrl+Alt+L
 ;  Opens the programs in [StartOfShift] (any version) first, waits for
@@ -1099,66 +1177,5 @@ LoginProblem(trig, user, win, remind, logins, row) {
     if remind != "" && remind != "0" && Integer(remind) > 600
         return "The reminder is in minutes, up to 600 (like 55)."
     return ""
-}
-
-; Writes the logins as [Login1] ... [Login9] (no passwords), and removes
-; the older single login under [User]
-WriteLogins(logins) {
-    for key in ["LoginTrigger", "LoginUser", "LoginPassword"]
-        try IniDelete SettingsFile, "User", key
-    Loop 9 {
-        sec := "Login" A_Index
-        if A_Index > logins.Length {
-            try IniDelete SettingsFile, sec
-            continue
-        }
-        l := logins[A_Index]
-        IniWrite l.trig, SettingsFile, sec, "Trigger"
-        IniWrite l.user, SettingsFile, sec, "User"
-        IniSetOrDelete(sec, "Window", l.win)
-        IniSetOrDelete(sec, "Remind", l.remind ? l.remind : "")
-        try IniDelete SettingsFile, sec, "Password"
-    }
-}
-
-IniSetOrDelete(sec, key, val) {
-    if val != ""
-        IniWrite val, SettingsFile, sec, key
-    else
-        try IniDelete SettingsFile, sec, key
-}
-
-; Deletes the saved password of every login that's gone (unless another
-; login still uses the same username)
-RemovePasswords(newLogins) {
-    keep := Map()
-    keep.CaseSense := false
-    for x in newLogins
-        keep[x.user] := true
-    for l in LoginList {
-        if keep.Has(l.user)
-            continue
-        keep[l.user] := true
-        if CredExists(l.user) && CredRemove(l.user)
-            Activity("Password deleted from this PC for " l.user " (login removed)")
-    }
-}
-
-
-; =====================================================================
-;  START WITH WINDOWS  (Settings > Windows)
-;  A shortcut in your Startup folder (shell:startup) opens the script
-;  when you sign in to Windows.
-; =====================================================================
-StartupShortcuts() {
-    found := []
-    Loop Files A_Startup "\*.lnk" {
-        try {
-            FileGetShortcut A_LoopFileFullPath, &target, , &args
-            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName)
-                found.Push(A_LoopFileFullPath)
-        }
-    }
-    return found
 }
 
