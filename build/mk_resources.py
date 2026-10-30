@@ -41,7 +41,8 @@ ms = (a << 16) | b; ls = (c << 16) | dd
 fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, ms, ls, ms, ls, 0x3F, 0, 0x40004, 1, 0, 0, 0)
 strings = [s('FileDescription', 'Watchlog'), s('ProductName', 'Watchlog'), s('FileVersion', ver),
            s('ProductVersion', ver), s('InternalName', 'Watchlog'), s('OriginalFilename', 'Watchlog.exe'),
-           s('Comments', 'Types standard log entries from short codes')]
+           s('Comments', 'Types standard log entries from short codes'),
+           s('LegalCopyright', 'Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.')]
 st = node('040904B0', b'', 1, strings, vlen=0)
 sfi = node('StringFileInfo', b'', 1, [st], vlen=0)
 var = node('Translation', struct.pack('<HH', 0x0409, 0x04B0), 0)

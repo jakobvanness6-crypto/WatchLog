@@ -3,16 +3,186 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.17.0 (Oct 26, 2026).
+Current version: v3.24.0 (Oct 30, 2026): code words that fill the daily log (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
-- **Casino autocorrect in every program** (Jakob, Oct 26: "add it to the rest of the programs"). Today it only runs in the call pad and the log form boxes. Plan: an optional system-wide mode ([CallPad] Autocorrect=everywhere, plus a tick in Settings) that fixes a word when a space, Enter or punctuation follows it, in any window. Open points: it must stay out of password and login fields and out of Watchlog's own typing (logins, templates); in Citrix/iTrak a fix means Backspaces plus retyping, which can be slow or drop keys, so it needs its own test there; IT should hear about it (it watches typed words, stores nothing). Same autocorrect.txt list. Wait for the full test pass (docs checklist) before building.
+### Plan: failure safeguards (Oct 30, NOT built, waiting on Jakob's list of failures he has actually hit, and "build it")
+
+From a read-through of Watchlog.ahk v3.23.0. Already safe today: login locked to a window is re-checked just before typing; full-entry logs (Ctrl+Alt+F) re-check iTrak is in front before every click; the call pad saves itself so a crash can't lose a call; a team templates file that won't load falls back to the last good copy; self-update tests the new file first and keeps the old one; OneDrive conflict copies of settings.ini show in the Security window; errors go in the activity log.
+
+Ranked by how much harm the failure does. Speed cost is for a normal run where nothing goes wrong.
+
+1. **Passwords only typed into a safe window.** Today: a login with no window lock types name, Tab, password, Enter into whatever is in front (only the finder and Settings are blocked). If the iTrak daily log, the call pad, Notepad, Teams or Outlook has the keyboard, the password lands there in plain text. Safeguard: refuse to type when the front window is one of those, say why, and offer once to lock that login to its program. Speed cost: none (one check).
+2. **A form's log only pastes into the window you started in.** Today: after Enter on a form, Watchlog waits up to 2 seconds for that window to come back, then pastes anyway, even if it closed or a pop-up took the front. The log goes into the wrong window or nowhere. Safeguard: if it isn't back, don't paste; beep and show "The log is on the clipboard: click where it goes and press Ctrl+V". Speed cost: none.
+3. **Alert Grid clearing stops if Alert Grid loses the front partway.** Today: it checks only at the start, so a pop-up arriving mid-run gets the right-click, menu and Submit clicks. Safeguard: check before each click and stop with a tip. Speed cost: under 1 ms per click, so a dozen alerts a second stays the same.
+4. **Display scale changed since the clicks were taught.** Today: the scale is saved when iTrak spots are taught but never checked, so after a Windows scale change the clicks land in the wrong place without warning. Safeguard: compare at start-up (iTrak and Alert Grid) and warn once with how to fix it. Speed cost: none during the shift.
+5. **Esc on a form doesn't throw away what you typed.** Today: Esc or the X closes the form and the boxes are gone. Safeguard: keep a cancelled form for 10 minutes (memory only, not on disk); reopening the same template fills the boxes back in with a note, Esc again clears them. Speed cost: none.
+6. **Paste one of my last logs again.** Today: if a paste went missing you retype it, or dig in the shift journal. Safeguard: a pick list of this shift's last 5 logs (hotkey to choose), Enter pastes it again. Kept in memory only. Speed cost: none.
+7. **templates.txt goes blank or half-synced.** Today: only the team file has a fallback; the local templates.txt does not, so a half-synced OneDrive copy loses templates silently. Safeguard: keep a last good copy on this PC; if templates.txt loads empty or with far fewer templates than last time, use the copy and warn. Speed cost: none (at load only).
+8. **Settings get broken or overwritten.** Today: no backups of settings.ini, itrak.ini, alertgrid.ini or the window layout, and a OneDrive conflict copy is only mentioned in the Security window. Safeguard: one backup a day on this PC (keep 7), tray "Restore settings from a backup", and a tray message when a conflict copy appears. Speed cost: none.
+9. **A bad update.** Today: the old version is kept but going back is by hand. Safeguard: tray "Go back to v(previous)" when a backup exists. Speed cost: none.
+10. **An error mid-shift.** Today: AutoHotkey's raw error box with code appears and that action stops. Safeguard: a short plain message ("That didn't finish. Watchlog is still running.") with a Copy details button for reporting the line number. Speed cost: none.
+
+Not proposed: an auto-restart helper if Watchlog closes (needs a second program or a scheduled task, more for IT to approve).
+
+Questions for Jakob: which of these has actually happened to you? Anything else that has gone wrong on shift? Build all ten, or only some?
+
+### Plan: shorthand line to finished log (Oct 30, step 1 of 2, NOT built, waiting on Jakob's examples and "build it")
+
+**The idea.** You write one short line the way you jot it on paper, and Watchlog turns it into the finished log using the template you already have. No form when the line has everything; the form only opens when something is missing, with what it found already filled in.
+
+**Where you type it.** On the call pad (Numpad +, as now). The first word is the code word of a template, with or without the `;`. Ctrl+Enter makes the log as it does today. Plain jottings with no code word in front keep working exactly as now (they still fill the next form).
+
+**What happens.**
+- Every box in that template has an answer from the line: the finished log goes straight into the window you were in (iTrak, Notepad...), counted in Time saved. No form.
+- Something is missing: the usual form opens, found boxes say "(from your call pad)", the cursor sits in the first empty one.
+- Boxes with a `blank=` that can stay empty (Note, Signs observed, Reason (only if up)...) do not count as missing.
+
+**How the words are read** (order does not matter for most):
+- Money: `5k`, `5000`, `5,000`, `$5000`, `11421.11` -> $5,000 / $11,421.11 (same as the pad does now).
+- Table: any table in your tables list, any case; the number alone works when it is unique (`205` -> BJ205).
+- Machine: a letter + 3 to 5 digits -> caps (`b1410` -> B1410); `n3` -> NRT3, `a1` -> ATM1.
+- Pick lists: the first letters of a choice (`def` -> Defective, `exp` -> expired ID, `up`/`dn` -> Up/Down, `24`/`ind` -> 24 hour/indefinite).
+- Numbers for # boxes (Alert #, Asset #, Player #, Window #) are taken in the order the template asks for them; `w3` or `win 3` always means the window.
+- Anything left over goes into the one free-text box, if the template has one (Note, What the review showed...).
+- Several items in a "several" or "Add another" template are all used (`open 201 202 203`, two fills in one line).
+
+**Examples with today's templates** (made-up values):
+
+| You type | You get |
+|---|---|
+| `fill 205 5k` | BJ205 $5,000 |
+| `fill 205 5k 303 10k` | BJ205 $5,000 / BJ303 $10,000 (two lines, as Add another does) |
+| `open 201 202 203` | UT201, FB202, UT203 Opened. (one line, as the several box does) |
+| `cards ry301` | Card change on RY301. |
+| `bv c2102 4471 full` | C2102 #4471 (Full) |
+| `found b1410 45.20` | Operations Supervisor advised printing off abandoned credits in the amount of $45.20 from B1410. Funds taken to Security as found. |
+| `aml 123 b1410` | AML Alert #123 populated at B1410 (time now). Review showed nothing suspicious. |
+| `maint n2 n4` | NRT2 and NRT4 Maintenance. |
+| `refuse 2 exp` | Security Officer refused entry to 2 patrons due to expired ID. |
+| `jack c2102 11421.11 w3 2130` | the full jackpot sentence, time paid 21:30 (time format to confirm) |
+| `player 123456 3 205 2k up 5k` | Player #123456 playing Spot 3, BJ205, In $2,000, Up $5,000. |
+| `medical guest kitchen` | form opens (What the review showed / Outcome still needed), Who and Location already filled |
+
+**Your own short codes (optional).** You can give any template a second, shorter code just for the pad, for example `f` for fill or `o` for open, in Customize. Safer than changing the real code words.
+
+**Questions for Jakob before building:**
+1. Five to ten real lines the way you jot them on the paper pad (fake numbers are fine), and what each should become.
+2. How do you write times (2130, 9:30p, 930)? 24-hour in the log?
+3. Should it also work outside the call pad, for example typing `;fill 205 5k` straight into iTrak and pressing a key? (Harder inside Citrix: see step 2.)
+
+### Idea: "Info From" department search (Jakob's coworker, Oct 30, NOT built)
+In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
+- How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
+- Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
+- A hotkey can also do it on its own, at any time, for any open log.
+- Confirmed by Jakob (Oct 30, with screenshot): the Info From button is inside the Daily Log Entry window. Click it, a list drops down (Personnel, Subject, Contact, Company, Remove Selected, Remove All), click Personnel, click into a search bar, type, Enter runs the search. Department searches work. Watchlog would do those clicks and typing, then stop so you double-click the name.
+- Teach spots (like the full-entry logs): Info From button, Personnel, and the search bar. Subject, Contact and Company could use the same idea later.
+- Screenshots from Jakob (Oct 30): clicking Personnel opens its own "Personnel" window with a "Look For:" box at the top, Find Now / Clear, a results grid (Last Name, First Name, Middle Name, Gender, Property, Department, Position, Personnel ID) and Select / Cancel at the bottom. So the spots are: Info From button, Personnel (in the dropdown), and the Look For box in the new window (measured from that window, like the entry window). He is still sending the department names (his list so far shows Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH), which look like the department names; to confirm).
+- Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
+- Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
+
+### Step 2 (after step 1): autocorrect everywhere, including Citrix/iTrak
+Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Design comes after step 1 ships.
+
+
+
+- **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Waiting on Location, Topic, Reference and End Time click for those three.
+- **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
+
+
 - Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
-- Shorthand for other logs (which ones, with his real examples).
+- Shorthand for other logs: see the plan at the top (step 1).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.24.0 (Oct 30)
+- Code words that fill the whole iTrak daily log: end a templates.txt line with ` >> Location | Topic | Reference` (add `| end` last to click End Time Now). Typing the code word (and answering its boxes) fills the open daily log, or opens a new one if none is open, from any window. Shift+Enter on the form, or Shift held when a no-box code word fires, pastes just the wording instead. First one: `;cards` (Card change) with GUESSED Location/Topic/Reference "Pit 2 | Card Change | NA": Jakob to correct.
+- Still open: more code words to convert (Jakob to say which), and a Customize screen box for it.
+
+## Done in v3.23.0 (Oct 30)
+- Edge-only start of shift: Ctrl+Alt+L opens iTrak facial rec and the Citrix page in one Edge window (FaceUrl, CitrixUrl). Removed Ctrl+Tab tab hunting, keep-on-top guard, Chrome profile lookup, ChromeAccount and LaunchWork.bat use; Ctrl+Alt+G is Edge. Each bay re-saves the window layout once. Built without running AutoHotkey (Wine run blocked).
+- Docs: all versions brought to 3.23.0 (Overview and IT Summary said 3.10.1), docx/pdf rebuilt, ChatGPT hand-off rebuilt.
+
+## Done in v3.22.2 (Oct 30)
+- Settings window: the tab area is taller (350 -> 400), so the "Beep when a log-in-again reminder pops up" tick on the Logins tab is no longer cut off by Save and Cancel (Jakob's screenshot, display scaling makes text taller than under Wine).
+
+## Done in v3.22.1 (Oct 30)
+- Jakob's first look at the dark theme: dark text on a dark background somewhere, so light is now the default (blue accent kept, teal gone) and dark is a switch: tray menu > Dark look, or Customize. Dark text on dark probably came from a colour I did not remap; if he turns dark on again and sees it, ask for a screenshot.
+
+## Done in v3.22.0 (Oct 30)
+- Dark look with a blue accent in every window (Jakob: "I like a dark colour scheme", blue or forest green, my pick: blue). Built as a WGui class that remaps the colours each window asks for; Customize > "Dark look" turns it off ([Look] Dark=no). Tabs show as a row of buttons.
+- Home window: three panels at the top (logs, logins, typing saved this shift).
+- Interior, Exterior and Parking Officer/Supervisor full-entry logs (six, in templates.txt, no End Time click).
+- Docs brought up to v3.22.0: README, QUICK START, the plain Overview, the IT Summary and the one-page Summary (Word and PDF). The "(with screenshots)" overview was NOT redone (needs new screenshots).
+- Not tested on a real Windows PC: only under Wine, which draws buttons and lists light. The dark buttons, list headers and scroll bars rely on Windows' own dark mode, so check them on the bay.
+
+## Done in v3.21.0 (Oct 30)
+- The Start full-entry log also clicks End Time's Now button (Jakob asked; goes out with this build).
+- Customize Watchlog (tray menu and a Customize button on the home window): screens for the full-entry daily logs (add, edit, copy, delete, try), the shortcut keys (21 of them can be changed; pause, reload, app keys and form keys stay), the programs opened and closed at the start and end of shift, the shared lists (opens the template editor on that tab), the autocorrect words, and the speed and timing values; logins, reminders, Caps Lock, journal and updates open Settings on the right tab.
+- The tray menu, home window and cheat sheet show the shortcut keys you picked.
+- Saving from these screens applies right away, with no automatic restart (the hotkey screen restarts Watchlog).
+- Not tested: pressing the shortcut keys (Wine can't fire hotkeys), so a changed key is checked only for being registered.
+
+## Done in v3.20.3 (Oct 30)
+- Start of shift full-entry log: "start" in the Ctrl+Alt+F list. Surveillance, Duty, NA, synopsis "Start of Shift Bay (bay) Operator". It always asks which bay (offering the last one) and keeps the answer for the shift; the End log and ;end then use it without asking. It leaves End Time alone (add `| end` to its line in templates.txt if you want the Now click too).
+
+## Done in v3.20.2 (Oct 30)
+- Confirmed on Jakob's PC: the End log fills in about 4 seconds, against about 15 s by hand (7 s was his best). Real timing for the manager pitch.
+- End of shift full-entry log: type "end" in the Ctrl+Alt+F list: Surveillance, Duty, NA, synopsis "End of Shift Bay (your bay) Operator", then End Time's Now button is clicked. New fifth teach step (End Time's Now button): run Ctrl+Alt+Shift+F again.
+- The bay entered at the start of shift is kept for the shift (14 hours): the ;end template and the End log no longer ask for it (new box option {Bay: saved}; asks as before if no bay was entered at the start).
+
+## Done in v3.20.1 (Oct 30)
+- Fix for the daily log teach step ("the click position wasn't in the iTrak window"): the daily log form is its own window titled "Daily Log Entry - N/A - \\Remote", so the field spots are now measured from that window, and the fill waits for the new form to open instead of a fixed pause.
+
+## Done in v3.20.0 (Oct 30)
+- Full-entry daily logs: Ctrl+Alt+F opens a pick list (type the first letters, Enter) of never-changing logs; Watchlog opens a new daily log in iTrak and fills Location, Topic, Reference and Synopsis with no questions. Break, Table Drop and Card Destruction are ready-made in templates.txt (lines `+Name = Location | Topic | Reference | Synopsis`). End Time and Save stay yours. Ctrl+Alt+Shift+F teaches the four field spots once per PC. Counted in Time saved and the journal ("Full log: Break"): 5 keystrokes per drop-down, full length of Reference and Synopsis plus 1 per click, 2 for the new-log click.
+- SDS login reminder: no "log in again" reminder for a login typed into SDS while "Sign back into SDS by itself" is ticked (it was only skipped when the login was locked to SDS with Window=). Untick the box to get the reminder back.
+- Home window: the whole Shift section is gone (shortcuts and the cheat sheet remain).
+- Not tried on a real iTrak/Citrix: Wine test with a fake iTrak window passed (pick list, clicks, typing, paste, counts).
+- Still open from this thread: more full-entry logs from Jakob (he is sending 3-5; 3 done), End Time Now click is NOT used, sharing the field spots with the team, other home window trimming.
+
+## Shipped without a version (templates.txt only)
+- Oct 29: ;open and ;auto got {repeat} (one table per line); replaced the same day by v3.19.3's one-line list.
+
+## Done in v3.19.3 (Oct 29)
+- Start of shift no longer puts SDS where Alert Grid goes. Both are the same Java program (javaw.exe) and the layout matched them by front-to-back order, so after the start of shift sign-in left SDS in front it took Alert Grid's spot. Save window layout now notes which one each Java window is (Alert Grid, SDS or other, from the start of its title; the title isn't saved) and Put windows back matches on that. A layout saved before v3.19.3 still works the old way and asks once to be saved again (Ctrl+Alt+Shift+S).
+- Several tables on one line: ;open and ;auto take Add another (Ctrl+Enter) and paste "BJ205, BJ206 and RO204 Opened." New box option | several (README, template options). The table box starts empty; a table added twice is listed once.
+- Tested under Wine with fake SDS and Alert Grid windows (the old matching swapped them, the new one doesn't) and the forms. The real Bally windows only on a bay.
+
+## Done in v3.19.2 (Oct 29)
+- Alert Grid teach has a new step 6 (the casino added a click that says there are no more alerts, last in the sequence, after the clear-acknowledged button). Hover over the box's button and press F8. Saved as NoMoreX/NoMoreY (+ NoMoreBox, the box's title, when it's a separate box; measured from that box) in alertgrid.ini and included in Share my setup with the team. Old teaches work and skip the click until re-taught. Waits up to 0.8 s for the box, so no extra delay when it isn't there. Built without running AutoHotkey (not run under Wine).
+
+## Done in v3.19.1 (Oct 27)
+- Copyright and licence (step 1 of making Watchlog proprietary): "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved." and a short licence (permission only, no copying/sharing/changing/redistributing, provided as is). New About Watchlog window (tray menu and home window); the line also shows under the tutorial, in the version box, at the bottom of the cheat sheet and in Security and status; Copyright field in the exe's file properties; block at the top of README, QUICK START, templates.txt and Watchlog.ahk; LICENCE.txt in the zip, built into the exe and in Make a copy to share.
+- Release zip has only Watchlog.exe and the text files. The script version is in "for IT (on request)" in the project files, for Jakob to send IT directly.
+- Built with build/rebuild-resources.py (Python, swaps the resources in the v3.19.0 exe) because running AutoHotkey under Wine was blocked this time: not run or tested under Wine.
+
+## Done in v3.19.0 (Oct 27)
+- Ctrl+Alt+D opens a new daily log in iTrak (a taught mouse click, or two if it takes a button and a menu line), Ctrl+Alt+Shift+I teaches it. Measured from inside the iTrak window, follows the nearest edge on resize, refuses when the window is too small or off screen, can be shared through the team folder (tray > iTrak). Settings > Alert Grid tab, tray, home tile, Security status and cheat sheet updated. Wine-tested with a fake iTrak (10 cases); the teach step and the real Citrix click can only be tried on a bay.
+
+## Done in v3.18.0 (Oct 26)
+- Alert Grid clear works wherever Alert Grid is and whatever its size: spots measured from inside the window (old teach files change over by themselves), the clear-acknowledged button follows its nearest edge on resize, the teach asks which menu line "Acknowledge as received" is (also in Settings > Alert Grid) and the arrow keys pick it when the menu opens upward near the bottom of the screen or a menu click misses, and it refuses (clicks nothing) when Alert Grid is too small or off the screen. Tray > Alert Grid > Share my setup with the team puts the numbers in alertgrid.ini in the team folder (per screen scaling) for PCs that haven't been taught. Not done: UI Automation / Java Access Bridge, picture search. Wine-tested with a fake Alert Grid (11 cases pass); the real Java menu and arrow keys only on a bay.
+
+## Done in v3.17.6 (Oct 26)
+- Alert Grid clear, option A (Jakob): no Caps Lock wait, modifier wait only while Ctrl/Alt/Shift are really down (max 250 ms), Ctrl+A held ~20 ms, 5 colour reads instead of ~20, SelectWait default 120 (Ctrl+A re-pressed halfway), lone alert 40 ms.
+
+## Done in v3.17.5 (Oct 26)
+- Alert Grid clear faster again (Jakob: still slower than before): key-release wait capped at 250 ms in total, SelectWait default 200, lone alert 50 ms, 5 ms polling, no extra pause after the list turns blue.
+
+## Done in v3.17.4 (Oct 26)
+- Alert Grid clear made quicker for busy lists (about a dozen alerts a second): shorter Ctrl+A hold, 15 ms polling, about 20 colour reads instead of 100.
+
+## Done in v3.17.3 (Oct 26)
+- Alert Grid clear with a single alert: the row is already blue from the click, so a plain column under it now means only a 100 ms wait.
+
+## Done in v3.17.2 (Oct 26)
+- Alert Grid clear with a single alert was slow (waited 800 ms for a colour change that never comes): wait is now 300 ms.
+
+## Done in v3.17.1 (Oct 26)
+- Alert Grid clear (Ctrl+Alt+A, Caps Lock) no longer clears just the top alert half the time: waits for Ctrl/Alt/Shift/Caps Lock to be let go, holds Ctrl+A like a real keypress, watches the list turn selected (presses Ctrl+A again if it didn't), then right-clicks. Wine-tested only with a fake list that ignores the first Ctrl+A.
 
 ## Done in v3.17.0 (Oct 26)
 - Edits in the shift journal count everywhere: each log carries a [k] tag with its exact keystrokes saved; removing, renaming or adding logs in Ctrl+Alt+J and pressing Save changes updates Shift count, this shift, Time saved and the dashboard. Old untagged logs use the type's average.
@@ -300,3 +470,10 @@ Added Oct 16 (templates.txt only): `;selfex` Self-exclusion and `;found` Abandon
 - Templates fire instantly; `;count` renamed `;countstep`; clashing triggers are refused with a message.
 - App hotkeys: Ctrl+Alt+T Teams, U Outlook, Y Spotify, G Chrome.
 - Ctrl+Alt+T find notes by tag removed.
+
+## Queued (Jakob 2026-10-30, build only when he says "build it")
+Six full-entry logs, none click End Time Now, Reference NA:
+- +Interior Officer / +Interior Supervisor: Back of House - Non Sensitive | Call - Radio | NA | Security Officer (or Supervisor) performed interior door check
+- +Exterior Officer / +Exterior Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed exterior door check
+- +Parking Officer / +Parking Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed parking lot patrol
+(templates.txt only, no version bump.)
