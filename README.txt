@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.26.2  -  README
+  WATCHLOG  v3.26.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.26.2 (Documents, or the program folder).
+                      v3.26.3 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -885,6 +885,9 @@ SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
       jack c2102 11421.11 w3 cash 2130      jackpot: machine, amount, window, time paid (military
                               time, optional; cash is the default wording)
       bv c2102 4471 full      emergency BV pull (full or def, for defective)
+      mfill n3 190800 bvs     machine fill (v3.26.3), one fill per line for several; the older
+                              n3 190800 bvs and c2102 11421.11 win 3 cash, with no code word,
+                              now also make the log when you press Ctrl+Enter
       account 123456          account under review: fills the iTrak daily log (Guest
                               Services | Account under review | M6 (417))
   Any other code word first (cards ry301, aml 123 b1410) opens that log's form with the

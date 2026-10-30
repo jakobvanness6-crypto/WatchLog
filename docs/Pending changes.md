@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.26.2 (Oct 30, 2026): the shorthand logs also fill the daily log (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.26.3 (Oct 30, 2026): mfill and old-style shorthand lines now make the log from the call pad (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -97,6 +97,9 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.26.3 (Oct 30)
+- Fix: `mfill n3 190800 bvs` (and the old `n3 190800 bvs` with no code word, and `c2102 11421.11 win 3 cash` for a jackpot) pressed with Ctrl+Enter on the call pad now make the log directly instead of opening an empty form.
 
 ## Done in v3.26.2 (Oct 30)
 - ;fill ;open ;auto ;jack ;bv ;mfill also fill the iTrak daily log (Location, Topic, Reference as Jakob gave them; Reference left empty for him on fill, jack, bv and mfill). Pit comes from the table (@pit list), Alpha/Bravo/Charlie Slots from the machine letter (@slots list), both editable in templates.txt: groundwork for more automation. Open: is D = Delta Slots? exact iTrak topic names; Auto-close Reference assumed NA.

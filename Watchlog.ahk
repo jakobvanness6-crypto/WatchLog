@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.26.2"
+VERSION := "3.26.3"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -2804,14 +2804,25 @@ PadShortcut(text) {
     words := StrSplit(RegExReplace(line, "\s+", " "), " ")
     code := StrLower(words[1])
     rest := []
-    known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1)
+    known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1, "mfill", 1)
+    padText := text
     if known.Has(code) {
         loop words.Length - 1
             rest.Push(words[A_Index + 1])
+        if code = "mfill"
+            padText := RegExReplace(text, "i)^\s*mfill\s*", "")
     } else if words.Length > 1 && StrLower(words[words.Length]) = "auto" {
         code := "auto"
         loop words.Length - 1
             rest.Push(words[A_Index])
+    } else if (sh := PadParse(text)).fills.Length {
+        ; the older shorthand with no code word: n3 190800 bvs  = machine fill
+        code := "mfill"
+    } else if IsObject(sh.jack) {
+        ; c2102 11421.11 win 3 cash  = jackpot
+        code := "jack"
+        for w in words
+            rest.Push(w)
     } else {
         for t in TemplateList
             if t.trig = ";" code
@@ -2888,6 +2899,10 @@ PadShortcut(text) {
             hints["reason"] := reason
         hints["expect"] := 3
         hints["go"] := machine != "" && asset != "" && reason != ""
+    } else if code = "mfill" {
+        fills := PadParse(padText).fills
+        if fills.Length
+            hints["fills"] := fills, hints["go"] := true
     } else if code = "account" {
         if rest.Length && RegExMatch(rest[1], "^\d{3,}$") {
             hints["account"] := rest[1]
