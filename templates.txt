@@ -15,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 26, 2026 (1)
-# Program version: 3.19.3
+# Program version: 3.20.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -120,6 +120,18 @@
 ;account (Account review) = Account #{Account #: blank=} reviewed, not banned player, Guest Services notified
 ;drop (Table drop) = Security Officers performed Table Drop
 ;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep.
+
+
+# ----- FULL DAILY LOGS -----------------------------------------------
+#  Logs that never change. Ctrl+Alt+F lists them; type the first letters,
+#  Enter. Watchlog opens a new daily log in iTrak and fills in Location,
+#  Topic, Reference and the Synopsis (End Time and Save are left to you).
+#  One line each:   +Name = Location | Topic | Reference | Synopsis
+#  (teach the spots once with Ctrl+Alt+Shift+F; see README section 10)
+
++Break = Surveillance | Duty | NA | Break
++Table Drop = Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690) | Security Officers performed Table Drop
++Card Destruction = Card Destruction Room | Card Destruction | M6 (750,751,749) | Security Officers entered Card Destruction Room for Card Destruction.
 
 
 # ----- TABLES --------------------------------------------------------

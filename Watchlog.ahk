@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.19.3   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.20.0   (called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.19.3"
+VERSION := "3.20.0"
 VERSION_DATE := "Oct 29, 2026"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
@@ -77,6 +77,7 @@ CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
 TemplateList := []
+Entries := []        ; full-entry daily logs: {name, loc, topic, ref, syn, end}
 Lists := Map()          ; @lists from templates.txt, e.g. @tables
 Lists.CaseSense := false
 AppList := []
@@ -477,7 +478,7 @@ AddLogin(trig, user, fallbackPw, win, remind := 0) {
     Hotstring(":*C:" trig, (*) => DoLogin(trig, user, fallbackPw, rec))
     HotIf
     LoginList.Push(rec)
-    if remind
+    if remind && !(Cfg["SdsResign"] && (InStr(win, "SDS") || IsSdsLogin(rec)))
         ResumeReminder(rec)
     if win = "" && SubStr(trig, 1, 1) != ";"
         return "   " trig " has no `; in front, so it can fire in a chat or email and send your password.`n"
@@ -595,8 +596,18 @@ DoLogin(trig, user, fallbackPw, rec) {
     SendInput "{Enter}"
     CountSaved("login", StrLen(user) + StrLen(pw) + 2 - StrLen(trig), "Login " trig)
     pw := ""
-    StartReminder(rec)
-    if RegExMatch(WinGetTitle("A"), "i)^SDS\b")
+    ; Typed into SDS while "sign back into SDS by itself" is on: no
+    ; "log in again" reminder for this login at all (v3.20.0). The login is
+    ; remembered as an SDS one, so the reminder stays off after a reload and
+    ; even if its Window= doesn't name SDS.
+    isSds := RegExMatch(WinGetTitle("A"), "i)^SDS\b")
+    if isSds && Cfg["SdsResign"] {
+        try RegWrite 1, "REG_DWORD", RegKey, "SdsLogin " rec.user
+        try RegDelete RegKey, "LastLogin " rec.user
+        SetTimer rec.timer, 0
+    } else
+        StartReminder(rec)
+    if isSds
         StartSdsResign()
     ; The activity log notes where a password was typed (never the password)
     exe := ""
@@ -722,10 +733,16 @@ ResumeReminder(rec) {
         SetTimer rec.timer, -1000
 }
 
+; True when this login was last typed into SDS (see DoLogin)
+IsSdsLogin(rec) {
+    try return RegRead(RegKey, "SdsLogin " rec.user) = 1
+    return false
+}
+
 ShowLoginReminder(rec) {
     global ReminderGui
     ; SDS signs itself back in, so its "log in again" warning isn't needed
-    if Cfg["SdsResign"] && InStr(rec.win, "SDS")
+    if Cfg["SdsResign"] && (InStr(rec.win, "SDS") || IsSdsLogin(rec))
         return
     CloseReminder()
     g := Gui("+AlwaysOnTop +ToolWindow", "Login reminder")
@@ -990,6 +1007,9 @@ LoadTemplates() {
     ReadLists(mine, "my-templates.txt", true, &problems)
     Tpl.count := AddTemplates(main.text, main.src = "local" ? "local" : "team", main.label, trigs, &problems)
     Tpl.mine := AddTemplates(mine, "mine", "my-templates.txt", trigs, &problems)
+    Entries := []
+    ReadEntries(main.text, main.label, &problems)
+    ReadEntries(mine, "my-templates.txt", &problems)
     Activity("Templates: " TemplateSummary())
     if main.text = "" && main.note = ""
         problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" HomeDir "`n`n"
@@ -1107,7 +1127,7 @@ CountTemplates(text) {
     n := 0
     Loop Parse text, "`n", "`r" {
         line := Trim(A_LoopField)
-        if line != "" && !InStr("#@", SubStr(line, 1, 1)) && InStr(line, "=")
+        if line != "" && !InStr("#@+", SubStr(line, 1, 1)) && InStr(line, "=")
             n += 1
     }
     return n
@@ -1152,12 +1172,42 @@ ReadLists(content, label, personal, &problems) {
     }
 }
 
+; Full-entry daily logs (v3.20.0): lines starting with +
+;   +Break = Location | Topic | Reference | Synopsis [| end]
+; Ctrl+Alt+F lists them; Enter on one opens a new daily log in iTrak and fills
+; Location, Topic, Reference and the Synopsis, with no questions. The word
+; end on the end clicks End Time's Now button too (not taught yet: ignored).
+ReadEntries(content, label, &problems) {
+    Loop Parse content, "`n", "`r" {
+        line := Trim(A_LoopField)
+        if SubStr(line, 1, 1) != "+"
+            continue
+        eq := InStr(line, "=")
+        name := Trim(SubStr(line, 2, eq ? eq - 2 : StrLen(line)))
+        parts := eq ? StrSplit(SubStr(line, eq + 1), "|") : []
+        if !eq || name = "" || parts.Length < 4 {
+            problems .= label " line " A_Index ": a full-entry log looks like  +Break = Location | Topic | Reference | Synopsis`n"
+            continue
+        }
+        dupe := false
+        for e in Entries
+            if StrLower(e.name) = StrLower(name)
+                dupe := true
+        if dupe {
+            problems .= label " line " A_Index ": there are two full-entry logs called " name ", so this one was skipped.`n"
+            continue
+        }
+        Entries.Push({name: name, loc: Trim(parts[1]), topic: Trim(parts[2]), ref: Trim(parts[3]), syn: Trim(parts[4])
+            , end: parts.Length >= 5 && StrLower(Trim(parts[5])) = "end"})
+    }
+}
+
 ; Turns each template line into a trigger. Returns how many were added.
 AddTemplates(content, src, label, trigs, &problems) {
     added := 0
     Loop Parse content, "`n", "`r" {
         line := Trim(A_LoopField)
-        if line = "" || SubStr(line, 1, 1) = "#" || SubStr(line, 1, 1) = "@"
+        if line = "" || SubStr(line, 1, 1) = "#" || SubStr(line, 1, 1) = "@" || SubStr(line, 1, 1) = "+"
             continue
         eq := InStr(line, "=")
         if !eq {
@@ -3926,16 +3976,16 @@ ITrakSpot(hwnd, tx, ty, w0, h0, &x, &y) {
     return tx >= 0 && ty >= 0 && tx < cw && ty < ch
 }
 
-ITrakNewLog() {
+ITrakNewLog(count := true) {
     c := ITrakLoad()
     if !c {
         MsgBox "iTrak's new daily log click hasn't been taught on this PC yet (and the team folder has none for this screen).`n`nPress Ctrl+Alt+Shift+I once and follow the steps.", "New iTrak daily log", "Icon!"
-        return
+        return false
     }
     win := ITrakWin()
     if !win {
         Tip("iTrak isn't open.", 2000, true)
-        return
+        return false
     }
     ; let go of Ctrl/Alt first so the click isn't a Ctrl+Alt+click (at most 250 ms)
     held := A_TickCount + 250
@@ -3949,7 +3999,7 @@ ITrakNewLog() {
     WinActivate "ahk_id " win
     if !WinWaitActive("ahk_id " win, , 2) || !WinActive("ahk_id " win) {
         Tip("Couldn't bring iTrak to the front.", 2500, true)
-        return
+        return false
     }
     if !wasActive
         Sleep 300    ; Citrix needs a moment to take the keyboard and mouse
@@ -3959,7 +4009,7 @@ ITrakNewLog() {
     if StrLower(Trim(IniRead(SettingsFile, "ITrak", "RefuseIfResized", "no"))) ~= "^(yes|on|1|true)$" && (Abs(cw - w0) > 2 || Abs(ch - h0) > 2) {
         Tip("The iTrak window isn't the size it was when taught (" cw "x" ch " now, " w0 "x" h0 " then). Put it back, or teach again.", 4000, true)
         Activity("iTrak new daily log: not clicked (window " cw "x" ch ", taught at " w0 "x" h0 ")")
-        return
+        return false
     }
     n := c["Clicks"]
     loop n {
@@ -3968,12 +4018,12 @@ ITrakNewLog() {
             Tip("The iTrak window is too small for the taught spot (or off the screen). Make it bigger, or teach again.", 4000, true)
             Activity("iTrak new daily log: not clicked (spot " k " outside the window)")
             MouseMove ox, oy, 0
-            return
+            return false
         }
         if !WinActive("ahk_id " win) {
             Tip("iTrak lost the front. Nothing more was clicked.", 3000, true)
             Activity("iTrak new daily log: stopped before click " k " (iTrak lost the front)")
-            return
+            return false
         }
         if k > 1
             Sleep pause
@@ -3983,9 +4033,245 @@ ITrakNewLog() {
     }
     Sleep 60
     MouseMove ox, oy, 0
-    Tip("New daily log", 1000)
+    if count
+        Tip("New daily log", 1000)
     Activity("iTrak: new daily log clicked (" n " click" (n = 1 ? "" : "s") ", window " cw "x" ch ")" (c["Src"] = "team" ? " (team setup)" : ""))
-    CountSaved("", 2, "iTrak new daily log")
+    if count
+        CountSaved("", 2, "iTrak new daily log")
+    return true
+}
+
+; =====================================================================
+;  FULL-ENTRY DAILY LOGS  -  Ctrl+Alt+F picks one, Ctrl+Alt+Shift+F teaches  (v3.20.0)
+;  For logs that never change (Break, Table Drop, Card Destruction...):
+;  +Break = Surveillance | Duty | NA | Break    in templates.txt
+;  Ctrl+Alt+F shows the list; type the first letters, Enter. Watchlog
+;  clicks New daily log (taught with Ctrl+Alt+Shift+I), then clicks each
+;  field it was taught (Ctrl+Alt+Shift+F: open a daily log, hover over
+;  Location, Topic, Reference and Synopsis, F8 on each) and types the
+;  wording: the drop-downs are typed in full and accepted with Enter, the
+;  Reference is typed, the Synopsis is pasted. End Time is left alone and
+;  nothing is saved: you click Now and Save yourself. Spots are numbers
+;  measured from inside the iTrak window, like the new-log click.
+; =====================================================================
+^!f:: ShowEntryPick()
+^!+f:: TeachEntryFields()
+
+EntryFields := ["Location", "Topic", "Reference", "Synopsis"]
+
+; The taught field spots as a Map (LocX LocY ... W H), or "" when none
+EntryLoad() {
+    global ITrakFile, EntryFields
+    c := Map()
+    try {
+        for k in EntryFields
+            for ax in ["X", "Y"]
+                c[k ax] := Trim(IniRead(ITrakFile, "Fields", k ax, ""))
+        c["W"] := Trim(IniRead(ITrakFile, "Fields", "W", ""))
+        c["H"] := Trim(IniRead(ITrakFile, "Fields", "H", ""))
+    } catch
+        return ""
+    for k, v in c
+        if !IsInteger(v)
+            return ""
+    return c
+}
+
+EntryPickWin := ""
+
+#HotIf IsObject(EntryPickWin) && WinActive("ahk_id " EntryPickWin.gui.Hwnd)
+Down:: EntryPickMove(1)
+Up:: EntryPickMove(-1)
+#HotIf
+
+ShowEntryPick() {
+    global EntryPickWin
+    if IsObject(EntryPickWin) {
+        try WinActivate "ahk_id " EntryPickWin.gui.Hwnd
+        return
+    }
+    if !Entries.Length {
+        MsgBox "There are no full-entry logs yet.`n`nAdd lines to templates.txt like:`n+Break = Surveillance | Duty | NA | Break`n(Location | Topic | Reference | Synopsis), then press Ctrl+Alt+R.", "Full-entry logs", "Icon!"
+        return
+    }
+    target := WinExist("A")
+    g := Gui("+AlwaysOnTop +ToolWindow", "Full-entry daily log")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText(, "Type the first letters, then Enter. It opens a new daily log in iTrak and fills it in.")
+    ed := g.AddEdit("w380")
+    lb := g.AddListBox("w380 r" Min(Max(Entries.Length, 3), 10))
+    g.AddButton("Default w100", "Run").OnEvent("Click", Run)
+    g.AddButton("x+8 yp w100", "Cancel").OnEvent("Click", Cancel)
+    shown := []
+    EntryPickWin := {gui: g, lb: lb}
+    ed.OnEvent("Change", Refill)
+    g.OnEvent("Escape", Cancel)
+    g.OnEvent("Close", Cancel)
+    Refill()
+    g.Show()
+
+    Refill(*) {
+        typed := StrLower(Trim(ed.Text))
+        shown := []
+        for e in Entries
+            if typed = "" || InStr(StrLower(e.name), typed) = 1
+                shown.Push(e)
+        for e in Entries
+            if typed != "" && InStr(StrLower(e.name), typed) > 1
+                shown.Push(e)
+        lb.Delete()
+        names := []
+        for e in shown
+            names.Push(e.name)
+        if names.Length {
+            lb.Add(names)
+            lb.Choose(1)
+        }
+    }
+    Cancel(*) {
+        global EntryPickWin
+        EntryPickWin := ""
+        g.Destroy()
+    }
+    Run(*) {
+        global EntryPickWin
+        i := lb.Value
+        if !i || i > shown.Length
+            return
+        e := shown[i]
+        EntryPickWin := ""
+        g.Destroy()
+        try WinActivate "ahk_id " target
+        RunEntry(e)
+    }
+}
+
+EntryPickMove(d) {
+    lb := EntryPickWin.lb
+    n := SendMessage(0x18B, 0, 0, lb.Hwnd)      ; LB_GETCOUNT
+    if n < 1
+        return
+    i := lb.Value + d
+    lb.Choose(Max(1, Min(n, i)))
+}
+
+; Fills a new daily log. Keys counted as saved: 5 for each drop-down (a
+; few letters, Enter, the click), the full length of the Reference and
+; the Synopsis plus a click each, and the 2 for the new-log click.
+RunEntry(e) {
+    global EntryFields
+    f := EntryLoad()
+    if !f {
+        MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
+        return
+    }
+    if !ITrakNewLog(false)
+        return
+    win := ITrakWin()
+    wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "1500"))
+    Sleep wait          ; the new log takes a moment to open in Citrix
+    if !win || !WinActive("ahk_id " win) {
+        Tip("iTrak lost the front. Nothing was filled in.", 3000, true)
+        Activity("Full-entry log " e.name ": stopped (iTrak lost the front after New daily log)")
+        return
+    }
+    w0 := Integer(f["W"]), h0 := Integer(f["H"])
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", e.syn)
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    keys := 2
+    for k in EntryFields {
+        if vals[k] = ""
+            continue
+        if !ITrakSpot(win, Integer(f[k "X"]), Integer(f[k "Y"]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
+            Tip("The iTrak window is too small for the " k " spot (or off the screen). Stopped.", 4000, true)
+            Activity("Full-entry log " e.name ": stopped before " k " (spot outside the window)")
+            return
+        }
+        if !WinActive("ahk_id " win) {
+            Tip("iTrak lost the front. Stopped before " k ".", 3000, true)
+            Activity("Full-entry log " e.name ": stopped before " k " (iTrak lost the front)")
+            return
+        }
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        Sleep pause
+        if k = "Synopsis" {
+            Paste(vals[k], true)
+            keys += StrLen(vals[k]) + 1
+        } else if k = "Reference" {
+            EntryType vals[k]
+            keys += StrLen(vals[k]) + 1
+        } else {
+            EntryType vals[k]
+            Sleep 250           ; let the list narrow down to the one option
+            SendInput "{Enter}"
+            keys += 5
+        }
+        Sleep 120
+    }
+    MouseMove ox, oy, 0
+    Tip("Filled in: " e.name, 1500)
+    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
+    CountSaved("log", keys, "Full log: " e.name)
+    Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " e.syn, keys)
+}
+
+; Types text key by key (what Citrix handles best), a little slower than normal
+EntryType(text) {
+    SetKeyDelay 20, 10
+    SendEvent "{Text}" text
+}
+
+TeachEntryFields() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachEntryFieldsRun()
+    catch as err
+        MsgBox "Teach daily log fields stopped: " err.Message, "Teach daily log fields", "Icon!"
+    TeachBusy := false
+}
+
+TeachEntryFieldsRun() {
+    global ITrakFile, EntryFields
+    win := ITrakWin()
+    if !win {
+        MsgBox "Open iTrak first, then open a new daily log (the empty Daily Log Entry form).", "Teach daily log fields", "Icon!"
+        return
+    }
+    if MsgBox("Open a new daily log in iTrak so the empty form is showing.`n`nThen, for each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
+        return
+    SetTitleMatchMode 2
+    pts := Map()
+    for i, k in EntryFields {
+        if !TeachWait(i " of 4`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+            return
+        win := ITrakWin()
+        if !win || !ITrakPoint(win, &x, &y) {
+            MsgBox "That spot isn't inside the iTrak window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+            return
+        }
+        pts[k] := [x, y]
+    }
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    try {
+        for k in EntryFields {
+            IniWrite pts[k][1], ITrakFile, "Fields", k "X"
+            IniWrite pts[k][2], ITrakFile, "Fields", k "Y"
+        }
+        IniWrite cw, ITrakFile, "Fields", "W"
+        IniWrite ch, ITrakFile, "Fields", "H"
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach daily log fields", "Icon!"
+        return
+    }
+    Activity("iTrak: daily log fields taught (window " cw "x" ch ")")
+    MsgBox "Saved. Ctrl+Alt+F now fills in a full-entry log (add them to templates.txt as lines like  +Break = Surveillance | Duty | NA | Break ).`n`nThe new daily log's form has to open in the same place each time.", "Teach daily log fields"
 }
 
 TeachITrak() {
@@ -6455,6 +6741,7 @@ ShowCheatSheet() {
         , ["E", "template editor"], ["I", "window info"], ["Shift+S", "save window layout"], ["W", "put windows back"]
         , ["K", "log out of SDS"], ["A", "clear all Alert Grid alerts"], ["Shift+A", "teach Alert Grid the clicks"]
         , ["D", "new daily log in iTrak"], ["Shift+I", "teach iTrak the click"]
+        , ["F", "full-entry log (Break, Table Drop...)"], ["Shift+F", "teach the daily log fields"]
         , ["Shift+Caps", "turn Caps Lock on"], ["P or X", "pause / resume"], ["R", "reload"], ["H", "this sheet"]]
 
     g.SetFont("s20 bold c" teal, "Segoe UI")
@@ -7184,6 +7471,8 @@ BuildTrayMenu() {
     itm := Menu()
     MenuItem(itm, "New daily log  (Ctrl+Alt+D)", (*) => ITrakNewLog(), 0xE710)
     MenuItem(itm, "Teach the click  (Ctrl+Alt+Shift+I)", (*) => TeachITrak(), 0xE7C9)
+    MenuItem(itm, "Full-entry log  (Ctrl+Alt+F)", (*) => ShowEntryPick(), 0xE8F1)
+    MenuItem(itm, "Teach the daily log fields  (Ctrl+Alt+Shift+F)", (*) => TeachEntryFields(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 
@@ -7266,14 +7555,6 @@ ShowHome() {
         , ["Time saved", "this shift and before", 0xE916, () => ShowTimeSaved(), false]
         , ["Shift count", "exact tally of this shift", 0xE9D2, () => ShowShiftCount(), false]
         , ["Shift dashboard", "Ctrl+Alt+Shift+D", 0xE9D9, () => ShowDashboard(), false]])
-
-    Group("Shift", 0xB86E00, [
-        ["Start of shift", "Ctrl+Alt+L", 0xE768, () => StartOfShift(), false]
-        , ["End of shift", "Ctrl+Alt+Shift+L", 0xE7E8, () => EndOfShift(), false]
-        , ["Log out of SDS", "Ctrl+Alt+K", 0xE72E, () => SDSLogout(), false]
-        , ["Clear Alert Grid", "Ctrl+Alt+A or Caps Lock", 0xE894, () => ClearAlerts(), true]
-        , ["New iTrak daily log", "Ctrl+Alt+D", 0xE710, () => ITrakNewLog(), true]
-        , ["Put windows back", "Ctrl+Alt+W", 0xE7C4, () => RestoreLayout(), false]])
 
     logins := []
     for rec in LoginList

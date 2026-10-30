@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.19.3  -  README
+  WATCHLOG  v3.20.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -205,6 +205,27 @@ couple of seconds. No need to press anything.
                     clicks, default 300), RefuseIfResized=yes (don't click if the
                     window isn't the size it was when taught). Numbers only are kept,
                     in %LOCALAPPDATA%\Watchlog\itrak.ini.
+  Ctrl+Alt+F        (v3.20.0) FULL-ENTRY DAILY LOGS, for logs that never change (Break,
+                    Table Drop, Card Destruction). A short list opens: type the first
+                    letters of the log's name (br, ta, ca), press Enter. Watchlog clicks
+                    New daily log (the Ctrl+Alt+D click), then clicks Location, Topic,
+                    Reference and Synopsis in turn: Location and Topic are typed in full
+                    and accepted with Enter, Reference is typed, the Synopsis is pasted.
+                    It asks nothing. It does not touch End Time and does not save: you
+                    click Now and Save yourself. Each is counted in Time saved and the
+                    shift journal ("Full log: Break"): 5 keystrokes for each drop-down,
+                    the full length of the Reference and Synopsis plus 1 for each click,
+                    and 2 for the new-log click.
+                    The logs are lines in templates.txt (or my-templates.txt):
+                      +Name = Location | Topic | Reference | Synopsis
+                    e.g. +Break = Surveillance | Duty | NA | Break
+                    Three come ready-made: Break, Table Drop, Card Destruction.
+  Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
+                    run this, hover over Location, Topic, Reference and Synopsis and press F8
+                    on each (nothing is clicked for you). Measured from inside the iTrak window
+                    like the new-log click, so the new log's form has to open in the same place
+                    each time. settings.ini [ITrak] EntryWait= (ms to wait after New daily log
+                    before filling, default 1500). Not shared with the team yet.
   Tray > iTrak > Share my setup with the team   (v3.19.0) puts this PC's iTrak click
                     in itrak.ini in the team folder, filed by screen scaling, for PCs
                     that haven't been taught. A PC's own teach always wins.
@@ -678,7 +699,9 @@ and the less-used items sit in sub-menus):
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
-                                (Ctrl+Alt+Shift+I), Share my setup (v3.19.0)
+                                (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
+                                Teach the daily log fields (Ctrl+Alt+Shift+F),
+                                Share my setup (v3.19.0)
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -698,11 +721,13 @@ and the less-used items sit in sub-menus):
                                 Start menu)
 
 WATCHLOG HOME  (click the icon, or Ctrl+Alt+M)
-  Big buttons in four groups: Logs (find a template, cheat sheet,
-  journal, quick notes, time saved), Shift (start, end, log out of SDS,
-  clear Alert Grid, put windows back), Logins (one button per saved
-  login) and Set up (template editor, settings, tutorial, security and
-  status, save window layout). Each button shows its shortcut, so new
+  Big buttons in three groups: Logs (call pad, find a template, cheat
+  sheet, journal, quick notes, time saved, shift count, dashboard), Logins
+  (one button per saved login) and Set up (template editor, settings,
+  tutorial, security and status, about, save window layout). The Shift
+  buttons (start, end, log out of SDS, clear Alert Grid, new iTrak daily
+  log, put windows back) were removed in v3.20.0: use the shortcuts, or the
+  cheat sheet (Ctrl+Alt+H) if you forget them. Each button shows its shortcut, so new
   operators learn them as they go. It closes when you press a button,
   and anything that types goes into the window you were in before.
   A login button brings up the program its login is locked to; a login
