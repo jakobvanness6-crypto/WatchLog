@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.25.0 (Oct 30, 2026): setting for the code word prefix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.25.1 (Oct 30, 2026): fix so v3.25.0's Settings text loads (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -97,6 +97,9 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.25.1 (Oct 30)
+- Fix: v3.25.0 failed to start with Missing quote on line 6258 (a space then ; inside a string is a comment in AutoHotkey). The new prefix text in Settings now escapes it.
 
 ## Done in v3.25.0 (Oct 30)
 - New setting: the character(s) typed in front of code words, logins and the stamps (;t ;dd ;dt) instead of ; (Settings > General, or settings.ini [Triggers] Prefix=). 1 to 3 symbols. Per PC; templates files keep the ;. Saves and reloads.

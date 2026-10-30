@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.25.0"
+VERSION := "3.25.1"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -6255,8 +6255,8 @@ ShowSettings(welcome := false, startTab := 1) {
     startCB := g.AddCheckbox("xs y+6" (StartupShortcuts().Length ? " Checked" : ""), "Start Watchlog when I sign in to Windows")
     g.AddText("xs y+14", "Type this in front of code words and logins:")
     prefE := g.AddEdit("x+8 yp-3 w60 Limit3", Cfg["Prefix"])
-    g.AddText("x+8 yp+3 w330", "(a ; by default; 1 to 3 symbols, no letters or digits)")
-    g.AddText("xs y+4 w" W, "The templates and shared files keep the ; in them: this PC just types your prefix instead. Press Ctrl+Alt+H after saving to see your shortcuts.")
+    g.AddText("x+8 yp+3 w330", "(a `; by default, 1 to 3 symbols, no letters or digits)")
+    g.AddText("xs y+4 w" W, "The templates and shared files keep the `; in them: this PC just types your prefix instead. Press Ctrl+Alt+H after saving to see your shortcuts.")
     tabs.UseTab()
 
     tabs.GetPos(&tx, &ty, &tw, &th)
@@ -6485,7 +6485,7 @@ ShowSettings(welcome := false, startTab := 1) {
             newPfx := ";"
         if StrLen(newPfx) > 3 || RegExMatch(newPfx, "[\s:a-zA-Z0-9]") || InStr(newPfx, "``") {
             tabs.Choose(6)
-            MsgBox "The prefix must be 1 to 3 symbols, like ; or . or // (no letters, digits, spaces or colons).", "Watchlog", "Icon!"
+            MsgBox "The prefix must be 1 to 3 symbols, like `; or . or // (no letters, digits, spaces or colons).", "Watchlog", "Icon!"
             return
         }
         failed := ""

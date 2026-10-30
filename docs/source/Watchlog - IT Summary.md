@@ -2,7 +2,7 @@
 
 Oct 25, 2026 · Jakob
 
-Watchlog is a small Windows program I built that types our standard surveillance log entries. I type a short code like `;interior` and the full wording appears. It's written in AutoHotkey v2 and comes as one Watchlog.exe with the AutoHotkey runtime built in, so nothing else is installed. The same program is also available as one plain text script for anyone to read. I'm on version 3.25.0 and have been using it on my own shifts since October 13. I'm asking for approval so other operators and supervisors can use it if they choose to, on our 3 operator bays and the supervisor bay.
+Watchlog is a small Windows program I built that types our standard surveillance log entries. I type a short code like `;interior` and the full wording appears. It's written in AutoHotkey v2 and comes as one Watchlog.exe with the AutoHotkey runtime built in, so nothing else is installed. The same program is also available as one plain text script for anyone to read. I'm on version 3.25.1 and have been using it on my own shifts since October 13. I'm asking for approval so other operators and supervisors can use it if they choose to, on our 3 operator bays and the supervisor bay.
 
 ## What it does and doesn't do
 
