@@ -166,6 +166,7 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Still open from this thread: more full-entry logs from Jakob (he is sending 3-5; 3 done), End Time Now click is NOT used, sharing the field spots with the team, other home window trimming.
 
 ## Shipped without a version (templates.txt only)
+- Oct 30 (night): ;jack topic typed as Jackpot (the drop-down item is "Jackpot / Table Win" and needs spaces around the slash, so the short word is typed), ;bv topic Emergency Pull. The topic box is not case sensitive. Wording version Oct 30, 2026 (5).
 - Oct 30 (later): the eight code words that match a full-entry log now fill the daily log too: ;start and ;end (click End Time Now), ;interior, ;exterior, ;parking (Officer/Supervisor pick box, same Location/Topic as the + lines), ;drop, ;man, ;destroy. Ctrl+Alt+F and the + lines are unchanged. Wording version Oct 30, 2026 (2). Not tested on a bay.
 - Oct 30: `;break` code word fills a daily log (Surveillance | Duty | NA, synopsis Break), same as the Ctrl+Alt+F Break entry. Needs v3.24.0 or newer. Wording version Oct 30, 2026 (1). `;cards` confirmed working.
 - Oct 29: ;open and ;auto got {repeat} (one table per line); replaced the same day by v3.19.3's one-line list.

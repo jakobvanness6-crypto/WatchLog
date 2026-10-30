@@ -14,7 +14,7 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 30, 2026 (4)
+# Wording version: Oct 30, 2026 (5)
 # Program version: 3.26.2
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
@@ -95,7 +95,7 @@
 
 # ----- FORMS ---------------------------------------------------------
 
-;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot/Table Win |
+;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot |
 
 ;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed.
 
@@ -172,7 +172,7 @@
 
 # ----- SLOTS ---------------------------------------------------------
 
-;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency BV Pull |
+;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency Pull |
 ;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money})
 ;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found.
 ;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious.

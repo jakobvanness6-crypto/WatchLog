@@ -741,7 +741,7 @@ DAILY LOG FILLS FOR THE SHORTHAND LOGS  (v3.26.2)
   Reference, like ;cards and ;break. Reference is left empty on purpose where you fill it
   yourself (fill, jack, bv, mfill). Shift+Enter on the form still pastes just the wording.
       ;fill   Pit | Table Fill |            ;open, ;auto   Pit | Table Opening/Closing | NA
-      ;jack   Slots | Jackpot/Table Win |   ;bv   Slots | Emergency BV Pull |
+      ;jack   Slots | Jackpot |   ;bv   Slots | Emergency Pull |
       ;mfill  ABM/NRT | ATM/NRT/CTR fill |
   The Pit and Slots come from the log itself: %pit% in a code word's Location is the pit of
   the first table (2xx = Pit 2, 3xx = Pit 3) and %slots% the area of the first machine (the
