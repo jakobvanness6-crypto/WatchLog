@@ -232,7 +232,7 @@ What IT would need to approve:
 
 ## Next steps
 
-Version 3.27.0 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.27.1 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.

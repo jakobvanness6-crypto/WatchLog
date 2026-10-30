@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.27.0"
+VERSION := "3.27.1"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -741,6 +741,28 @@ SdsLoginScreen() {
     return 0
 }
 
+; The login for the SDS window (v3.27.1). Tries the usual match (a login locked to
+; the program in front); if something else grabbed the keyboard in the meantime it
+; brings SDS back and tries again, then falls back to the login whose Only in
+; names SDS, or the one that was last typed into SDS.
+SdsLoginRec(sds) {
+    loop 2 {
+        r := LoginForWindow()
+        if r
+            return r
+        try WinActivate "ahk_id " sds
+        WinWaitActive "ahk_id " sds, , 2
+        Sleep 300
+    }
+    for rec in LoginList
+        if rec.win != "" && InStr(rec.win, "SDS")
+            return rec
+    for rec in LoginList
+        if IsSdsLogin(rec)
+            return rec
+    return ""
+}
+
 SdsResignDue() {
     global SdsTries
     if !Cfg["SdsResign"]
@@ -772,11 +794,17 @@ SdsResignDue() {
         return
     }
     Sleep 1000
-    rec := LoginForWindow()
+    rec := SdsLoginRec(sds)
     if !rec {
-        Activity("SDS sign-in: no saved login is locked to SDS")
+        why := ""
+        for l in LoginList
+            why .= " [" l.trig " -> " (l.win != "" ? l.win : "any program") "]"
+        Activity("SDS sign-in: no saved login is locked to SDS; logins are:" why)
         return
     }
+    ; DoLogin checks the window it is locked to is in front: make sure SDS is
+    try WinActivate "ahk_id " sds
+    WinWaitActive "ahk_id " sds, , 2
     Activity("SDS sign-in: signing back in by itself")
     DoLogin(rec.trig, rec.user, rec.pw, rec)
     Sleep 3000

@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.27.0 (Oct 30, 2026): failure safeguards, first batch (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.27.1 (Oct 30, 2026): SDS hourly sign-in fix on top of the first safeguards batch (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -97,6 +97,9 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.27.1 (Oct 30)
+- Fix: the hourly SDS sign-in stopped with "no saved login is locked to SDS". It now brings SDS back and retries, then falls back to the login whose Only in names SDS, and logs the logins' triggers and windows if it still can't.
 
 ## Done in v3.27.0 (Oct 30)
 - Failure safeguards, first batch (items 1 to 5 and 10 of the plan below): passwords never typed into Notepad, mail, chat, Office, Watchlog's windows or the daily log when a login has no program set; refused logins show a message; form logs aren't pasted into the wrong window (they stay on the clipboard); Alert Grid stops if a pop-up takes the front; display scale warning at start-up; a form closed with Esc comes back for 10 minutes; plain error box.

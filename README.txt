@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.27.0  -  README
+  WATCHLOG  v3.27.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.27.0 (Documents, or the program folder).
+                      v3.27.1 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -874,6 +874,13 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
+SDS SIGN-IN FIX  (v3.27.1)
+  The hourly SDS sign-in could stop with "no saved login is locked to SDS" when something else
+  took the keyboard a moment after SDS came to the front. It now brings SDS back and tries
+  again, then uses the login whose Only in names SDS (or the one last typed into SDS), even
+  without a ; in front. If it still can't, the Activity log lists your logins and the program
+  each is locked to (no passwords).
+
 SAFEGUARDS  (v3.27.0)
   Things Watchlog now refuses or warns about, instead of failing quietly:
   - A login with no program set (no Window= / Only in) is never typed into Notepad,
