@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 2 of 9 (lines 1058-2290 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 2 of 9 (lines 1058-2290 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
 ; Add more as [App3], [App4] ... up to [App9].
 ; Taken keys: Q O I H P X R L E J K W A M N

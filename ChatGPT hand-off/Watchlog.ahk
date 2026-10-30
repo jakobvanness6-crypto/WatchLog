@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.27.2"
+VERSION := "3.27.3"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -741,7 +741,7 @@ SdsLoginScreen() {
     return 0
 }
 
-; The login for the SDS window (v3.27.2). Tries the usual match (a login locked to
+; The login for the SDS window (v3.27.3). Tries the usual match (a login locked to
 ; the program in front); if something else grabbed the keyboard in the meantime it
 ; brings SDS back and tries again, then falls back to the login whose Only in
 ; names SDS, or the one that was last typed into SDS.
@@ -4392,7 +4392,7 @@ AlertClearAcked(c, grid, gap, noMore := true) {
     if noMore && IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
         if c["NoMoreBox"] != "" {
             SetTitleMatchMode 3
-            nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 0.8)
+            nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 2)
             SetTitleMatchMode "RegEx"
             if nb {
                 WinActivate "ahk_id " nb
@@ -4401,6 +4401,8 @@ AlertClearAcked(c, grid, gap, noMore := true) {
                 WinWaitClose "ahk_id " nb, , 1
             }
         } else if WinExist("ahk_id " grid) && AlertSpot(c, grid, "NoMoreX", "NoMoreY", false, &nmx, &nmy) {
+            ; the box needs a moment to come up after the clear button (v3.27.3)
+            Sleep Max(gap * 4, 250)
             Click nmx, nmy
             Sleep gap
         }
@@ -4429,8 +4431,14 @@ CheckScale() {
 GridFront(grid) {
     if WinActive("ahk_id " grid)
         return true
-    try WinActivate "ahk_id " grid
-    return WinWaitActive("ahk_id " grid, , 1) != 0
+    ; the "no more alerts" box closing right after the last click can hold the
+    ; front for a moment: try again for up to 2 seconds before giving up (v3.27.3)
+    loop 4 {
+        try WinActivate "ahk_id " grid
+        if WinWaitActive("ahk_id " grid, , 0.5)
+            return true
+    }
+    return false
 }
 
 ; Puts back the window that was in front before a clear

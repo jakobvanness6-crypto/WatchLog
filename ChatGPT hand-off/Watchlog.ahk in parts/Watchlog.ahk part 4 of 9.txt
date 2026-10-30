@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 4 of 9 (lines 3702-4762 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 4 of 9 (lines 3702-4770 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; The logs in some journal text: [{head, name, keys, tagged}] in order
 JournalLogs(text) {
     logs := []
@@ -692,7 +692,7 @@ AlertClearAcked(c, grid, gap, noMore := true) {
     if noMore && IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
         if c["NoMoreBox"] != "" {
             SetTitleMatchMode 3
-            nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 0.8)
+            nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 2)
             SetTitleMatchMode "RegEx"
             if nb {
                 WinActivate "ahk_id " nb
@@ -701,6 +701,8 @@ AlertClearAcked(c, grid, gap, noMore := true) {
                 WinWaitClose "ahk_id " nb, , 1
             }
         } else if WinExist("ahk_id " grid) && AlertSpot(c, grid, "NoMoreX", "NoMoreY", false, &nmx, &nmy) {
+            ; the box needs a moment to come up after the clear button (v3.27.3)
+            Sleep Max(gap * 4, 250)
             Click nmx, nmy
             Sleep gap
         }
@@ -729,8 +731,14 @@ CheckScale() {
 GridFront(grid) {
     if WinActive("ahk_id " grid)
         return true
-    try WinActivate "ahk_id " grid
-    return WinWaitActive("ahk_id " grid, , 1) != 0
+    ; the "no more alerts" box closing right after the last click can hold the
+    ; front for a moment: try again for up to 2 seconds before giving up (v3.27.3)
+    loop 4 {
+        try WinActivate "ahk_id " grid
+        if WinWaitActive("ahk_id " grid, , 0.5)
+            return true
+    }
+    return false
 }
 
 ; Puts back the window that was in front before a clear

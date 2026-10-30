@@ -15,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 30, 2026 (5)
-# Program version: 3.27.2
+# Program version: 3.27.3
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.

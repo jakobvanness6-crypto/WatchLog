@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 9 of 9 (lines 9297-10571 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 9 of 9 (lines 9305-10579 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; "START / END OF SHIFT  (asks which bay)" -> "Start / end of shift"
 EdSectionName(s) {
     s := Trim(RegExReplace(s, "\s*\(.*$"))

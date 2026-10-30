@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 4763-5925 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 5 of 9 (lines 4771-5924 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
 EntryPickMove(d) {
     lb := EntryPickWin.lb
     n := SendMessage(0x18B, 0, 0, lb.Hwnd)      ; LB_GETCOUNT
@@ -1152,13 +1152,4 @@ BrowserOpen() {
             return true
     return false
 }
-
-; =====================================================================
-;  START OF SHIFT  -  Ctrl+Alt+L
-;  Opens the programs in [StartOfShift] (any version) first, waits for
-;  their windows, then opens the Citrix Receiver page in Edge (the only web
-;  page it opens, so there is no tab to hunt for).
-;  If Edge is already open, it asks before opening the page again.
-; =====================================================================
-; (set up by RegisterHotkeys, see HotkeyDefs)
 

@@ -1,4 +1,13 @@
-; ===== Watchlog.ahk PART 6 of 9 (lines 5926-7079 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 9 (lines 5925-7087 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; =====================================================================
+;  START OF SHIFT  -  Ctrl+Alt+L
+;  Opens the programs in [StartOfShift] (any version) first, waits for
+;  their windows, then opens the Citrix Receiver page in Edge (the only web
+;  page it opens, so there is no tab to hunt for).
+;  If Edge is already open, it asks before opening the page again.
+; =====================================================================
+; (set up by RegisterHotkeys, see HotkeyDefs)
+
 StartOfShift() {
     sites := true
     if BrowserOpen()

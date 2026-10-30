@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 7 of 9 (lines 7080-8140 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 7 of 9 (lines 7088-8148 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
 SetStartup(on) {
     have := StartupShortcuts()
     if on && !have.Length {

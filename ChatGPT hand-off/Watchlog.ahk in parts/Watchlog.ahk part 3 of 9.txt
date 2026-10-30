@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 3 of 9 (lines 2291-3701 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 3 of 9 (lines 2291-3701 of 10579). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Moves to the next (dir = 1) or previous (dir = -1) box in the open form
 FormMove(dir) {
     ctrls := CurForm.ctrls
