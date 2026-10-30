@@ -155,6 +155,7 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Still open from this thread: more full-entry logs from Jakob (he is sending 3-5; 3 done), End Time Now click is NOT used, sharing the field spots with the team, other home window trimming.
 
 ## Shipped without a version (templates.txt only)
+- Oct 30: `;break` code word fills a daily log (Surveillance | Duty | NA, synopsis Break), same as the Ctrl+Alt+F Break entry. Needs v3.24.0 or newer. Wording version Oct 30, 2026 (1). `;cards` confirmed working.
 - Oct 29: ;open and ;auto got {repeat} (one table per line); replaced the same day by v3.19.3's one-line list.
 
 ## Done in v3.19.3 (Oct 29)
