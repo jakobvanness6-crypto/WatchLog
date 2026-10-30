@@ -1,5 +1,7 @@
 # =====================================================================
 #  WATCHLOG - template wording
+#  Watchlog: Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+#  Used by permission only; see LICENCE.txt.
 #  Edit this file freely and save it. The script reloads by itself.
 #
 #  TEAM COPY
@@ -13,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 26, 2026 (1)
-# Program version: 3.17.0
+# Program version: 3.23.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -46,6 +48,9 @@
 #      {Match: percent}               67 becomes 67%
 #      {Employee #: clip}             fills in a copied employee #
 #      {Bay: last}                    remembers what you typed last time
+#      {Bay: saved}                   like last, but a bay entered in the last
+#                                     14 hours (at the start of shift) is
+#                                     used without asking
 #      {Step: next | A | B | C}       opens on the step after the one
 #                                     you used last time (C wraps to A)
 #      {Machine: blank=AXXXX}         what to leave if the box is empty
@@ -74,6 +79,9 @@
 #    Put {repeat} at the end of a form line and the form gets an
 #    "Add another" button (or press Ctrl+Enter). Fill in one, add
 #    another, and Insert pastes them all as one log, one per line.
+#    Add | several to a box to keep it all on one line instead: Add
+#    another adds to that box's list ({Table: @tables | several}
+#    gives "BJ205, BJ206 and RO204 Opened.").
 #
 #  SHARED LISTS
 #    A line starting with @ is a list you can use in any blank. Change
@@ -99,7 +107,7 @@
 # ----- START / END OF SHIFT (asks which bay, remembers the last one) -
 
 ;start (Start of shift) = Start of Shift Bay {Bay: last} Operator
-;end (End of shift) = End of Shift Bay {Bay: last} Operator
+;end (End of shift) = End of Shift Bay {Bay: saved} Operator
 
 
 # ----- QUICK TEMPLATES -----------------------------------------------
@@ -117,11 +125,35 @@
 ;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep.
 
 
+# ----- FULL DAILY LOGS -----------------------------------------------
+#  Logs that never change. Ctrl+Alt+F lists them; type the first letters,
+#  Enter. Watchlog opens a new daily log in iTrak and fills in Location,
+#  Topic, Reference and the Synopsis (End Time and Save are left to you).
+#  One line each:   +Name = Location | Topic | Reference | Synopsis
+#  Add  | end  at the end of a line to click End Time's Now button when the
+#  log is filled; {Bay} in the synopsis is the bay entered at the start of shift,
+#  and {Bay?} asks which bay (offering the last one) and keeps it for the shift.
+#  (teach the spots once with Ctrl+Alt+Shift+F; see README section 10)
+
++Break = Surveillance | Duty | NA | Break
++Table Drop = Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690) | Security Officers performed Table Drop
++Start = Surveillance | Duty | NA | Start of Shift Bay {Bay?} Operator | end
++End = Surveillance | Duty | NA | End of Shift Bay {Bay} Operator | end
++Garbage Sweep = Cage ManTrap | Security Escort | M6 (972,973) | Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep.
++Card Destruction = Card Destruction Room | Card Destruction | M6 (750,751,749) | Security Officers entered Card Destruction Room for Card Destruction.
++Interior Officer = Back of House - Non Sensitive | Call - Radio | NA | Security Officer performed interior door check
++Interior Supervisor = Back of House - Non Sensitive | Call - Radio | NA | Security Supervisor performed interior door check
++Exterior Officer = Parking Lot | Call - Radio | NA | Security Officer performed exterior door check
++Exterior Supervisor = Parking Lot | Call - Radio | NA | Security Supervisor performed exterior door check
++Parking Officer = Parking Lot | Call - Radio | NA | Security Officer performed parking lot patrol
++Parking Supervisor = Parking Lot | Call - Radio | NA | Security Supervisor performed parking lot patrol
+
+
 # ----- TABLES --------------------------------------------------------
 
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes.
-;open (Table opening) = {Table: @tables | blank=XXXXX} Opened.
-;auto (Auto-close) = {Table: @tables | blank=XXXXX} Closed and Auto-Close started.
+;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat}
+;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat}
 ;cards (Card change) = Card change on {Table: @tables}.
 ;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat}
 ;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat}
