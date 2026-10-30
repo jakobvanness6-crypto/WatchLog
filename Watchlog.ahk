@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.27.1"
+VERSION := "3.27.2"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -741,7 +741,7 @@ SdsLoginScreen() {
     return 0
 }
 
-; The login for the SDS window (v3.27.1). Tries the usual match (a login locked to
+; The login for the SDS window (v3.27.2). Tries the usual match (a login locked to
 ; the program in front); if something else grabbed the keyboard in the meantime it
 ; brings SDS back and tries again, then falls back to the login whose Only in
 ; names SDS, or the one that was last typed into SDS.
@@ -2012,12 +2012,12 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         ; kept for 10 minutes so reopening the same log puts it back; not when it
         ; is only what was put back last time (a second Esc clears it)
         if !Untouched() {
-            vals := [], joined := ""
+            vals := [], snapTxt := ""
             for c in ctrls {
                 vals.Push(c.Text)
-                joined .= c.Text Chr(1)
+                snapTxt .= c.Text Chr(1)
             }
-            if joined != restored
+            if snapTxt != restored
                 Cancelled := {title: title, vals: vals, at: A_TickCount}
         }
         SetForm("")

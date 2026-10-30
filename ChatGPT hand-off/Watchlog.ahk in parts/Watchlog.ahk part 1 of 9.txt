@@ -1,0 +1,1058 @@
+; ===== Watchlog.ahk PART 1 of 9 (lines 1-1057 of 10571). Delete this first line from each part, then join all 9 in order to get the full file. =====
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+; Speed: AutoHotkey pauses 100 ms after every window switch by default,
+; and keeps a running record of every line it runs. Neither is needed here.
+SetWinDelay 10
+SetControlDelay 0
+ListLines False
+KeyHistory 0
+
+; =====================================================================
+;  WATCHLOG  v3.21.0   (called Log Templates before v3.0.1)
+;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+;  Used only with the copyright holder's permission. No copying,
+;  sharing, changing or redistributing it, in whole or in part, without
+;  written permission. Provided "as is", without warranty. The full
+;  licence is in LICENCE.txt and in tray menu > About Watchlog.
+;
+;  This is the program. You shouldn't need to edit it.
+;  The first time it runs on a PC that had Log Templates, it moves
+;  everything over to the new name by itself (see MOVING FROM LOG
+;  TEMPLATES below): saved passwords, the data folder, the Startup
+;  shortcut. Nobody has to type their passwords again.
+;    templates.txt     = wording of every template (or the team's shared
+;                        copy on SharePoint, picked in tray > Settings)
+;    my-templates.txt  = your own extra templates (optional)
+;    settings.ini      = your personal settings (logins, apps). No
+;                        passwords: those are in Windows Credential Manager.
+;  They live in the same folder as this file.
+;  After saving any of them, the script reloads by itself in a couple of
+;  seconds (Ctrl+Alt+R still works too).
+; =====================================================================
+
+; The version shows on the tray icon (hover over it), at the top of the
+; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
+VERSION := "3.27.2"
+VERSION_DATE := "Oct 30, 2026"
+; Colours of the dark look (see LOOK at the end of the file)
+global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
+; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
+COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
+; The exe installs itself here (no administrator rights needed)
+CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
+HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
+INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
+INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
+UNINSTALL_KEY := "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Watchlog"
+; Where settings.ini, templates.txt and my-templates.txt live. Run as a
+; script it's the script's own folder, as always. The exe keeps them in
+; Documents\Watchlog (which OneDrive syncs between bays), unless the exe
+; sits next to a settings.ini (a portable copy).
+HomeDir := A_ScriptDir
+if A_IsCompiled && !FileExist(A_ScriptDir "\settings.ini")
+    HomeDir := A_MyDocuments "\Watchlog"
+TemplatesFile := HomeDir "\templates.txt"
+IconFile := A_IsCompiled ? "" : A_ScriptDir "\Watchlog.ico"   ; the exe carries its own icon
+MyTemplatesFile := HomeDir "\my-templates.txt"
+AutoFile := HomeDir "\autocorrect.txt"
+SettingsFile := HomeDir "\settings.ini"
+NotesFile := A_MyDocuments "\Quick Notes.md"
+; Kept on this PC only (not synced): the activity log and the last good
+; copy of the team templates
+DataDir := EnvGet("LOCALAPPDATA") "\Watchlog"
+RegKey := "HKCU\Software\Watchlog"
+ActivityFile := DataDir "\activity.log"
+TeamCopyFile := DataDir "\team templates (last good copy).txt"
+LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
+SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
+AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
+ITrakFile := DataDir "\itrak.ini"           ; where the iTrak new-daily-log click goes (numbers only), this PC only
+; the keys kept in alertgrid.ini (all numbers, plus Basis=client from v3.18.0)
+ALERT_KEYS := ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY", "OkX", "OkY"
+    , "ClearX", "ClearY", "NoMoreX", "NoMoreY", "NoMoreBox", "GridW", "GridH", "MenuLine", "Basis"]
+CallPadFile := DataDir "\call pad.txt"            ; the call pad text, this PC only, wiped at end of shift
+CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, this PC only
+LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
+CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
+CapsWasOn := false
+CapsGui := ""
+CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
+Cfg := Map()
+TemplateList := []
+Entries := []        ; full-entry daily logs: {name, loc, topic, ref, syn, end, src}
+; Shortcut keys that can be changed in Customize Watchlog > Shortcut keys
+; (see RegisterHotkeys): id, standard key, what it does
+HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) => ShowPicker()}
+    , {id: "callpad", key: "^!n", label: "call pad  (also Numpad +)", fn: (*) => ShowCallPad()}
+    , {id: "quicknote", key: "^!q", label: "add a quick note", fn: (*) => QuickNote()}
+    , {id: "notes", key: "^!o", label: "open notes", fn: (*) => ShowNotes()}
+    , {id: "journal", key: "^!j", label: "shift journal", fn: (*) => ShowJournal()}
+    , {id: "start", key: "^!l", label: "start of shift", fn: (*) => StartOfShift()}
+    , {id: "end", key: "$^!+l", label: "end of shift", fn: (*) => EndOfShift()}
+    , {id: "home", key: "^!m", label: "Watchlog home", fn: (*) => ShowHome()}
+    , {id: "editor", key: "$^!e", label: "template editor", fn: (*) => ShowEditor()}
+    , {id: "wininfo", key: "^!i", label: "window info", fn: (*) => WindowInfo()}
+    , {id: "savelayout", key: "^!+s", label: "save window layout", fn: (*) => SaveLayout()}
+    , {id: "restorelayout", key: "^!w", label: "put windows back", fn: (*) => RestoreLayout()}
+    , {id: "sdslogout", key: "^!k", label: "log out of SDS", fn: (*) => SDSLogout()}
+    , {id: "alertclear", key: "^!a", label: "clear all Alert Grid alerts", fn: (*) => ClearAlerts()}
+    , {id: "alertteach", key: "^!+a", label: "teach Alert Grid the clicks", fn: (*) => TeachAlerts()}
+    , {id: "itraknew", key: "^!d", label: "new daily log in iTrak", fn: (*) => ITrakNewLog()}
+    , {id: "itrakteach", key: "^!+i", label: "teach iTrak the click", fn: (*) => TeachITrak()}
+    , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
+    , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
+    , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
+    , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
+
+Lists := Map()          ; @lists from templates.txt, e.g. @tables
+Lists.CaseSense := false
+AppList := []
+LoginList := []
+PickMode := false        ; true while Pick window waits for a click
+PickHwnd := 0
+TeachBusy := false       ; true while the Alert Grid teach step runs
+NotesWin := ""           ; the quick notes window while it's open
+PadShort := ""           ; a shorthand line being run from the call pad (v3.26.0)
+Cancelled := ""          ; the last form closed with Esc: its title, boxes and time (v3.27.0)
+InErr := false
+LeftOnClip := ""         ; the last log Watchlog left on the clipboard (not your own copy)
+CallPadWin := ""         ; the call pad window (hidden, not closed, when you press Esc)
+CallPadTarget := 0       ; the window you were in when the pad opened
+CallPadLoaded := false
+PadText := ""            ; what is on the call pad now (this PC only)
+PadStart := ""           ; HH:mm the current call began
+PadStamp := 0            ; when the pad text last changed
+DashWin := ""             ; the open Shift dashboard window
+PadKeys := 0             ; keys typed on the pad for this call (for the time saved tally)
+PadHistory := []         ; earlier calls this shift, newest first
+AutoMap := Map()         ; casino autocorrect: what you type -> what it becomes
+AutoMap.CaseSense := false
+AutoStamp := "-"         ; modified time of autocorrect.txt when it was last read
+CurForm := ""
+JustFired := 0
+ReminderGui := ""
+SdsTries := 0
+WatchTimes := Map()
+JournalNotified := false
+Picker := ""            ; the template finder (Ctrl+Alt+Space) while it's open
+SettingsWin := ""       ; the Settings window while it's open
+FirstRun := false       ; true when this PC had no settings.ini yet
+ReloadAt := 0           ; when an automatic reload was asked for
+UpdateOffered := ""     ; the update already offered this run (Later = don't ask again)
+Tpl := {src: "", file: "", count: 0, version: "", code: "", note: "", mine: 0, program: ""}   ; where the templates came from
+
+TutorialWin := ""       ; the tutorial window while it's open
+HomeWin := ""           ; the home window while it's open
+EditorWin := ""         ; the template editor while it's open
+WinMenu := ""           ; the tray's Windows sub-menu (has the Caps Lock guard tick)
+if A_IsCompiled {
+    ; "Watchlog.exe /selftest" only proves the exe starts (used before an update is swapped in)
+    if A_Args.Length && A_Args[1] = "/selftest"
+        ExitApp 0
+    try DirCreate DataDir
+    if A_Args.Length && A_Args[1] = "/uninstall" {
+        Uninstall()
+        ExitApp
+    }
+    if CheckInstall()
+        ExitApp
+    ; only one Watchlog at a time, even if an older copy or the script runs from elsewhere
+    CloseOtherCopies()
+    InstallBuiltIns()
+}
+
+MoveFromOldName()
+OnClipboardChange(NoteCopy)
+
+; Signs this PC has run Watchlog before (used if settings.ini goes missing)
+RanBefore := FileExist(ActivityFile) != ""
+Loop Reg RegKey
+    RanBefore := true
+
+TrimActivity()
+TrimDayItems()
+Activity("Started v" VERSION " on " A_ComputerName " (Windows user " A_UserName ") from " A_ScriptDir)
+OnExit(LogExit)
+OnError(LogError)
+LoadSettings()
+LoadTemplates()
+LoadApps()
+RegisterHotkeys()
+CheckScale()
+RegisterStamps()
+ResumeSdsResign()
+StartWatching()
+CleanJournal()
+SetTimer CleanJournal, 6 * 3600000
+
+; The Watchlog icon (Watchlog.ico next to this file; the green H without it)
+if FileExist(IconFile)
+    try TraySetIcon IconFile
+
+; Click the tray icon for the home window, right-click it for the menu
+; (see TRAY MENU below)
+A_IconTip := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
+BuildTrayMenu()
+
+; The red Caps Lock tag (see CAPS LOCK below)
+BuildCapsTag()
+SetTimer CheckCaps, 150
+
+; A newer Watchlog in the team folder: offer it before anything else
+CheckForUpdate()
+AnnounceVersion()
+; First time on this PC: the setup window (it's the Settings window)
+if FirstRun
+    ShowTutorial(true)
+
+
+; =====================================================================
+;  VERSION
+;  Each load shows "Watchlog v3.0.1 running" in the bottom-right
+;  corner for a few seconds. The templates file can say which version
+;  everyone should be on ("# Program version: 3.0.1"). If this PC is on
+;  an older one, it says so when it loads, on the tray icon and in the
+;  version box. The program check code tells two PCs apart exactly: the
+;  same code means exactly the same Watchlog.ahk.
+; =====================================================================
+OneDriveMissing() {
+    return InStr(HomeDir, "OneDrive") && !ProcessExist("OneDrive.exe")
+}
+
+; True when the templates file names a newer program version than this one
+OutOfDate() {
+    return Tpl.program != "" && VerCompare(VERSION, Tpl.program) < 0
+}
+
+; One line on whether this PC has the version the team is on
+VersionStatus() {
+    if Tpl.program = ""
+        return "The templates file doesn't say which version the team is on (no `"# Program version:`" line)."
+    if OutOfDate()
+        return "OUT OF DATE: the team is on v" Tpl.program ". This PC needs the new Watchlog.ahk."
+    return "Up to date: the team is on v" Tpl.program "."
+}
+
+ProgramCode() {
+    static code := ""
+    if code = ""
+        try code := A_IsCompiled ? CheckCode(VERSION "|" FileGetSize(A_ScriptFullPath)) : CheckCode(FileRead(A_ScriptFullPath, "UTF-8"))
+    return code
+}
+
+AnnounceVersion() {
+    CoordMode "ToolTip", "Screen"
+    ToolTip "Watchlog v" VERSION " running" (OutOfDate() ? "  (update needed)" : Tpl.program != "" ? "  (up to date)" : ""), A_ScreenWidth - 290, A_ScreenHeight - 90, 2
+    SetTimer () => ToolTip(, , , 2), -4000
+    ; (when the update is waiting in the team folder, it has just been offered)
+    if OutOfDate() && !UpdateWaiting() {
+        Activity("Out of date: running v" VERSION ", the templates say v" Tpl.program)
+        MsgBox "This PC is running Watchlog v" VERSION ", but the team is on v" Tpl.program ".`n`n"
+            . "Get the new " (A_IsCompiled ? "Watchlog.exe" : "Watchlog.ahk") " from whoever looks after the tool, put it in place of this one:`n" A_ScriptFullPath (A_IsCompiled ? "" : "`n`nthen press Ctrl+Alt+R."), "Watchlog - update needed", "Icon!"
+    }
+}
+
+; Tray menu > the version line at the top
+ShowVersion() {
+    MsgBox "Watchlog v" VERSION "  (" VERSION_DATE ")`n" COPYRIGHT "`n`n" VersionStatus()
+        . "`n`nProgram check code: " ProgramCode() "`n(The same code on two PCs means exactly the same program.)"
+        . "`n`nRunning from:`n" A_ScriptFullPath
+        . "`n`nTemplates: " TemplateSummary()
+        . "`n`nTray menu > Security and status shows what's kept where.", "Watchlog version"
+}
+
+
+; =====================================================================
+;  MOVING FROM LOG TEMPLATES
+;  Watchlog was called Log Templates before v3.0.1. On a PC that ran the
+;  old one, this moves things over the first time Watchlog starts:
+;    - closes Log Templates if it's still running (both at once would
+;      type every log twice)
+;    - %LOCALAPPDATA%\Log Templates (activity log, team copy, backups)
+;      becomes %LOCALAPPDATA%\Watchlog
+;    - HKCU\Software\Log Templates (last login times) moves to Watchlog
+;    - a Startup shortcut to Log Templates.ahk becomes one to Watchlog
+;  Saved passwords move one by one the first time each is used (see
+;  CredLoad), so they're never lost even if something here fails.
+;  A small Log Templates.ahk is left in the folder that only starts
+;  Watchlog, so an old shortcut on another bay still works.
+; =====================================================================
+MoveFromOldName() {
+    oldData := EnvGet("LOCALAPPDATA") "\Log Templates"
+    oldKey := "HKCU\Software\Log Templates"
+    moved := []
+    ; The old program, if it's still running on this PC
+    prev := A_DetectHiddenWindows
+    DetectHiddenWindows true
+    for id in WinGetList("\Log Templates.ahk ahk_class AutoHotkey") {
+        try {
+            pid := WinGetPID(id)
+            WinClose id
+            if !ProcessWaitClose(pid, 5)
+                ProcessClose pid
+            moved.Push("closed the old Log Templates that was still running")
+        }
+    }
+    DetectHiddenWindows prev
+    if DirExist(oldData) && !DirExist(DataDir) {
+        try {
+            DirMove oldData, DataDir
+            moved.Push("moved " oldData " to " DataDir)
+        }
+    }
+    hadOldKey := false
+    Loop Reg oldKey
+        hadOldKey := true
+    if hadOldKey {
+        try {
+            Loop Reg oldKey
+                RegWrite RegRead(), A_LoopRegType, RegKey, A_LoopRegName
+            RegDeleteKey oldKey
+            moved.Push("moved " oldKey " to " RegKey)
+        }
+    }
+    Loop Files A_Startup "\*.lnk" {
+        try {
+            FileGetShortcut A_LoopFileFullPath, &target
+            if SubStr(target, -18) = "\Log Templates.ahk" {
+                FileDelete A_LoopFileFullPath
+                if !FileExist(A_Startup "\Watchlog.lnk")
+                    FileCreateShortcut A_ScriptFullPath, A_Startup "\Watchlog.lnk", A_ScriptDir, , "Watchlog", FileExist(IconFile) ? IconFile : ""
+                moved.Push("Startup shortcut now starts Watchlog")
+            }
+        }
+    }
+    for m in moved
+        Activity("Moving from Log Templates: " m)
+}
+
+
+; =====================================================================
+;  ACTIVITY LOG  -  %LOCALAPPDATA%\Watchlog\activity.log
+;  A plain record of what the tool did on this PC and when: starting,
+;  where the templates came from, settings and passwords changed, and
+;  each time it typed a login (the username and the program, never the
+;  password). It never holds a password or the text of a log.
+;  Tray menu > Activity log opens it. It trims itself past 200 KB.
+; =====================================================================
+Activity(what) {
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        FileAppend FormatTime(, "yyyy-MM-dd HH:mm:ss") "  " what "`n", ActivityFile, "UTF-8"
+    }
+}
+
+TrimActivity() {
+    try {
+        if FileGetSize(ActivityFile) < 200000
+            return
+        text := FileRead(ActivityFile, "UTF-8")
+        cut := InStr(text, "`n", , StrLen(text) // 2)
+        f := FileOpen(ActivityFile, "w", "UTF-8")
+        f.Write(SubStr(text, cut + 1))
+        f.Close()
+    }
+}
+
+OpenActivity() {
+    if !FileExist(ActivityFile)
+        Activity("Activity log opened")
+    Run 'notepad.exe "' ActivityFile '"'
+}
+
+LogExit(reason, code) {
+    if reason != "Reload"
+        Activity("Closed (" reason ")")
+}
+
+; Errors still show their usual message; the log gets the line number and
+; message only (never the values involved, which could be anything)
+LogError(e, mode) {
+    global InErr
+    Activity("Error on line " e.Line ": " e.Message)
+    if InErr
+        return 0
+    ; A short plain box instead of AutoHotkey's error window; Watchlog keeps
+    ; running (v3.27.0). The line number is what to report.
+    InErr := true
+    try MsgBox("That didn't finish, but Watchlog is still running.`n`nIf it keeps happening, tell whoever looks after the tool:`nline " e.Line ": " e.Message, "Watchlog", "Icon! T20")
+    InErr := false
+    return 1
+}
+
+
+; =====================================================================
+;  SETTINGS
+; =====================================================================
+LoadSettings() {
+    if !FileExist(SettingsFile)
+        FirstRunSetup()
+    Cfg["LoginTrigger"] := Trim(IniRead(SettingsFile, "User", "LoginTrigger", ""))
+    Cfg["LoginUser"] := Trim(IniRead(SettingsFile, "User", "LoginUser", ""))
+    Cfg["LoginPassword"] := IniRead(SettingsFile, "User", "LoginPassword", "")
+    Cfg["LaunchWork"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWork", A_MyDocuments "\LaunchWork.bat"))
+    ; A LaunchWork.bat that came in the program folder (a shared copy) works too
+    if !FileExist(Cfg["LaunchWork"]) && FileExist(HomeDir "\LaunchWork.bat")
+        Cfg["LaunchWork"] := HomeDir "\LaunchWork.bat"
+    Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
+    Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "20"))
+    Cfg["FaceUrl"] := Trim(IniRead(SettingsFile, "Paths", "FaceUrl", "https://itrakappprod.olgnetwork.ca/iTrak/login.aspx"))
+    Cfg["CitrixUrl"] := Trim(IniRead(SettingsFile, "Paths", "CitrixUrl", "https://apps.gcgaming.com/Citrix/GCGCWeb/"))
+    ; The team's shared templates file (blank = templates.txt in this folder)
+    Cfg["SharedTemplates"] := Trim(IniRead(SettingsFile, "Templates", "Shared", ""), " `t`"")
+    ; Shift journal: full = time, name and text of every log; counts = time
+    ; and name only; off = nothing saved. KeepDays: older shift files are
+    ; deleted (0 = keep them all).
+    Cfg["JournalSave"] := StrLower(Trim(IniRead(SettingsFile, "Journal", "Save", "full")))
+    if !RegExMatch(Cfg["JournalSave"], "^(full|counts|off)$")
+        Cfg["JournalSave"] := "full"
+    keep := Trim(IniRead(SettingsFile, "Journal", "KeepDays", "30"))
+    Cfg["KeepDays"] := IsInteger(keep) && keep >= 0 ? Integer(keep) : 30
+    ; Ctrl+Alt+L puts the saved window layout back at the end (only if one was saved)
+    ; the character(s) typed in front of code words instead of ; (v3.25.0):
+    ; 1 to 3 symbols, no letters, digits, spaces or : or `
+    pfx := Trim(IniRead(SettingsFile, "Triggers", "Prefix", ";"))
+    Cfg["Prefix"] := pfx != "" && StrLen(pfx) <= 3 && !RegExMatch(pfx, "[\s:a-zA-Z0-9]") && !InStr(pfx, "``") ? pfx : ";"
+    Cfg["LayoutAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Layout", "AfterStart", "yes"))), "^(no|off|0|false)$")
+    ; Ctrl+Alt+L signs into the Bally programs it just opened (after asking)
+    Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
+    ; The plain Caps Lock key (which does nothing with the guard on) clears the Alert Grid alerts
+    Cfg["CapsClearsAlerts"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "AlertGrid", "CapsLockClears", "yes"))), "^(no|off|0|false)$")
+    ; Dark look for every Watchlog window (off unless turned on in the tray menu or Customize)
+    Cfg["Dark"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Look", "Dark", "no"))), "^(no|off|0|false)$")
+    ; Minutes after an SDS login to sign back into SDS by itself (0 = off)
+    sr := Trim(IniRead(SettingsFile, "SDS", "ResignMinutes", "62"))
+    Cfg["SdsResign"] := IsInteger(sr) && sr >= 0 && sr <= 600 ? Integer(sr) : 62
+    ; Call pad: Numpad + opens it (Ctrl+Alt+N always does). Key=off frees the + key.
+    Cfg["PadKey"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Key", "NumpadAdd"))), "^(off|no|0|false|none)$")
+    ; Casino autocorrect in the call pad and the log forms
+    Cfg["Autocorrect"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Autocorrect", "yes"))), "^(no|off|0|false)$")
+    ; Beep with the login reminder pop-up (off unless asked for in Settings)
+    Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
+    ; A folder of your own to take updates from, instead of the team folder
+    Cfg["UpdateFolder"] := Trim(IniRead(SettingsFile, "Updates", "Folder", ""), " `t`"")
+    Cfg["CloseApps"] := Trim(IniRead(SettingsFile, "EndOfShift", "Close", "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe"))
+
+    ; Programs Ctrl+Alt+L opens before LaunchWork.bat: [StartOfShift] Run1 ... Run9
+    ; A * in a path means "any version" (the newest one found is used).
+    ; WindowN (optional) = how to spot it already open, so it isn't opened twice.
+    Cfg["StartApps"] := []
+    hasSection := false
+    ; (a [StartOfShift] with only SignIn= in it, from Settings, still means the usual three)
+    try hasSection := RegExMatch(IniRead(SettingsFile, "StartOfShift"), "im)^\s*Run\d\s*=") > 0
+    if hasSection {
+        Loop 9 {
+            p := Trim(IniRead(SettingsFile, "StartOfShift", "Run" A_Index, ""))
+            w := Trim(IniRead(SettingsFile, "StartOfShift", "Window" A_Index, ""))
+            if p != ""
+                Cfg["StartApps"].Push({path: p, win: w != "" ? w : DefaultStartWindow(p)})
+        }
+    } else {
+        for p in ["C:\BallyTechnologies\AlertGridUI*\AlertGridUI\AlertGridUI.bat"
+                , "C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat"
+                , "C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe"]
+            Cfg["StartApps"].Push({path: p, win: DefaultStartWindow(p)})
+    }
+
+    ; Logins: [Login1] ... [Login9], plus the older single login under [User].
+    ; Any password still in settings.ini gets moved into Windows Credential
+    ; Manager on this PC, then removed from the file.
+    moved := 0, warnings := "", failed := ""
+    if Cfg["LoginUser"] != "" && Cfg["LoginTrigger"] != "" {
+        pw := MovePassword("User", "LoginPassword", Cfg["LoginUser"], Cfg["LoginPassword"], &moved, &failed)
+        warnings .= AddLogin(Cfg["LoginTrigger"], Cfg["LoginUser"], pw, "")
+    }
+    Loop 9 {
+        sec := "Login" A_Index
+        trig := Trim(IniRead(SettingsFile, sec, "Trigger", ""))
+        user := Trim(IniRead(SettingsFile, sec, "User", ""))
+        pw := IniRead(SettingsFile, sec, "Password", "")
+        win := Trim(IniRead(SettingsFile, sec, "Window", ""))
+        remind := Trim(IniRead(SettingsFile, sec, "Remind", ""))
+        remind := IsInteger(remind) ? Integer(remind) : 0
+        if trig != "" && user != "" {
+            pw := MovePassword(sec, "Password", user, pw, &moved, &failed)
+            warnings .= AddLogin(trig, user, pw, win, remind)
+        }
+    }
+    if moved
+        MsgBox moved " login password(s) were moved out of settings.ini and into Windows Credential Manager on this PC.`n`n"
+            . "settings.ini no longer holds them. On your other bay PCs, each login asks for its password once the first time you use it.", "Watchlog"
+    if failed != ""
+        MsgBox "These passwords couldn't be moved out of settings.ini, so they're still in it (logins keep working):`n`n" failed
+            . "`nTake a screenshot of this and send it to Claude.", "Watchlog", "Icon!"
+    if warnings != ""
+        MsgBox "Login warning:`n`n" warnings "`nAdd a `; in front of the trigger, or add a Window= line so it only works in one program.", "Watchlog", "Icon!"
+}
+
+; Saves a password from settings.ini into Credential Manager and deletes it
+; from the file. Returns "" when it moved, or the password if it couldn't
+; (and adds the reason to failed).
+MovePassword(sec, key, user, pw, &moved, &failed) {
+    if pw = "" || pw = "********"
+        return ""
+    if !CredSave(user, pw) {
+        failed .= "   " user ":  Windows wouldn't save it (error " A_LastError ")`n"
+        return pw
+    }
+    if CredLoad(user) !== pw {
+        failed .= "   " user ":  saved, but reading it back didn't match (error " A_LastError ")`n"
+        return pw
+    }
+    try {
+        IniDelete SettingsFile, sec, key
+    } catch as e {
+        failed .= "   " user ":  saved in Credential Manager, but couldn't delete it from settings.ini (" e.Message ")`n"
+        return ""
+    }
+    if IniRead(SettingsFile, sec, key, "") != "" {
+        failed .= "   " user ":  saved in Credential Manager, but it's still in settings.ini after deleting`n"
+        return ""
+    }
+    moved += 1
+    Activity("Password for " user " moved out of settings.ini into Credential Manager")
+    return ""
+}
+
+; win = optional window (e.g. iTrak) the login is limited to.
+; remind = optional minutes after using it to pop up "time to log in again".
+; Returns a warning if the trigger could fire while typing normally.
+AddLogin(trig, user, fallbackPw, win, remind := 0) {
+    rec := {trig: trig, user: user, win: win, remind: remind, pw: fallbackPw}
+    rec.timer := ShowLoginReminder.Bind(rec)
+    HotIf(win != "" ? MakeWindowCheck(win) : NotInSettings)
+    Hotstring(":*C:" TrigKey(trig), (*) => DoLogin(trig, user, fallbackPw, rec))
+    HotIf
+    LoginList.Push(rec)
+    if remind && !(Cfg["SdsResign"] && (InStr(win, "SDS") || IsSdsLogin(rec)))
+        ResumeReminder(rec)
+    if win = "" && SubStr(trig, 1, 1) != ";"
+        return "   " trig " has no `; in front, so it can fire in a chat or email and send your password.`n"
+    return ""
+}
+
+MakeWindowCheck(win) {
+    return (*) => LoginWindowActive(win)
+}
+
+; win can name several windows, separated by | (the login works in any of them)
+LoginWindowActive(win) {
+    SetTitleMatchMode 2
+    if SettingsActive()
+        return false
+    for part in StrSplit(win, "|") {
+        part := Trim(part)
+        if part != "" && WinActive(part)
+            return true
+    }
+    return false
+}
+
+; ---- "Pick window": click a program and its name is filled in for you ----
+#HotIf PickMode
+LButton:: {
+    global PickMode, PickHwnd
+    MouseGetPos(, , &h)
+    PickHwnd := h
+    PickMode := false
+}
+Esc:: {
+    global PickMode
+    PickMode := false
+}
+#HotIf
+
+; Waits for one click on any window (the click is swallowed, so it presses
+; nothing there) and returns text for the Window box, or "" if cancelled.
+PickWindow() {
+    global PickMode, PickHwnd
+    PickHwnd := 0
+    PickMode := true
+    ToolTip "Click the program this login should work in.`nEsc cancels.", , , 7
+    stop := A_TickCount + 30000
+    while PickMode && A_TickCount < stop
+        Sleep 50
+    PickMode := false
+    ToolTip , , , 7
+    hwnd := PickHwnd
+    if !hwnd
+        return ""
+    try {
+        pid := WinGetPID("ahk_id " hwnd)
+        exe := WinGetProcessName("ahk_id " hwnd)
+        title := WinGetTitle("ahk_id " hwnd)
+    } catch {
+        MsgBox "Couldn't read that window. Try again, or type it in.", "Watchlog", "Icon!"
+        return ""
+    }
+    if pid = DllCall("GetCurrentProcessId") {
+        MsgBox "That was Watchlog itself. Press Pick window again and click the other program.", "Watchlog"
+        return ""
+    }
+    ; Browsers, Java programs and Citrix host many different things, so they
+    ; get the title as well (Citrix sessions are all wfica32.exe)
+    if RegExMatch(exe, "i)^(wfica32)\.exe$")
+        guess := "ahk_exe " exe
+    else if RegExMatch(exe, "i)^(chrome|msedge|firefox|javaw|java)\.exe$") && title != ""
+        guess := title " ahk_exe " exe
+    else
+        guess := "ahk_exe " exe
+    ib := InputBox("This is what I found:`n`n   Program: " exe "`n   Title: " title "`n`nThe login will only type in a window matching the text below. For a web page or Java program, cut the title down to the part that never changes (like iTrak).", "Watchlog - Pick window", "w480 h260", guess)
+    return ib.Result = "OK" ? Trim(ib.Value) : ""
+}
+
+; Shortcuts don't fire in the Settings window or the template editor, so
+; typing ;me into a Shortcut box doesn't type a password there
+SettingsActive() => (IsObject(SettingsWin) || IsObject(EditorWin)) && WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
+NotInSettings(*) => !SettingsActive()
+
+; What you type for a code word: the files keep the ; in front (so they work
+; the same on every PC), and the PC's own prefix is typed instead (v3.25.0)
+TrigKey(t) {
+    pfx := Cfg.Has("Prefix") ? Cfg["Prefix"] : ";"
+    return pfx != ";" && SubStr(t, 1, 1) = ";" ? pfx SubStr(t, 2) : t
+}
+
+; Types the username, Tab, the password, Enter.
+; The password comes from Windows Credential Manager on this PC. If there
+; isn't one saved yet, it asks once and saves it.
+DoLogin(trig, user, fallbackPw, rec) {
+    ; Never type a password into the template finder's search box or Settings
+    if PickerActive() || SettingsActive()
+        return
+    pw := CredLoad(user)
+    if pw = ""
+        pw := fallbackPw
+    if pw = "" {
+        target := WinExist("A")
+        ib := InputBox("There's no password saved on this PC for " user ".`n`nType it once. It's kept in Windows Credential Manager on this PC, not in settings.ini.", "Watchlog - " trig, "Password w400 h170")
+        if ib.Result != "OK" || ib.Value = ""
+            return
+        pw := ib.Value
+        if CredSave(user, pw)
+            Activity("Password saved on this PC for " user " (asked at first use)")
+        else
+            MsgBox "Couldn't save the password in Credential Manager, so it will ask again next time.", "Watchlog", "Icon!"
+        if target {
+            try WinActivate "ahk_id " target
+            WinWaitActive "ahk_id " target, , 1
+        }
+    }
+    ; Last check before typing: the right window must still be in front
+    if rec.win != "" && !LoginWindowActive(rec.win) {
+        Activity("Login " trig " NOT typed: " "the window it is locked to wasn't in front")
+        Tip("Login not typed: the program it's for isn't in front.", 3500, true)
+        return
+    }
+    ; A login with no program set never goes into Notepad, mail, chat, Office,
+    ; Watchlog's own windows or the daily log (v3.27.0)
+    if rec.win = "" && (blocked := LoginBlockedWin()) != "" {
+        Activity("Login " trig " NOT typed: " blocked " was in front")
+        Tip("Login not typed: " blocked " is in front. Click the program it's for first.", 4000, true)
+        return
+    }
+    SendInput "{Text}" user
+    SendInput "{Tab}"
+    SendInput "{Text}" pw
+    SendInput "{Enter}"
+    CountSaved("login", StrLen(user) + StrLen(pw) + 2 - StrLen(trig), "Login " trig)
+    pw := ""
+    ; Typed into SDS while "sign back into SDS by itself" is on: no
+    ; "log in again" reminder for this login at all (v3.20.0). The login is
+    ; remembered as an SDS one, so the reminder stays off after a reload and
+    ; even if its Window= doesn't name SDS.
+    isSds := RegExMatch(WinGetTitle("A"), "i)^SDS\b")
+    if isSds && Cfg["SdsResign"] {
+        try RegWrite 1, "REG_DWORD", RegKey, "SdsLogin " rec.user
+        try RegDelete RegKey, "LastLogin " rec.user
+        SetTimer rec.timer, 0
+    } else
+        StartReminder(rec)
+    if isSds
+        StartSdsResign()
+    ; The activity log notes where a password was typed (never the password)
+    exe := ""
+    try exe := WinGetProcessName("A")
+    Activity("Login typed: " trig " (" user ") into " (exe != "" ? exe : "an unknown window"))
+}
+
+
+; The window that must never get a typed password, or "" (v3.27.0)
+LoginBlockedWin() {
+    hwnd := WinExist("A")
+    if !hwnd
+        return ""
+    exe := "", title := ""
+    try exe := StrLower(WinGetProcessName("ahk_id " hwnd))
+    try title := WinGetTitle("ahk_id " hwnd)
+    if WinGetPID("ahk_id " hwnd) = ProcessExist()
+        return "a Watchlog window"
+    if RegExMatch(exe, "^(notepad|outlook|olk|ms-teams|teams|winword|excel|onenote|slack|whatsapp|discord)\.exe$")
+        return exe
+    if InStr(title, "Daily Log Entry")
+        return "the daily log"
+    return ""
+}
+
+
+; =====================================================================
+;  SDS SIGNS BACK IN BY ITSELF  ([SDS] ResignMinutes=62, 0 = off)
+;  SDS logs you out an hour after you sign in. Typing the SDS login starts
+;  a countdown; when it runs out and SDS is back on its login screen, SDS
+;  comes to the front, the saved login is typed, and the window you were in
+;  is put back. If SDS still says Welcome it looks again every minute (up
+;  to 6 times). The time is kept on this PC, so a reload doesn't reset it.
+; =====================================================================
+StartSdsResign() {
+    global SdsTries
+    SdsTries := 0
+    if !Cfg["SdsResign"]
+        return
+    try RegWrite A_Now, "REG_SZ", RegKey, "LastSDSLogin"
+    SetTimer SdsResignDue, -Cfg["SdsResign"] * 60000
+}
+
+ResumeSdsResign() {
+    global SdsTries
+    SdsTries := 0
+    if !Cfg["SdsResign"]
+        return
+    try {
+        last := RegRead(RegKey, "LastSDSLogin")
+        secsLeft := Cfg["SdsResign"] * 60 - DateDiff(A_Now, last, "Seconds")
+    } catch {
+        return
+    }
+    if secsLeft > 0
+        SetTimer SdsResignDue, -secsLeft * 1000
+    else if secsLeft > -600
+        SetTimer SdsResignDue, -1000
+}
+
+; The SDS window on its login screen (not "SDS | Welcome, ..."), or 0
+SdsLoginScreen() {
+    SetTitleMatchMode 2
+    for id in WinGetList("SDS ahk_exe javaw.exe") {
+        t := SafeTitle(id)
+        if RegExMatch(t, "i)^SDS\b") && !InStr(t, "Welcome")
+            return id
+    }
+    return 0
+}
+
+; The login for the SDS window (v3.27.2). Tries the usual match (a login locked to
+; the program in front); if something else grabbed the keyboard in the meantime it
+; brings SDS back and tries again, then falls back to the login whose Only in
+; names SDS, or the one that was last typed into SDS.
+SdsLoginRec(sds) {
+    loop 2 {
+        r := LoginForWindow()
+        if r
+            return r
+        try WinActivate "ahk_id " sds
+        WinWaitActive "ahk_id " sds, , 2
+        Sleep 300
+    }
+    for rec in LoginList
+        if rec.win != "" && InStr(rec.win, "SDS")
+            return rec
+    for rec in LoginList
+        if IsSdsLogin(rec)
+            return rec
+    return ""
+}
+
+SdsResignDue() {
+    global SdsTries
+    if !Cfg["SdsResign"]
+        return
+    ; Not while you're in Settings or the editor, or in the middle of typing
+    if SettingsActive() || PickerActive() {
+        SetTimer SdsResignDue, -30000
+        return
+    }
+    sds := SdsLoginScreen()
+    if !sds {
+        if SDSWindow() && ++SdsTries <= 6 {
+            SetTimer SdsResignDue, -60000     ; still signed in; look again in a minute
+            return
+        }
+        Activity("SDS sign-in: " (SDSWindow() ? "SDS still said Welcome after 6 looks" : "no SDS login screen found") ", nothing typed")
+        return
+    }
+    waited := 0
+    while A_TimeIdlePhysical < 1500 && waited < 15000 {
+        Sleep 300
+        waited += 300
+    }
+    prev := WinExist("A")
+    Tip("Signing back into SDS...", 4000, true)
+    WinActivate "ahk_id " sds
+    if !WinWaitActive("ahk_id " sds, , 3) {
+        Activity("SDS sign-in: couldn't bring SDS to the front")
+        return
+    }
+    Sleep 1000
+    rec := SdsLoginRec(sds)
+    if !rec {
+        why := ""
+        for l in LoginList
+            why .= " [" l.trig " -> " (l.win != "" ? l.win : "any program") "]"
+        Activity("SDS sign-in: no saved login is locked to SDS; logins are:" why)
+        return
+    }
+    ; DoLogin checks the window it is locked to is in front: make sure SDS is
+    try WinActivate "ahk_id " sds
+    WinWaitActive "ahk_id " sds, , 2
+    Activity("SDS sign-in: signing back in by itself")
+    DoLogin(rec.trig, rec.user, rec.pw, rec)
+    Sleep 3000
+    if prev && prev != sds && WinExist("ahk_id " prev)
+        try WinActivate "ahk_id " prev
+}
+
+
+; =====================================================================
+;  LOGIN REMINDER  (Remind=55 under a [LoginN] in settings.ini)
+;  Using that login starts the countdown. When it runs out, a small
+;  window pops up on top without taking over the keyboard. The time of
+;  the last login is kept on this PC, so a reload doesn't reset it.
+; =====================================================================
+StartReminder(rec) {
+    if !rec.remind
+        return
+    CloseReminder()
+    try RegWrite A_Now, "REG_SZ", RegKey, "LastLogin " rec.user
+    SetTimer rec.timer, -rec.remind * 60000
+}
+
+; After a reload, picks the countdown back up from the last login
+ResumeReminder(rec) {
+    try {
+        last := RegRead(RegKey, "LastLogin " rec.user)
+        secsLeft := rec.remind * 60 - DateDiff(A_Now, last, "Seconds")
+    } catch {
+        return
+    }
+    if secsLeft > 0
+        SetTimer rec.timer, -secsLeft * 1000
+    else if secsLeft > -600              ; only just ran out (e.g. during a reload)
+        SetTimer rec.timer, -1000
+}
+
+; True when this login was last typed into SDS (see DoLogin)
+IsSdsLogin(rec) {
+    try return RegRead(RegKey, "SdsLogin " rec.user) = 1
+    return false
+}
+
+ShowLoginReminder(rec) {
+    global ReminderGui
+    ; SDS signs itself back in, so its "log in again" warning isn't needed
+    if Cfg["SdsResign"] && (InStr(rec.win, "SDS") || IsSdsLogin(rec))
+        return
+    CloseReminder()
+    g := WGui("+AlwaysOnTop +ToolWindow", "Login reminder")
+    g.SetFont("s11", "Segoe UI")
+    g.MarginX := 16, g.MarginY := 12
+    g.AddText(, "Time to log in again  (" rec.remind " minutes since the last one)`n`n      " TrigKey(rec.trig) "      " rec.user)
+    g.AddButton("Default w100", "OK").OnEvent("Click", (*) => CloseReminder())
+    g.SetFont("s9")
+    g.AddText("x+12 yp+6", "(or press Esc)")
+    g.OnEvent("Close", (*) => CloseReminder())
+    g.OnEvent("Escape", (*) => CloseReminder())
+    ReminderGui := g
+    ; Bottom-right corner, above the taskbar, without taking the keyboard
+    ; from the window you're typing in
+    g.Show("NoActivate Hide")
+    g.GetPos(, , &w, &h)
+    MonitorGetWorkArea(MonitorGetPrimary(), , , &right, &bottom)
+    g.Show("NoActivate x" (right - w - 12) " y" (bottom - h - 12))
+    if Cfg["ReminderBeep"]
+        SoundBeep 750, 250
+}
+
+CloseReminder() {
+    global ReminderGui
+    if IsObject(ReminderGui) {
+        try ReminderGui.Destroy()
+        ReminderGui := ""
+    }
+}
+
+; =====================================================================
+;  WINDOWS CREDENTIAL MANAGER
+;  Passwords are saved as "Watchlog: username" (Control Panel >
+;  Credential Manager > Windows Credentials shows them). They stay on
+;  this PC and don't sync through OneDrive. One still saved under the old
+;  name ("Log Templates: username") is moved to the new name the first
+;  time it's used.
+; =====================================================================
+CredSave(user, pw, target := "") {
+    if target = ""
+        target := "Watchlog: " user
+    cred := Buffer(24 + A_PtrSize * 7, 0)                       ; CREDENTIALW
+    NumPut("UInt", 1, cred, 4)                                  ; Type = generic
+    NumPut("Ptr", StrPtr(target), cred, 8)                      ; TargetName
+    NumPut("UInt", StrLen(pw) * 2, cred, 16 + A_PtrSize * 2)    ; CredentialBlobSize
+    NumPut("Ptr", StrPtr(pw), cred, 16 + A_PtrSize * 3)         ; CredentialBlob
+    NumPut("UInt", 2, cred, 16 + A_PtrSize * 4)                 ; Persist = this PC
+    NumPut("Ptr", StrPtr(user), cred, 24 + A_PtrSize * 6)       ; UserName
+    return DllCall("Advapi32.dll\CredWriteW", "Ptr", cred, "UInt", 0, "Int")
+}
+
+CredLoad(user) {
+    pw := CredReadTarget("Watchlog: " user)
+    if pw != ""
+        return pw
+    ; Saved by Log Templates: move it to the new name (the old one is only
+    ; deleted once the new one is saved)
+    pw := CredReadTarget("Log Templates: " user)
+    if pw != "" && CredSave(user, pw) {
+        DllCall("Advapi32.dll\CredDeleteW", "Str", "Log Templates: " user, "UInt", 1, "UInt", 0, "Int")
+        Activity("Password for " user " moved from the old Log Templates name to Watchlog")
+    }
+    return pw
+}
+
+CredReadTarget(target) {
+    pCred := 0
+    if !DllCall("Advapi32.dll\CredReadW", "Str", target, "UInt", 1, "UInt", 0, "Ptr*", &pCred, "Int") || !pCred
+        return ""
+    size := NumGet(pCred, 16 + A_PtrSize * 2, "UInt")
+    blob := NumGet(pCred, 16 + A_PtrSize * 3, "Ptr")
+    pw := (size && blob) ? StrGet(blob, size // 2, "UTF-16") : ""
+    DllCall("Advapi32.dll\CredFree", "Ptr", pCred)
+    return pw
+}
+
+; Whether this PC has a password saved for a username (without reading it),
+; under the new name or the old one
+CredExists(user) {
+    for target in ["Watchlog: " user, "Log Templates: " user] {
+        pCred := 0
+        if DllCall("Advapi32.dll\CredReadW", "Str", target, "UInt", 1, "UInt", 0, "Ptr*", &pCred, "Int") && pCred {
+            DllCall("Advapi32.dll\CredFree", "Ptr", pCred)
+            return true
+        }
+    }
+    return false
+}
+
+; Deletes a saved password from this PC (used when a login is removed),
+; under both names
+CredRemove(user) {
+    a := DllCall("Advapi32.dll\CredDeleteW", "Str", "Watchlog: " user, "UInt", 1, "UInt", 0, "Int")
+    b := DllCall("Advapi32.dll\CredDeleteW", "Str", "Log Templates: " user, "UInt", 1, "UInt", 0, "Int")
+    return a || b
+}
+
+; True if settings.ini still has a password typed into it (it shouldn't:
+; they're moved into Credential Manager the moment the script sees one)
+PasswordInSettings() {
+    try text := FileRead(SettingsFile)
+    catch
+        return false
+    return RegExMatch(text, "im)^\s*(Login)?Password\s*=\s*(?!\*+\s*$)\S") > 0
+}
+
+; Runs when there is no settings.ini. OneDrive can briefly hide the file
+; while it syncs, or rename it settings-PCNAME.ini when two PCs save it at
+; once, so it checks for both before starting fresh (a fresh file would
+; have no logins in it).
+FirstRunSetup() {
+    global FirstRun
+    while !FileExist(SettingsFile) && (OneDriveMissing() || RanBefore) {
+        if MsgBox("There's no settings.ini in this folder:`n" HomeDir "`n`n"
+            . (RanBefore ? "Watchlog has run on this PC before, so OneDrive may still be bringing it back.`n`n" : "")
+            . (OneDriveMissing() ? "OneDrive isn't running. Start it from the Start menu and let it sync.`n`n" : "")
+            . "Yes = check again`nNo = set up new settings", "Watchlog v" VERSION, "YesNo Icon! Default1") != "Yes"
+            break
+        Sleep 2000
+    }
+    if FileExist(SettingsFile)
+        return
+
+    ; A copy OneDrive renamed, like settings-BAY2.ini
+    copy := "", newest := ""
+    Loop Files HomeDir "\settings-*.ini" {
+        if StrCompare(A_LoopFileTimeModified, newest) > 0
+            copy := A_LoopFileFullPath, newest := A_LoopFileTimeModified
+    }
+    if copy != "" {
+        SplitPath copy, &cname
+        if MsgBox("There's no settings.ini, but there is " cname " (saved " FormatTime(newest, "MMM d, yyyy HH:mm") ").`n`n"
+            . "OneDrive renames settings.ini like this when two PCs save it at the same time, so it's probably yours.`n`n"
+            . "Use it as your settings?", "Watchlog v" VERSION, "YesNo Icon? Default1") = "Yes" {
+            try {
+                FileMove copy, SettingsFile
+                Activity("settings.ini was missing; used " cname " (an OneDrive copy) instead")
+                return
+            } catch as e {
+                MsgBox "Couldn't rename it (" e.Message "), so new settings will be set up.", "Watchlog", "Icon!"
+            }
+        }
+    }
+
+    ; The exe on a PC that ran the script version: offer to bring its settings over
+    oldDir := A_MyDocuments "\AutoHotkey"
+    if A_IsCompiled && StrLower(oldDir) != StrLower(HomeDir) && FileExist(oldDir "\settings.ini") {
+        if MsgBox("Found settings from the script version of Watchlog:`n" oldDir "`n`n"
+            . "Copy your logins and your own templates over to this one? (Saved passwords stay safe in Windows.)", "Watchlog v" VERSION, "YesNo Icon? Default1") = "Yes" {
+            try {
+                FileCopy oldDir "\settings.ini", SettingsFile
+                if FileExist(oldDir "\my-templates.txt") && !FileExist(MyTemplatesFile)
+                    FileCopy oldDir "\my-templates.txt", MyTemplatesFile
+                Activity("First run of the exe: settings copied from " oldDir)
+                return
+            } catch as e {
+                MsgBox "Couldn't copy them (" e.Message "), so new settings will be set up.", "Watchlog", "Icon!"
+            }
+        }
+    }
+
+    text := "
+    (
+; =====================================================================
+;  WATCHLOG - your personal settings
+;  Most of this is set in tray menu > Settings, so you shouldn't need
+;  to edit this file. If you do, save it and the script reloads.
+;  No passwords are kept here: they're in Windows Credential Manager.
+; =====================================================================
+
+[Templates]
+; The team's shared templates file (in SharePoint, synced by OneDrive).
+; Blank = templates.txt in this folder. Your own extra templates go in
+; my-templates.txt in this folder.
+Shared=
+
+[Journal]
+; Every log you insert is also saved in Documents\Shift Journal, one
+; file per shift. Ctrl+Alt+J shows the shift summary.
+; Save=full keeps the log text, Save=counts keeps only the time and
+; template name, Save=off turns it off.
+; KeepDays = days before old shift files are deleted (0 = keep them).
+Save=full
+KeepDays=30
+
+[Paths]
+LaunchWait=20
+CitrixTab=Citrix|apps.gcgaming.com
+; The two web pages Ctrl+Alt+L opens, in Microsoft Edge: iTrak facial rec
+; (blank = not opened) and the Citrix Receiver page (opened last)
+FaceUrl=https://itrakappprod.olgnetwork.ca/iTrak/login.aspx
+CitrixUrl=https://apps.gcgaming.com/Citrix/GCGCWeb/
+
+[StartOfShift]
+; Programs Ctrl+Alt+L opens first (up to Run9), then it opens the Citrix page in Edge.
+; A * means any version, so upgrades don't break these.
+Run1=C:\BallyTechnologies\AlertGridUI*\AlertGridUI\AlertGridUI.bat
+Run2=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
+Run3=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
+
+[EndOfShift]
+; Programs Ctrl+Alt+Shift+L closes (separate with commas)
+Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe
+

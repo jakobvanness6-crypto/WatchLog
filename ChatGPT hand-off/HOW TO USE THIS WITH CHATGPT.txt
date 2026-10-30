@@ -1,0 +1,54 @@
+HOW TO USE THIS WITH CHATGPT
+============================
+
+WHAT TO UPLOAD (start a new chat, attach both files)
+  1. Watchlog - Everything (read first).md
+       All the notes, the manual, pending changes, ideas, the template
+       wording, the example settings, the build files, and the text of
+       the docs I made for my supervisor, manager and IT.
+  2. Watchlog.ahk
+       The whole program (v3.27.2, about 10,600 lines).
+
+  If ChatGPT won't take Watchlog.ahk as a file (or says it's too long),
+  use the folder "Watchlog.ahk in parts" instead: upload or paste the 9 parts one at a time, in order. Before pasting part 1, say:
+  "I'm going to paste Watchlog.ahk in 9 parts. Just say 'got it' after
+  each one until I say 'done'." Each part starts with one comment line
+  saying which part it is; that line is not part of the program.
+
+  For a project in ChatGPT, put both files in the project's files so
+  every chat in it can see them.
+
+SUGGESTED FIRST MESSAGE (copy and paste)
+
+  This is my AutoHotkey v2 tool, Watchlog, for casino surveillance log
+  entries. Read "Watchlog - Everything (read first).md" first, starting
+  with PROJECT-NOTES.md inside it, then Watchlog.ahk. Rules:
+  - AutoHotkey v2 only, never v1 syntax.
+  - I test on a Windows work PC and report errors with line numbers.
+  - Always send me complete updated files, never snippets or lines to
+    paste. I want to do as little by hand as possible.
+  - Never ask for or include my real passwords. Passwords live in
+    Windows Credential Manager; settings.ini only has usernames.
+  - New ideas go on the Pending changes list first. Don't change any
+    files until I say "build it", then make it one new version and bump
+    "# Program version:" in templates.txt to match. Wording-only changes
+    to templates.txt can ship right away with no version bump.
+  - Keep README.txt and PROJECT-NOTES.md up to date when you change
+    features or hotkeys.
+  When you've read everything, give me a short summary of what Watchlog
+  does and what's on the Pending changes list, so I know you've got it.
+
+GOOD TO KNOW
+  - The program is Watchlog.ahk. Watchlog.exe is built from it with
+    build/build.ahk (see the Everything file). If ChatGPT changes the
+    .ahk, I can run the .ahk directly with AutoHotkey v2, or rebuild
+    the exe.
+  - Line numbers in error messages match the whole Watchlog.ahk file,
+    not the parts.
+  - What was taken out: my personal email, account names, my work
+    username and a PC name (replaced with placeholders), and the work
+    website links in LaunchWork.bat. No settings.ini, no passwords,
+    no .exe or .zip files are in here. The program code is unchanged,
+    so it still has the Citrix web address it looks for.
+  - Not included: screenshots, the Round files (separate project) and
+    Desk Helper (retired, now part of Watchlog).
