@@ -51,6 +51,17 @@ Current version: v3.23.0 (Oct 30, 2026): Edge-only start of shift (built, not ru
 2. How do you write times (2130, 9:30p, 930)? 24-hour in the log?
 3. Should it also work outside the call pad, for example typing `;fill 205 5k` straight into iTrak and pressing a key? (Harder inside Citrix: see step 2.)
 
+### Idea: "Info From" department search (Jakob's coworker, Oct 30, NOT built)
+In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
+- How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
+- Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
+- A hotkey can also do it on its own, at any time, for any open log.
+- Confirmed by Jakob (Oct 30, with screenshot): the Info From button is inside the Daily Log Entry window. Click it, a list drops down (Personnel, Subject, Contact, Company, Remove Selected, Remove All), click Personnel, click into a search bar, type, Enter runs the search. Department searches work. Watchlog would do those clicks and typing, then stop so you double-click the name.
+- Teach spots (like the full-entry logs): Info From button, Personnel, and the search bar. Subject, Contact and Company could use the same idea later.
+- Screenshots from Jakob (Oct 30): clicking Personnel opens its own "Personnel" window with a "Look For:" box at the top, Find Now / Clear, a results grid (Last Name, First Name, Middle Name, Gender, Property, Department, Position, Personnel ID) and Select / Cancel at the bottom. So the spots are: Info From button, Personnel (in the dropdown), and the Look For box in the new window (measured from that window, like the entry window). He is still sending the department names (his list so far shows Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH), which look like the department names; to confirm).
+- Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
+- Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
+
 ### Step 2 (after step 1): autocorrect everywhere, including Citrix/iTrak
 Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Design comes after step 1 ships.
 
