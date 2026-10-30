@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.20.3   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.21.0   (called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.20.3"
+VERSION := "3.21.0"
 VERSION_DATE := "Oct 29, 2026"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
@@ -77,7 +77,31 @@ CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
 TemplateList := []
-Entries := []        ; full-entry daily logs: {name, loc, topic, ref, syn, end}
+Entries := []        ; full-entry daily logs: {name, loc, topic, ref, syn, end, src}
+; Shortcut keys that can be changed in Customize Watchlog > Shortcut keys
+; (see RegisterHotkeys): id, standard key, what it does
+HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) => ShowPicker()}
+    , {id: "callpad", key: "^!n", label: "call pad  (also Numpad +)", fn: (*) => ShowCallPad()}
+    , {id: "quicknote", key: "^!q", label: "add a quick note", fn: (*) => QuickNote()}
+    , {id: "notes", key: "^!o", label: "open notes", fn: (*) => ShowNotes()}
+    , {id: "journal", key: "^!j", label: "shift journal", fn: (*) => ShowJournal()}
+    , {id: "start", key: "^!l", label: "start of shift", fn: (*) => StartOfShift()}
+    , {id: "end", key: "$^!+l", label: "end of shift", fn: (*) => EndOfShift()}
+    , {id: "home", key: "^!m", label: "Watchlog home", fn: (*) => ShowHome()}
+    , {id: "editor", key: "$^!e", label: "template editor", fn: (*) => ShowEditor()}
+    , {id: "wininfo", key: "^!i", label: "window info", fn: (*) => WindowInfo()}
+    , {id: "savelayout", key: "^!+s", label: "save window layout", fn: (*) => SaveLayout()}
+    , {id: "restorelayout", key: "^!w", label: "put windows back", fn: (*) => RestoreLayout()}
+    , {id: "sdslogout", key: "^!k", label: "log out of SDS", fn: (*) => SDSLogout()}
+    , {id: "alertclear", key: "^!a", label: "clear all Alert Grid alerts", fn: (*) => ClearAlerts()}
+    , {id: "alertteach", key: "^!+a", label: "teach Alert Grid the clicks", fn: (*) => TeachAlerts()}
+    , {id: "itraknew", key: "^!d", label: "new daily log in iTrak", fn: (*) => ITrakNewLog()}
+    , {id: "itrakteach", key: "^!+i", label: "teach iTrak the click", fn: (*) => TeachITrak()}
+    , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
+    , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
+    , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
+    , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
+
 Lists := Map()          ; @lists from templates.txt, e.g. @tables
 Lists.CaseSense := false
 AppList := []
@@ -148,6 +172,7 @@ OnError(LogError)
 LoadSettings()
 LoadTemplates()
 LoadApps()
+RegisterHotkeys()
 ResumeSdsResign()
 StartWatching()
 CleanJournal()
@@ -1008,8 +1033,8 @@ LoadTemplates() {
     Tpl.count := AddTemplates(main.text, main.src = "local" ? "local" : "team", main.label, trigs, &problems)
     Tpl.mine := AddTemplates(mine, "mine", "my-templates.txt", trigs, &problems)
     Entries := []
-    ReadEntries(main.text, main.label, &problems)
-    ReadEntries(mine, "my-templates.txt", &problems)
+    ReadEntries(main.text, main.label, &problems, "main")
+    ReadEntries(mine, "my-templates.txt", &problems, "mine")
     Activity("Templates: " TemplateSummary())
     if main.text = "" && main.note = ""
         problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" HomeDir "`n`n"
@@ -1177,7 +1202,7 @@ ReadLists(content, label, personal, &problems) {
 ; Ctrl+Alt+F lists them; Enter on one opens a new daily log in iTrak and fills
 ; Location, Topic, Reference and the Synopsis, with no questions. The word
 ; end on the end clicks End Time's Now button too (not taught yet: ignored).
-ReadEntries(content, label, &problems) {
+ReadEntries(content, label, &problems, src := "main") {
     Loop Parse content, "`n", "`r" {
         line := Trim(A_LoopField)
         if SubStr(line, 1, 1) != "+"
@@ -1198,7 +1223,7 @@ ReadEntries(content, label, &problems) {
             continue
         }
         Entries.Push({name: name, loc: Trim(parts[1]), topic: Trim(parts[2]), ref: Trim(parts[3]), syn: Trim(parts[4])
-            , end: parts.Length >= 5 && StrLower(Trim(parts[5])) = "end"})
+            , end: parts.Length >= 5 && StrLower(Trim(parts[5])) = "end", src: src})
     }
 }
 
@@ -2119,6 +2144,13 @@ NoteOwnWrite() {
     WatchTimes[SettingsFile] := FileTimeOf(SettingsFile)
 }
 
+; Same, for every watched file: a Customize screen already applied what it
+; saved, so Watchlog doesn't need to reload over it (v3.21.0)
+NoteOwnWrites() {
+    for f in WatchTimes
+        WatchTimes[f] := FileTimeOf(f)
+}
+
 CheckForEdits() {
     if IsObject(CurForm) || IsObject(SettingsWin) || IsObject(Picker) || IsObject(EditorWin)
         return
@@ -2156,7 +2188,7 @@ ReloadOnce() {
 ;  Ctrl+Alt+Q = add a note
 ;  Ctrl+Alt+O = open all notes
 ; =====================================================================
-^!q:: QuickNote()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 QuickNote() {
     ib := InputBox("Type your note. Start with a tag like #todo, #incident or #idea:", "Quick Note", "w450 h120")
@@ -2200,7 +2232,7 @@ SaveNote(file, note) {
     return false
 }
 
-^!o:: ShowNotes()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ; Ctrl+Alt+O: a window that reads the notes file fresh every time, so it
 ; can't show an old copy the way a Notepad tab left open does. Notes saved
@@ -2281,7 +2313,7 @@ MergeNotesBackup() {
 #HotIf CallPadKeyOn()
 NumpadAdd:: ShowCallPad()
 #HotIf
-^!n:: ShowCallPad()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 #HotIf CallPadActive()
 ^Enter:: CallPadMakeLog()
@@ -3069,7 +3101,7 @@ JournalStats(file, text := "") {
     return st
 }
 
-^!j:: ShowJournal()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ShowJournal() {
     if Cfg["JournalSave"] = "off" {
@@ -3339,8 +3371,8 @@ JournalSummaryOf(text) => JournalStats("", text).summary
 ;  team templates file, one section per screen scaling) for PCs that
 ;  haven't been taught. A PC's own teach always wins.
 ; =====================================================================
-^!a:: ClearAlerts()
-^!+a:: TeachAlerts()
+; (set up by RegisterHotkeys, see HotkeyDefs)
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 AlertGridWin() {
     SetTitleMatchMode "RegEx"
@@ -3941,8 +3973,8 @@ AlertColumn(x, y, bottom) {
 ;  numbers in itrak.ini in the team folder (per screen scaling) for PCs
 ;  that haven't been taught. A PC's own teach always wins.
 ; =====================================================================
-^!d:: ITrakNewLog()
-^!+i:: TeachITrak()
+; (set up by RegisterHotkeys, see HotkeyDefs)
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ; iTrak is a Citrix window (wfica32.exe) titled like
 ; "iTrak - [Daily Log] - \\Remote". [ITrak] Window= in settings.ini changes
@@ -4091,8 +4123,8 @@ ITrakNewLog(count := true) {
 ;  nothing is saved: you click Now and Save yourself. Spots are numbers
 ;  measured from inside that Daily Log Entry window, so it can open anywhere.
 ; =====================================================================
-^!f:: ShowEntryPick()
-^!+f:: TeachEntryFields()
+; (set up by RegisterHotkeys, see HotkeyDefs)
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 EntryFields := ["Location", "Topic", "Reference", "Synopsis"]
 
@@ -4861,7 +4893,7 @@ ShowTimeSaved() {
 ;  "Alert clears" counts each Clear all (Ctrl+Alt+A / Caps Lock), not
 ;  each alert.
 ; =====================================================================
-^!+d:: ShowDashboard()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ; log / alert / other (logins, stamps and app switches aren't logs)
 ItemKind(name) {
@@ -5322,7 +5354,8 @@ VersionOf(name) {
     return v = "" ? "0" : v
 }
 
-^!i:: {
+; (set up by RegisterHotkeys, see HotkeyDefs)
+WindowInfo() {
     title := WinGetTitle("A")
     exe := WinGetProcessName("A")
     A_Clipboard := "Title: " title "  |  Program: " exe
@@ -5348,7 +5381,7 @@ BrowserOpen() {
 ;  If Chrome or Edge is already open, it asks before opening the websites
 ;  again, so you don't end up with every tab twice.
 ; =====================================================================
-^!l:: StartOfShift()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 StartOfShift() {
     sites := true
@@ -5655,7 +5688,7 @@ ChromeProfileFor(email) {
 ;  ([EndOfShift] Close=...). Apps get a normal close, so anything
 ;  that needs saving can still ask you.
 ; =====================================================================
-$^!+l:: EndOfShift()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 EndOfShift() {
     apps := Cfg["CloseApps"]
@@ -5719,7 +5752,7 @@ EndOfShift() {
 
 ; Ctrl+Alt+K: log out of SDS properly (same as end of shift does), leaving
 ; SDS open at its login screen
-^!k:: SDSLogout()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 SDSLogout() {
     if !SDSWindow() {
@@ -5870,7 +5903,7 @@ EditFile(path) {
 ;  matching templates show up with a preview. Enter runs the one picked
 ;  in the window you were typing in. Up/Down choose, Esc closes.
 ; =====================================================================
-^!Space:: ShowPicker()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 PickerActive() => IsObject(Picker) && WinActive("ahk_id " Picker.hwnd)
 
@@ -6863,7 +6896,7 @@ CopyForSharing(out) {
 ; =====================================================================
 ;  CHEAT SHEET  -  Ctrl+Alt+H   (built from templates.txt and settings.ini)
 ; =====================================================================
-^!h:: ShowCheatSheet()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ShowCheatSheet() {
     teal := "0F766E", ink := "1F2933", muted := "6B7280"
@@ -6885,13 +6918,10 @@ ShowCheatSheet() {
     for a in AppList
         apps.Push([a.key, a.name])
     stamps := [[";t", "time"], [";dd", "date"], [";dt", "date and time"]]
-    keys := [["Space", "find a template"], ["N", "call pad  (also Numpad +)"], ["Q", "add a quick note"], ["O", "open notes"]
-        , ["J", "shift journal"], ["L", "start of shift"], ["Shift+L", "end of shift"], ["M", "Watchlog home"]
-        , ["E", "template editor"], ["I", "window info"], ["Shift+S", "save window layout"], ["W", "put windows back"]
-        , ["K", "log out of SDS"], ["A", "clear all Alert Grid alerts"], ["Shift+A", "teach Alert Grid the clicks"]
-        , ["D", "new daily log in iTrak"], ["Shift+I", "teach iTrak the click"]
-        , ["F", "full-entry log (Break, Table Drop...)"], ["Shift+F", "teach the daily log fields"]
-        , ["Shift+Caps", "turn Caps Lock on"], ["P or X", "pause / resume"], ["R", "reload"], ["H", "this sheet"]]
+    keys := []
+    for d in HotkeyDefs
+        keys.Push([HKShort(d.id), d.label])
+    keys.Push(["Shift+Caps", "turn Caps Lock on"], ["P or X", "pause / resume"], ["R", "reload"])
 
     g.SetFont("s20 bold c" teal, "Segoe UI")
     g.AddText("x20 y10 w700", "Watchlog shortcuts")
@@ -6902,7 +6932,7 @@ ShowCheatSheet() {
     y1 := Section(x1, top, "FORMS", forms, 92)
     y2 := Section(x2, top, "QUICK TEMPLATES AND LOGINS", quick, 92)
     y2 := Section(x2, y2 + 14, "STAMPS", stamps, 92)
-    y3 := Section(x3, top, "HOTKEYS   (Ctrl+Alt + the key)", keys, 92)
+    y3 := Section(x3, top, "HOTKEYS   (Ctrl+Alt + the key unless shown in full)", keys, 92)
     y3 := Section(x3, y3 + 14, "APPS   (Ctrl+Alt + the key)", apps, 92)
     bottom := Max(y1, y2, y3) + 14
     g.SetFont("s9 norm c" muted, "Segoe UI")
@@ -6974,8 +7004,8 @@ TogglePause() {
 ;  and ask to be saved again.
 ; =====================================================================
 #HotIf
-^!+s:: SaveLayout()
-^!w:: RestoreLayout()
+; (set up by RegisterHotkeys, see HotkeyDefs)
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 LayoutSkip(hwnd) {
     if !WinExist("ahk_id " hwnd)
@@ -7599,42 +7629,43 @@ BuildTrayMenu() {
     MenuItem(tm, "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - update needed" : ""), (*) => ShowVersion(), 0xE946)
     tm.Add()
     MenuItem(tm, HOME_MENU, (*) => ShowHome(), 0xE80F)
-    MenuItem(tm, "Find a template  (Ctrl+Alt+Space)", (*) => ShowPicker(), 0xE721)
-    MenuItem(tm, "Cheat sheet  (Ctrl+Alt+H)", (*) => ShowCheatSheet(), 0xE8FD)
-    MenuItem(tm, "Shift journal  (Ctrl+Alt+J)", (*) => ShowJournal(), 0xE8F1)
+    MenuItem(tm, "Find a template  (" HK("find") ")", (*) => ShowPicker(), 0xE721)
+    MenuItem(tm, "Cheat sheet  (" HK("cheat") ")", (*) => ShowCheatSheet(), 0xE8FD)
+    MenuItem(tm, "Shift journal  (" HK("journal") ")", (*) => ShowJournal(), 0xE8F1)
     MenuItem(tm, "Call pad  (Numpad +)", (*) => ShowCallPad(), 0xE717)
-    MenuItem(tm, "Quick notes  (Ctrl+Alt+O)", (*) => ShowNotes(), 0xE70B)
+    MenuItem(tm, "Quick notes  (" HK("notes") ")", (*) => ShowNotes(), 0xE70B)
     MenuItem(tm, "Time saved", (*) => ShowTimeSaved(), 0xE916)
     MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
-    MenuItem(tm, "Shift dashboard  (Ctrl+Alt+Shift+D)", (*) => ShowDashboard(), 0xE9D9)
+    MenuItem(tm, "Shift dashboard  (" HK("dashboard") ")", (*) => ShowDashboard(), 0xE9D9)
     tm.Add()
-    MenuItem(tm, "Start of shift  (Ctrl+Alt+L)", (*) => StartOfShift(), 0xE768)
+    MenuItem(tm, "Start of shift  (" HK("start") ")", (*) => StartOfShift(), 0xE768)
     MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
 
     ag := Menu()
-    MenuItem(ag, "Clear all alerts  (Ctrl+Alt+A)", (*) => ClearAlerts(), 0xE894)
-    MenuItem(ag, "Teach the clicks  (Ctrl+Alt+Shift+A)", (*) => TeachAlerts(), 0xE7C9)
+    MenuItem(ag, "Clear all alerts  (" HK("alertclear") ")", (*) => ClearAlerts(), 0xE894)
+    MenuItem(ag, "Teach the clicks  (" HK("alertteach") ")", (*) => TeachAlerts(), 0xE7C9)
     MenuItem(ag, "Share my setup with the team", (*) => ShareAlertSetup(), 0xE72D)
     MenuItem(tm, "Alert Grid", ag, 0xEA8F)
 
     itm := Menu()
-    MenuItem(itm, "New daily log  (Ctrl+Alt+D)", (*) => ITrakNewLog(), 0xE710)
-    MenuItem(itm, "Teach the click  (Ctrl+Alt+Shift+I)", (*) => TeachITrak(), 0xE7C9)
-    MenuItem(itm, "Full-entry log  (Ctrl+Alt+F)", (*) => ShowEntryPick(), 0xE8F1)
-    MenuItem(itm, "Teach the daily log fields  (Ctrl+Alt+Shift+F)", (*) => TeachEntryFields(), 0xE7C9)
+    MenuItem(itm, "New daily log  (" HK("itraknew") ")", (*) => ITrakNewLog(), 0xE710)
+    MenuItem(itm, "Teach the click  (" HK("itrakteach") ")", (*) => TeachITrak(), 0xE7C9)
+    MenuItem(itm, "Full-entry log  (" HK("entrypick") ")", (*) => ShowEntryPick(), 0xE8F1)
+    MenuItem(itm, "Teach the daily log fields  (" HK("entryteach") ")", (*) => TeachEntryFields(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 
     WinMenu := Menu()
-    MenuItem(WinMenu, "Save window layout  (Ctrl+Alt+Shift+S)", (*) => SaveLayout(), 0xE74E)
-    MenuItem(WinMenu, "Put windows back  (Ctrl+Alt+W)", (*) => RestoreLayout(), 0xE7C4)
+    MenuItem(WinMenu, "Save window layout  (" HK("savelayout") ")", (*) => SaveLayout(), 0xE74E)
+    MenuItem(WinMenu, "Put windows back  (" HK("restorelayout") ")", (*) => RestoreLayout(), 0xE7C4)
     WinMenu.Add(CAPS_MENU, (*) => ToggleCapsGuard())
     if CapsGuard
         WinMenu.Check(CAPS_MENU)
     MenuItem(tm, "Windows", WinMenu, 0xE7F4)
     tm.Add()
 
-    MenuItem(tm, "Template editor  (Ctrl+Alt+E)", (*) => ShowEditor(), 0xE70F)
+    MenuItem(tm, "Template editor  (" HK("editor") ")", (*) => ShowEditor(), 0xE70F)
+    MenuItem(tm, "Customize Watchlog...", (*) => ShowCustomize(), 0xE713)
     MenuItem(tm, "Settings", (*) => ShowSettings(), 0xE713)
     MenuItem(tm, "Tutorial", (*) => ShowTutorial(), 0xE7BE)
     MenuItem(tm, "About Watchlog", (*) => ShowAbout(), 0xE946)
@@ -7664,6 +7695,876 @@ BuildTrayMenu() {
 
 
 ; =====================================================================
+;  CUSTOMIZE WATCHLOG  (v3.21.0)  -  tray menu > Customize Watchlog,
+;  or the Customize button on the home window
+;  Screens for the things that used to mean editing a file: the full-entry
+;  daily logs, the shortcut keys, the programs Ctrl+Alt+L opens and
+;  Ctrl+Alt+Shift+L closes, the shared lists, the autocorrect words and
+;  the waits behind Alert Grid and iTrak. Each saves when you press Save.
+; =====================================================================
+CustomWin := ""
+
+ShowCustomize() {
+    global CustomWin
+    if IsObject(CustomWin) {
+        try WinActivate "ahk_id " CustomWin.Hwnd
+        return
+    }
+    g := Gui("+AlwaysOnTop", "Customize Watchlog  -  v" VERSION)
+    CustomWin := g
+    g.BackColor := "FFFFFF"
+    g.MarginX := 20, g.MarginY := 16
+    g.SetFont("s16 bold c0E746E", "Segoe UI")
+    g.AddText(, "Customize Watchlog")
+    g.SetFont("s10 norm c606060")
+    g.AddText("w560", "Change how Watchlog works from these screens, with no files to edit. Each one opens in its own window and applies when you save.")
+    g.SetFont("s10 norm c000000")
+    items := [["Full-entry daily logs", "Add, change or remove the logs Ctrl+Alt+F fills in.", () => ShowEntryEditor()]
+        , ["Shortcut keys", "Pick different keys for Watchlog's shortcuts.", () => ShowHotkeyEditor()]
+        , ["Start and end of shift", "Which programs open first, and which close at the end.", () => ShowShiftEditor()]
+        , ["Shared lists", "Tables, machines and the other pick lists.", () => ShowEditor(2)]
+        , ["Autocorrect words", "Acronyms and words fixed as you type.", () => ShowAutoEditor()]
+        , ["Speed and timing", "The waits behind Alert Grid and iTrak, if one ever misses a step.", () => ShowTimingEditor()]
+        , ["Logins and reminders", "Logins, the SDS sign-in and the log-in-again reminder.", () => ShowSettings(false, 1)]
+        , ["Caps Lock, journal, updates", "The Caps Lock guard, the shift journal and update folder.", () => ShowSettings(false, 6)]]
+    for it in items {
+        g.AddButton("xm y+10 w220 h36", it[1]).OnEvent("Click", Open.Bind(it[3]))
+        g.AddText("x+14 yp+8 w330", it[2])
+    }
+    g.AddButton("xm y+22 w120 Default", "Close").OnEvent("Click", Close)
+    g.OnEvent("Escape", Close)
+    g.OnEvent("Close", Close)
+    g.Show()
+
+    Open(fn, *) {
+        Close()
+        fn()
+    }
+    Close(*) {
+        global CustomWin
+        CustomWin := ""
+        g.Destroy()
+    }
+}
+
+; ---- Shortcut keys -----------------------------------------------------
+; Every Ctrl+Alt shortcut that can be changed, with its standard key. A
+; key picked in Customize is kept in settings.ini [Hotkeys] id=key. The
+; pause and reload keys, the app keys (Ctrl+Alt + a letter from [AppN]) and
+; the keys inside forms stay as they are.
+HotkeyKey(id) {
+    for d in HotkeyDefs
+        if d.id = id {
+            v := ""
+            try v := Trim(IniRead(SettingsFile, "Hotkeys", id, ""))
+            return v != "" ? v : d.key
+        }
+    return ""
+}
+
+HotkeyNorm(k) => StrLower(LTrim(k, "$~*"))
+
+; "^!+s" -> "Ctrl+Alt+Shift+S"
+HotkeyLabel(k) {
+    k := LTrim(k, "$~*")
+    out := ""
+    while k != "" && InStr("^!+#<>", SubStr(k, 1, 1)) {
+        c := SubStr(k, 1, 1), k := SubStr(k, 2)
+        out .= c = "^" ? "Ctrl+" : c = "!" ? "Alt+" : c = "+" ? "Shift+" : c = "#" ? "Win+" : ""
+    }
+    return out (StrLen(k) = 1 ? StrUpper(k) : k)
+}
+
+HK(id) => HotkeyLabel(HotkeyKey(id))
+
+; "Shift+S" for Ctrl+Alt+Shift+S, the whole thing for any other combination
+HKShort(id) {
+    l := HK(id)
+    return SubStr(l, 1, 9) = "Ctrl+Alt+" ? SubStr(l, 10) : l
+}
+
+RegisterHotkeys() {
+    HotIf()
+    used := Map()
+    for a in AppList
+        used["^!" StrLower(a.key)] := true
+    for k in ["^!p", "^!x", "^!r", "numpadadd"]
+        used[k] := true
+    bad := ""
+    for d in HotkeyDefs {
+        k := HotkeyKey(d.id)
+        if used.Has(HotkeyNorm(k)) && HotkeyNorm(k) != HotkeyNorm(d.key) {
+            bad .= "   " d.label ":  " HotkeyLabel(k) " is already used, so the standard " HotkeyLabel(d.key) " is used instead`n"
+            k := d.key
+        }
+        if used.Has(HotkeyNorm(k)) {
+            bad .= "   " d.label ":  " HotkeyLabel(k) " is also taken, so it has no shortcut (Customize > Shortcut keys)`n"
+            continue
+        }
+        try {
+            Hotkey k, d.fn, "On"
+        } catch {
+            bad .= "   " d.label ":  " HotkeyLabel(k) " isn't a key Watchlog can use, so the standard " HotkeyLabel(d.key) " is used instead`n"
+            k := d.key
+            if used.Has(HotkeyNorm(k))
+                continue
+            try Hotkey k, d.fn, "On"
+        }
+        used[HotkeyNorm(k)] := true
+    }
+    if bad != "" {
+        Activity("Shortcut keys: " StrReplace(Trim(bad, "`n "), "`n", " / "))
+        MsgBox "Some shortcut keys couldn't be used:`n`n" bad "`nFix them in Customize Watchlog > Shortcut keys.", "Watchlog", "Icon!"
+    }
+}
+
+HotkeyWin := ""
+
+ShowHotkeyEditor() {
+    global HotkeyWin
+    if IsObject(HotkeyWin) {
+        try WinActivate "ahk_id " HotkeyWin.Hwnd
+        return
+    }
+    g := Gui("+AlwaysOnTop", "Shortcut keys")
+    HotkeyWin := g
+    g.BackColor := "FFFFFF"
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 18, g.MarginY := 14
+    g.AddText("w720", "Click a box and press the keys you want. Use Ctrl, Alt or Win with them, so a shortcut can't fire while you type. These stay as they are: pause (Ctrl+Alt+P or X), reload (Ctrl+Alt+R), the app keys and the keys inside forms.")
+    ctrls := []
+    half := Ceil(HotkeyDefs.Length / 2)
+    top := 78
+    for i, d in HotkeyDefs {
+        col := i <= half ? 0 : 1
+        row := i <= half ? i - 1 : i - half - 1
+        x := 18 + col * 370, y := top + row * 32
+        g.AddText("x" x " y" (y + 4) " w170", StrUpper(SubStr(d.label, 1, 1)) SubStr(d.label, 2))
+        ctrls.Push(g.AddHotkey("x" (x + 172) " y" y " w170", LTrim(HotkeyKey(d.id), "$")))
+    }
+    by := top + half * 32 + 14
+    g.AddButton("x18 y" by " w120 Default", "Save").OnEvent("Click", Save)
+    g.AddButton("x+8 w120", "Cancel").OnEvent("Click", Close)
+    g.AddButton("x+8 w200", "Back to the standard keys").OnEvent("Click", Standard)
+    g.AddText("x18 y+12 w720 c707070", "Messages elsewhere in Watchlog may still show the standard key names. Saving restarts Watchlog.")
+    g.OnEvent("Escape", Close)
+    g.OnEvent("Close", Close)
+    g.Show()
+
+    Standard(*) {
+        for i, d in HotkeyDefs
+            ctrls[i].Value := LTrim(d.key, "$")
+    }
+    Close(*) {
+        global HotkeyWin
+        HotkeyWin := ""
+        g.Destroy()
+    }
+    Save(*) {
+        global HotkeyWin
+        g.Opt("+OwnDialogs")
+        reserved := Map()
+        for a in AppList
+            reserved["^!" StrLower(a.key)] := "an app key"
+        for k in ["^!p", "^!x", "^!r"]
+            reserved[k] := "pause / reload"
+        reserved["numpadadd"] := "the call pad's + key"
+        seen := Map()
+        keys := []
+        for i, d in HotkeyDefs {
+            v := Trim(ctrls[i].Value)
+            if v = ""
+                v := LTrim(d.key, "$")
+            if !InStr(v, "^") && !InStr(v, "!") && !InStr(v, "#") {
+                MsgBox d.label ": " HotkeyLabel(v) " has no Ctrl, Alt or Win in it. Add one so it can't fire while you type.", "Shortcut keys", "Icon!"
+                return
+            }
+            n := HotkeyNorm(v)
+            if reserved.Has(n) {
+                MsgBox d.label ": " HotkeyLabel(v) " is used for " reserved[n] ". Pick another key.", "Shortcut keys", "Icon!"
+                return
+            }
+            if seen.Has(n) {
+                MsgBox d.label " and " seen[n] " both use " HotkeyLabel(v) ". Give one of them another key.", "Shortcut keys", "Icon!"
+                return
+            }
+            seen[n] := d.label
+            keys.Push(v)
+        }
+        try {
+            for i, d in HotkeyDefs {
+                if HotkeyNorm(keys[i]) = HotkeyNorm(d.key)
+                    IniDelete SettingsFile, "Hotkeys", d.id
+                else
+                    IniWrite keys[i], SettingsFile, "Hotkeys", d.id
+            }
+        } catch as e {
+            MsgBox "Couldn't save to settings.ini:`n" e.Message, "Shortcut keys", "Icon!"
+            return
+        }
+        Activity("Shortcut keys saved from Customize")
+        HotkeyWin := ""
+        g.Destroy()
+        if MsgBox("Saved. Watchlog restarts now to use the new keys.", "Shortcut keys", "OKCancel Iconi") = "OK"
+            Reload
+    }
+}
+
+; ---- Start and end of shift --------------------------------------------
+ShiftEdWin := ""
+
+ShowShiftEditor() {
+    global ShiftEdWin
+    if IsObject(ShiftEdWin) {
+        try WinActivate "ahk_id " ShiftEdWin.Hwnd
+        return
+    }
+    apps := []
+    for a in Cfg["StartApps"]
+        apps.Push({path: a.path, win: a.win})
+    g := Gui("+AlwaysOnTop", "Start and end of shift")
+    ShiftEdWin := g
+    g.BackColor := "FFFFFF"
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 18, g.MarginY := 14
+    g.AddText("w680", "Start of shift (" HK("start") ") opens these programs in this order, waits for them, then opens the work websites. A * in a path means any version (the newest is used). A program that's already open is left alone.")
+    lv := g.AddListView("xm y+10 w680 r7 -Multi NoSortHdr", ["#", "Program", "Spot it as already open by"])
+    lv.ModifyCol(1, 30), lv.ModifyCol(2, 400), lv.ModifyCol(3, 230)
+    g.AddButton("xm y+8 w100", "Add...").OnEvent("Click", (*) => EditRow(0))
+    g.AddButton("x+6 w100", "Edit...").OnEvent("Click", EditPicked)
+    g.AddButton("x+6 w100", "Remove").OnEvent("Click", Remove)
+    g.AddButton("x+6 w100", "Move up").OnEvent("Click", (*) => Move(-1))
+    g.AddButton("x+6 w100", "Move down").OnEvent("Click", (*) => Move(1))
+    g.AddText("xm y+16 w680", "End of shift (" HK("end") ") logs out of SDS, then closes these programs (separate them with commas):")
+    closeE := g.AddEdit("xm w680 r3", Cfg["CloseApps"])
+    g.AddButton("xm y+14 w120 Default", "Save").OnEvent("Click", Save)
+    g.AddButton("x+8 w120", "Cancel").OnEvent("Click", Close)
+    g.OnEvent("Escape", Close)
+    g.OnEvent("Close", Close)
+    Fill()
+    g.Show()
+
+    Fill(sel := 0) {
+        lv.Delete()
+        for i, a in apps
+            lv.Add(, i, a.path, a.win)
+        if sel && sel <= apps.Length
+            lv.Modify(sel, "Select Focus Vis")
+    }
+    EditPicked(*) {
+        g.Opt("+OwnDialogs")
+        row := lv.GetNext()
+        if !row {
+            MsgBox "Pick a program in the list first.", "Start and end of shift"
+            return
+        }
+        EditRow(row)
+    }
+    EditRow(row) {
+        g.Opt("+OwnDialogs")
+        if row = 0 && apps.Length >= 9 {
+            MsgBox "There's room for 9 programs.", "Start and end of shift"
+            return
+        }
+        cur := row ? apps[row] : {path: "", win: ""}
+        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit program" : "Add a program")
+        d.SetFont("s10", "Segoe UI")
+        d.AddText("w520", "The program or batch file to open (a * means any version):")
+        pe := d.AddEdit("w420 r1", cur.path)
+        d.AddButton("x+6 w90", "Browse...").OnEvent("Click", Browse)
+        d.AddText("xm w520", "How to tell it's already open (optional; for example  SDS ahk_exe javaw.exe  or  ahk_exe CMPDesktop.exe). Leave it blank for the Bally programs:")
+        we := d.AddEdit("xm w520 r1", cur.win)
+        d.AddButton("xm y+14 w110 Default", "OK").OnEvent("Click", OK)
+        d.AddButton("x+8 w110", "Cancel").OnEvent("Click", Done)
+        d.OnEvent("Escape", Done)
+        d.OnEvent("Close", Done)
+        g.Opt("+Disabled")
+        d.Show()
+
+        Browse(*) {
+            d.Opt("+OwnDialogs")
+            f := FileSelect(1, "C:\", "Pick the program or batch file", "Programs (*.exe; *.bat; *.cmd; *.lnk)")
+            if f != ""
+                pe.Value := f
+        }
+        OK(*) {
+            p := Trim(pe.Value, " `t`"")
+            if p = "" {
+                d.Opt("+OwnDialogs")
+                MsgBox "Type or browse to the program first.", "Start and end of shift"
+                return
+            }
+            w := Trim(we.Value)
+            if row
+                apps[row] := {path: p, win: w}
+            else
+                apps.Push({path: p, win: w})
+            Done()
+            Fill(row ? row : apps.Length)
+        }
+        Done(*) {
+            g.Opt("-Disabled")
+            d.Destroy()
+            WinActivate "ahk_id " g.Hwnd
+        }
+    }
+    Remove(*) {
+        g.Opt("+OwnDialogs")
+        row := lv.GetNext()
+        if !row {
+            MsgBox "Pick a program in the list first.", "Start and end of shift"
+            return
+        }
+        apps.RemoveAt(row)
+        Fill(Min(row, apps.Length))
+    }
+    Move(d) {
+        row := lv.GetNext()
+        if !row || row + d < 1 || row + d > apps.Length
+            return
+        t := apps[row], apps[row] := apps[row + d], apps[row + d] := t
+        Fill(row + d)
+    }
+    Close(*) {
+        global ShiftEdWin
+        ShiftEdWin := ""
+        g.Destroy()
+    }
+    Save(*) {
+        global ShiftEdWin
+        g.Opt("+OwnDialogs")
+        if !apps.Length {
+            MsgBox "Keep at least one program in the list (with none, Watchlog goes back to Alert Grid, SDS and CMP).", "Start and end of shift", "Icon!"
+            return
+        }
+        try {
+            Loop 9 {
+                IniDelete SettingsFile, "StartOfShift", "Run" A_Index
+                IniDelete SettingsFile, "StartOfShift", "Window" A_Index
+            }
+            for i, a in apps {
+                IniWrite a.path, SettingsFile, "StartOfShift", "Run" i
+                if a.win != ""
+                    IniWrite a.win, SettingsFile, "StartOfShift", "Window" i
+            }
+            IniWrite Trim(closeE.Value), SettingsFile, "EndOfShift", "Close"
+        } catch as e {
+            MsgBox "Couldn't save to settings.ini:`n" e.Message, "Start and end of shift", "Icon!"
+            return
+        }
+        Cfg["StartApps"] := []
+        for a in apps
+            Cfg["StartApps"].Push({path: a.path, win: a.win != "" ? a.win : DefaultStartWindow(a.path)})
+        Cfg["CloseApps"] := Trim(closeE.Value)
+        NoteOwnWrites()
+        Activity("Start and end of shift programs saved from Customize (" apps.Length " to open)")
+        ShiftEdWin := ""
+        g.Destroy()
+        Tip("Saved.", 1500, true)
+    }
+}
+
+; ---- Autocorrect words ---------------------------------------------------
+AutoEdWin := ""
+
+ShowAutoEditor() {
+    global AutoEdWin
+    if IsObject(AutoEdWin) {
+        try WinActivate "ahk_id " AutoEdWin.Hwnd
+        return
+    }
+    pairs := AutoParse(FileExist(AutoFile) ? FileRead(AutoFile, "UTF-8") : AutoDefault())
+    shown := []
+    g := Gui("+AlwaysOnTop", "Autocorrect words")
+    AutoEdWin := g
+    g.BackColor := "FFFFFF"
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 18, g.MarginY := 14
+    onCB := g.AddCheckbox("xm" (Cfg["Autocorrect"] ? " Checked" : ""), "Fix these words as I type in the call pad and the log forms")
+    g.AddText("xm y+8 w560", "A word is fixed when you finish it with a space, Enter or punctuation, never in the middle of a word. Ctrl+Z puts the old word back. A ticked row is on.")
+    search := g.AddEdit("xm y+8 w300")
+    SendMessage 0x1501, 1, StrPtr("Search the list"), search
+    lv := g.AddListView("xm y+6 w560 r14 Checked -Multi", ["When I type", "It becomes"])
+    lv.ModifyCol(1, 200), lv.ModifyCol(2, 330)
+    g.AddButton("xm y+8 w100", "Add...").OnEvent("Click", (*) => EditRow(0))
+    g.AddButton("x+6 w100", "Edit...").OnEvent("Click", EditPicked)
+    g.AddButton("x+6 w100", "Delete").OnEvent("Click", Remove)
+    g.AddButton("x+6 w180", "Back to the built-in list").OnEvent("Click", Reset)
+    g.AddButton("xm y+16 w120 Default", "Save").OnEvent("Click", Save)
+    g.AddButton("x+8 w120", "Cancel").OnEvent("Click", Close)
+    search.OnEvent("Change", (*) => Fill())
+    lv.OnEvent("ItemCheck", Checked)
+    lv.OnEvent("DoubleClick", (ctl, row) => row ? EditRow(row) : 0)
+    g.OnEvent("Escape", Close)
+    g.OnEvent("Close", Close)
+    Fill()
+    g.Show()
+
+    Fill() {
+        q := StrLower(Trim(search.Text))
+        lv.Delete()
+        shown := []
+        for i, p in pairs {
+            if q != "" && !InStr(StrLower(p.w), q) && !InStr(StrLower(p.r), q)
+                continue
+            shown.Push(i)
+            lv.Add(p.on ? "Check" : "", p.w, p.r)
+        }
+    }
+    Checked(ctl, item, isChecked) {
+        if item >= 1 && item <= shown.Length
+            pairs[shown[item]].on := isChecked ? true : false
+    }
+    EditPicked(*) {
+        g.Opt("+OwnDialogs")
+        row := lv.GetNext()
+        if !row {
+            MsgBox "Pick a row in the list first.", "Autocorrect words"
+            return
+        }
+        EditRow(row)
+    }
+    EditRow(row) {
+        g.Opt("+OwnDialogs")
+        idx := row ? shown[row] : 0
+        cur := idx ? pairs[idx] : {w: "", r: "", on: true}
+        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit a word" : "Add a word")
+        d.SetFont("s10", "Segoe UI")
+        d.AddText("w380", "When I type (one word, no spaces):")
+        we := d.AddEdit("w380 r1", cur.w)
+        d.AddText("w380", "It becomes:")
+        re := d.AddEdit("w380 r1", cur.r)
+        d.AddButton("xm y+14 w110 Default", "OK").OnEvent("Click", OK)
+        d.AddButton("x+8 w110", "Cancel").OnEvent("Click", Done)
+        d.OnEvent("Escape", Done)
+        d.OnEvent("Close", Done)
+        g.Opt("+Disabled")
+        d.Show()
+        OK(*) {
+            w := Trim(we.Value), r := Trim(re.Value)
+            d.Opt("+OwnDialogs")
+            if w = "" || r = "" || InStr(w, " ") || InStr(w, "=") {
+                MsgBox "Both boxes need something, and the word you type can't have spaces or an = sign in it.", "Autocorrect words"
+                return
+            }
+            if idx {
+                pairs[idx].w := w, pairs[idx].r := r
+            } else
+                pairs.Push({w: w, r: r, on: true})
+            Done()
+            Fill()
+        }
+        Done(*) {
+            g.Opt("-Disabled")
+            d.Destroy()
+            WinActivate "ahk_id " g.Hwnd
+        }
+    }
+    Remove(*) {
+        g.Opt("+OwnDialogs")
+        row := lv.GetNext()
+        if !row {
+            MsgBox "Pick a row in the list first.", "Autocorrect words"
+            return
+        }
+        pairs.RemoveAt(shown[row])
+        Fill()
+    }
+    Reset(*) {
+        g.Opt("+OwnDialogs")
+        if MsgBox("Replace the whole list with the built-in one? Your own words are lost.", "Autocorrect words", "YesNo Icon? Default2") != "Yes"
+            return
+        pairs := AutoParse(AutoDefault())
+        Fill()
+    }
+    Close(*) {
+        global AutoEdWin
+        AutoEdWin := ""
+        g.Destroy()
+    }
+    Save(*) {
+        global AutoEdWin, AutoStamp
+        g.Opt("+OwnDialogs")
+        out := "# Watchlog casino autocorrect. One fix per line:  what you type = what it becomes`n"
+            . "# A fix happens when you finish the word with a space, Enter or punctuation.`n"
+            . "# Ctrl+Z puts the old word back. A line starting with # is switched off.`n"
+            . "# Customize Watchlog > Autocorrect words edits this file for you.`n`n"
+        for p in pairs
+            out .= (p.on ? "" : "# ") p.w " = " p.r "`n"
+        try {
+            if FileExist(AutoFile)
+                FileCopy AutoFile, AutoFile ".bak", 1
+            f := FileOpen(AutoFile, "w", "UTF-8-RAW")
+            f.Write(out)
+            f.Close()
+            IniWrite onCB.Value ? "yes" : "no", SettingsFile, "CallPad", "Autocorrect"
+        } catch as e {
+            MsgBox "Couldn't save:`n" e.Message, "Autocorrect words", "Icon!"
+            return
+        }
+        Cfg["Autocorrect"] := onCB.Value ? true : false
+        AutoStamp := "-"
+        LoadAutocorrect()
+        NoteOwnWrites()
+        Activity("Autocorrect list saved from Customize (" pairs.Length " words, " (onCB.Value ? "on" : "off") ")")
+        AutoEdWin := ""
+        g.Destroy()
+        Tip("Saved.", 1500, true)
+    }
+}
+
+; Reads autocorrect text into [{w, r, on}]. A "# word = fix" line is a word that's switched off.
+AutoParse(text) {
+    pairs := []
+    for line in StrSplit(text, "`n", "`r") {
+        line := Trim(line)
+        on := true
+        if SubStr(line, 1, 1) = "#" {
+            on := false
+            line := Trim(SubStr(line, 2))
+        }
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        w := Trim(SubStr(line, 1, eq - 1)), r := Trim(SubStr(line, eq + 1))
+        if w = "" || r = "" || InStr(w, " ")
+            continue
+        if !on && !RegExMatch(w, "^[\p{L}\d'-]+$")
+            continue
+        pairs.Push({w: w, r: r, on: on})
+    }
+    return pairs
+}
+
+; ---- Speed and timing --------------------------------------------------
+TimingWin := ""
+
+ShowTimingEditor() {
+    global TimingWin
+    if IsObject(TimingWin) {
+        try WinActivate "ahk_id " TimingWin.Hwnd
+        return
+    }
+    rows := [{sec: "AlertGrid", key: "Pause", def: 40, label: "Alert Grid: wait between clicks", note: "Raise it if a clear misses a step."}
+        , {sec: "AlertGrid", key: "SelectWait", def: 120, label: "Alert Grid: most it waits for Select All", note: "Raise it if only the top alert is cleared."}
+        , {sec: "ITrak", key: "Pause", def: 300, label: "iTrak: wait between clicks", note: "Between the clicks that open a new daily log."}
+        , {sec: "ITrak", key: "EntryWait", def: 8000, label: "iTrak: most it waits for a new log", note: "How long a full-entry log waits for the new form to open."}
+        , {sec: "ITrak", key: "EntrySettle", def: 600, label: "iTrak: wait once the form is open", note: "Raise it if the first field is missed."}]
+    g := Gui("+AlwaysOnTop", "Speed and timing")
+    TimingWin := g
+    g.BackColor := "FFFFFF"
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 18, g.MarginY := 14
+    g.AddText("w640", "All in milliseconds (1000 = one second). The standard values are right for most PCs; change one only if something misses a step. Lower is faster.")
+    edits := []
+    for r in rows {
+        cur := ""
+        try cur := Trim(IniRead(SettingsFile, r.sec, r.key, r.def))
+        if !IsInteger(cur)
+            cur := r.def
+        g.AddText("xm y+14 w280", r.label)
+        edits.Push(g.AddEdit("x+6 yp-3 w80 Number", cur))
+        g.AddText("x+10 yp+3 w260 c707070", "standard " r.def ".  " r.note)
+    }
+    g.AddButton("xm y+22 w120 Default", "Save").OnEvent("Click", Save)
+    g.AddButton("x+8 w120", "Cancel").OnEvent("Click", Close)
+    g.AddButton("x+8 w200", "Back to the standard values").OnEvent("Click", Standard)
+    g.OnEvent("Escape", Close)
+    g.OnEvent("Close", Close)
+    g.Show()
+
+    Standard(*) {
+        for i, r in rows
+            edits[i].Value := r.def
+    }
+    Close(*) {
+        global TimingWin
+        TimingWin := ""
+        g.Destroy()
+    }
+    Save(*) {
+        global TimingWin
+        g.Opt("+OwnDialogs")
+        try {
+            for i, r in rows {
+                v := Trim(edits[i].Value)
+                if !IsInteger(v) || v < 0 || v > 60000
+                    v := r.def
+                if Integer(v) = r.def
+                    IniDelete SettingsFile, r.sec, r.key
+                else
+                    IniWrite v, SettingsFile, r.sec, r.key
+            }
+        } catch as e {
+            MsgBox "Couldn't save to settings.ini:`n" e.Message, "Speed and timing", "Icon!"
+            return
+        }
+        NoteOwnWrites()
+        Activity("Speed and timing saved from Customize")
+        TimingWin := ""
+        g.Destroy()
+        Tip("Saved.", 1500, true)
+    }
+}
+
+; ---- Full-entry daily logs ----------------------------------------------
+EntryEdWin := ""
+
+; The file an entry from src is kept in, or "" when it can't be changed from
+; here (the team's shared templates file)
+EntryFileFor(src) => src = "mine" ? MyTemplatesFile : (Tpl.src = "local" ? TemplatesFile : "")
+
+ShowEntryEditor() {
+    global EntryEdWin
+    if IsObject(EntryEdWin) {
+        try WinActivate "ahk_id " EntryEdWin.Hwnd
+        return
+    }
+    work := []
+    for e in Entries
+        work.Push({name: e.name, loc: e.loc, topic: e.topic, ref: e.ref, syn: e.syn, end: e.end, src: e.src})
+    g := Gui("+AlwaysOnTop", "Full-entry daily logs")
+    EntryEdWin := g
+    g.BackColor := "FFFFFF"
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 18, g.MarginY := 14
+    g.AddText("w760", "Logs for " HK("entrypick") ": type the first letters of a name, Enter, and Watchlog opens a new daily log in iTrak and fills it in with no questions. Only logs that never need extra input belong here. Pick a log, then Edit, or Add a new one.")
+    lv := g.AddListView("xm y+10 w760 r9 -Multi NoSortHdr", ["Name", "Location", "Topic", "Reference", "Clicks Now", "Kept in"])
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 140), lv.ModifyCol(3, 120), lv.ModifyCol(4, 170), lv.ModifyCol(5, 70), lv.ModifyCol(6, 110)
+    g.AddButton("xm y+8 w100", "Add...").OnEvent("Click", (*) => EditRow(0))
+    g.AddButton("x+6 w100", "Edit...").OnEvent("Click", EditPicked)
+    g.AddButton("x+6 w100", "Copy").OnEvent("Click", CopyRow)
+    g.AddButton("x+6 w100", "Delete").OnEvent("Click", Remove)
+    g.AddButton("x+22 w200", "Try it in iTrak...").OnEvent("Click", TryIt)
+    g.AddText("xm y+14 w760 c707070", "In a synopsis, {Bay} is the bay entered at the start of shift and {Bay?} asks which bay (and keeps it for the shift). Teach the field spots once with " HK("entryteach") ".")
+    g.AddButton("xm y+14 w120 Default", "Save").OnEvent("Click", Save)
+    g.AddButton("x+8 w120", "Cancel").OnEvent("Click", Close)
+    lv.OnEvent("DoubleClick", (ctl, row) => row ? EditRow(row) : 0)
+    g.OnEvent("Escape", Close)
+    g.OnEvent("Close", Close)
+    Fill()
+    g.Show()
+
+    Fill(sel := 0) {
+        lv.Delete()
+        for e in work
+            lv.Add(, e.name, e.loc, e.topic, e.ref, e.end ? "yes" : "", EntryFileFor(e.src) = "" ? "team file (read only)" : e.src = "mine" ? "my-templates.txt" : "templates.txt")
+        if sel && sel <= work.Length
+            lv.Modify(sel, "Select Focus Vis")
+    }
+    Picked() {
+        g.Opt("+OwnDialogs")
+        row := lv.GetNext()
+        if !row
+            MsgBox "Pick a log in the list first.", "Full-entry daily logs"
+        return row
+    }
+    EditPicked(*) {
+        row := Picked()
+        if row
+            EditRow(row)
+    }
+    EditRow(row) {
+        g.Opt("+OwnDialogs")
+        if row && EntryFileFor(work[row].src) = "" {
+            MsgBox "That log is in the team's shared templates file, which can't be changed from here. Copy it and change the copy.", "Full-entry daily logs"
+            return
+        }
+        cur := row ? work[row] : {name: "", loc: "", topic: "", ref: "", syn: "", end: false, src: Tpl.src = "local" ? "main" : "mine"}
+        d := Gui("+AlwaysOnTop +Owner" g.Hwnd, row ? "Edit " cur.name : "Add a full-entry log")
+        d.SetFont("s10", "Segoe UI")
+        d.AddText("w520", "Name (what you type in the list):")
+        ne := d.AddEdit("w520 r1", cur.name)
+        d.AddText("w520", "Location (typed in full, then Enter):")
+        le := d.AddEdit("w520 r1", cur.loc)
+        d.AddText("w520", "Topic (typed in full, then Enter):")
+        te := d.AddEdit("w520 r1", cur.topic)
+        d.AddText("w520", "Reference:")
+        re := d.AddEdit("w520 r1", cur.ref)
+        d.AddText("w520", "Synopsis:")
+        se := d.AddEdit("w520 r4 WantReturn", cur.syn)
+        nowCB := d.AddCheckbox("xm" (cur.end ? " Checked" : ""), "Click End Time's Now button when the log is filled (the log is complete)")
+        d.AddButton("xm y+14 w110 Default", "OK").OnEvent("Click", OK)
+        d.AddButton("x+8 w110", "Cancel").OnEvent("Click", Done)
+        d.OnEvent("Escape", Done)
+        d.OnEvent("Close", Done)
+        g.Opt("+Disabled")
+        d.Show()
+        OK(*) {
+            n := Trim(ne.Value), l := Trim(le.Value), t := Trim(te.Value), r := Trim(re.Value)
+            s := Trim(StrReplace(StrReplace(se.Value, "`r`n", " "), "`n", " "))
+            d.Opt("+OwnDialogs")
+            if n = "" || l = "" || t = "" || r = "" || s = "" {
+                MsgBox "Every box needs something (use NA in Reference if there's nothing).", "Full-entry daily logs"
+                return
+            }
+            for v in [n, l, t, r, s]
+                if InStr(v, "|") {
+                    MsgBox "A | can't be used in these boxes.", "Full-entry daily logs"
+                    return
+                }
+            if InStr(n, "=") || SubStr(n, 1, 1) = "+" {
+                MsgBox "The name can't have an = sign in it or start with +.", "Full-entry daily logs"
+                return
+            }
+            for i, w in work
+                if i != row && StrLower(w.name) = StrLower(n) {
+                    MsgBox "There's already a log called " n ".", "Full-entry daily logs"
+                    return
+                }
+            item := {name: n, loc: l, topic: t, ref: r, syn: s, end: nowCB.Value ? true : false, src: cur.src}
+            if row
+                work[row] := item
+            else
+                work.Push(item)
+            Done()
+            Fill(row ? row : work.Length)
+        }
+        Done(*) {
+            g.Opt("-Disabled")
+            d.Destroy()
+            WinActivate "ahk_id " g.Hwnd
+        }
+    }
+    CopyRow(*) {
+        row := Picked()
+        if !row
+            return
+        e := work[row]
+        n := e.name " copy"
+        while HasName(n)
+            n .= " 2"
+        work.InsertAt(row + 1, {name: n, loc: e.loc, topic: e.topic, ref: e.ref, syn: e.syn, end: e.end, src: Tpl.src = "local" ? "main" : "mine"})
+        Fill(row + 1)
+    }
+    HasName(n) {
+        for w in work
+            if StrLower(w.name) = StrLower(n)
+                return true
+        return false
+    }
+    Remove(*) {
+        row := Picked()
+        if !row
+            return
+        if EntryFileFor(work[row].src) = "" {
+            MsgBox "That log is in the team's shared templates file, which can't be changed from here.", "Full-entry daily logs"
+            return
+        }
+        if MsgBox("Delete " work[row].name "?", "Full-entry daily logs", "YesNo Icon?") != "Yes"
+            return
+        work.RemoveAt(row)
+        Fill(Min(row, work.Length))
+    }
+    TryIt(*) {
+        row := Picked()
+        if !row
+            return
+        if MsgBox("This opens a NEW daily log in iTrak and fills it in, as if you had picked " work[row].name " from the list.`n`nGo ahead?", "Full-entry daily logs", "YesNo Icon?") != "Yes"
+            return
+        e := work[row]
+        g.Hide()
+        RunEntry(e)
+        g.Show()
+    }
+    Close(*) {
+        global EntryEdWin
+        EntryEdWin := ""
+        g.Destroy()
+    }
+    Save(*) {
+        global EntryEdWin
+        g.Opt("+OwnDialogs")
+        byFile := Map()
+        for e in work {
+            f := EntryFileFor(e.src)
+            if f = ""
+                continue
+            if !byFile.Has(f)
+                byFile[f] := []
+            byFile[f].Push(e)
+        }
+        for src in ["main", "mine"] {
+            f := EntryFileFor(src)
+            if f != "" && !byFile.Has(f) && FileExist(f)
+                byFile[f] := []
+        }
+        for f, list in byFile {
+            if !WriteEntryLines(f, list) {
+                MsgBox "Couldn't save to " f, "Full-entry daily logs", "Icon!"
+                return
+            }
+        }
+        ReloadEntries()
+        NoteOwnWrites()
+        Activity("Full-entry logs saved from Customize (" work.Length " logs)")
+        EntryEdWin := ""
+        g.Destroy()
+        Tip("Saved. " Entries.Length " full-entry logs.", 2000, true)
+    }
+}
+
+; Rewrites the + lines of a templates file with list, leaving every other line
+; as it was (the old file is kept as .bak). Returns true when it saved.
+WriteEntryLines(file, list) {
+    text := ""
+    if FileExist(file)
+        try text := FileRead(file, "UTF-8")
+    nl := InStr(text, "`r`n") ? "`r`n" : "`n"
+    lines := StrSplit(StrReplace(text, "`r`n", "`n"), "`n")
+    block := []
+    for e in list
+        block.Push("+" e.name " = " e.loc " | " e.topic " | " e.ref " | " e.syn (e.end ? " | end" : ""))
+    out := [], placed := false
+    for ln in lines {
+        if SubStr(Trim(ln), 1, 1) = "+" {
+            if !placed {
+                for b in block
+                    out.Push(b)
+                placed := true
+            }
+            continue
+        }
+        out.Push(ln)
+    }
+    if !placed && block.Length {
+        while out.Length && out[out.Length] = ""
+            out.Pop()
+        out.Push("", "# ----- FULL DAILY LOGS (Customize Watchlog > Full-entry daily logs) -----")
+        for b in block
+            out.Push(b)
+        out.Push("")
+    }
+    s := ""
+    for i, ln in out
+        s .= ln (i < out.Length ? nl : "")
+    try {
+        if FileExist(file)
+            FileCopy file, file ".bak", 1
+        f := FileOpen(file, "w", "UTF-8-RAW")
+        f.Write(s)
+        f.Close()
+        return true
+    }
+    return false
+}
+
+; Reads the full-entry logs again after the editor saved
+ReloadEntries() {
+    global Entries
+    Entries := []
+    p := ""
+    main := ""
+    try main := FileRead(Tpl.src = "local" ? TemplatesFile : Tpl.file, "UTF-8")
+    ReadEntries(main, "templates.txt", &p, "main")
+    mine := ""
+    if FileExist(MyTemplatesFile)
+        try mine := FileRead(MyTemplatesFile, "UTF-8")
+    ReadEntries(mine, "my-templates.txt", &p, "mine")
+}
+
+
+; =====================================================================
 ;  WATCHLOG HOME  -  click the tray icon, or Ctrl+Alt+M   (v3.10.0)
 ;  Everything in one window, as buttons with pictures, for anyone who
 ;  doesn't know the shortcuts yet. Each button shows its shortcut, so
@@ -7674,7 +8575,7 @@ BuildTrayMenu() {
 ;  template, a login) goes into the window you were in before.
 ;  Ctrl+Alt+M again (or Esc) closes it.
 ; =====================================================================
-^!m:: ShowHome()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ShowHome() {
     global HomeWin
@@ -7697,13 +8598,13 @@ ShowHome() {
 
     Group("Logs", 0x0E746E, [
         ["Call pad", "Numpad +", 0xE717, () => ShowCallPad(), true]
-        , ["Find a template", "Ctrl+Alt+Space", 0xE721, () => ShowPicker(), false]
-        , ["Cheat sheet", "Ctrl+Alt+H", 0xE8FD, () => ShowCheatSheet(), false]
-        , ["Shift journal", "Ctrl+Alt+J", 0xE8F1, () => ShowJournal(), false]
-        , ["Quick notes", "Ctrl+Alt+O", 0xE70B, () => ShowNotes(), false]
+        , ["Find a template", HK("find"), 0xE721, () => ShowPicker(), false]
+        , ["Cheat sheet", HK("cheat"), 0xE8FD, () => ShowCheatSheet(), false]
+        , ["Shift journal", HK("journal"), 0xE8F1, () => ShowJournal(), false]
+        , ["Quick notes", HK("notes"), 0xE70B, () => ShowNotes(), false]
         , ["Time saved", "this shift and before", 0xE916, () => ShowTimeSaved(), false]
         , ["Shift count", "exact tally of this shift", 0xE9D2, () => ShowShiftCount(), false]
-        , ["Shift dashboard", "Ctrl+Alt+Shift+D", 0xE9D9, () => ShowDashboard(), false]])
+        , ["Shift dashboard", HK("dashboard"), 0xE9D9, () => ShowDashboard(), false]])
 
     logins := []
     for rec in LoginList
@@ -7712,12 +8613,13 @@ ShowHome() {
         Group("Logins  (types the username and password, like typing the shortcut)", 0x1565C0, logins)
 
     Group("Set up", 0x555555, [
-        ["Template editor", "Ctrl+Alt+E", 0xE70F, () => ShowEditor(), false]
+        ["Template editor", HK("editor"), 0xE70F, () => ShowEditor(), false]
+        , ["Customize", "logs, keys, lists, programs", 0xE713, () => ShowCustomize(), false]
         , ["Settings", "logins, shift, updates", 0xE713, () => ShowSettings(), false]
         , ["Tutorial", "a two-minute tour", 0xE7BE, () => ShowTutorial(), false]
         , ["Security and status", "what's kept where", 0xE72E, () => ShowSecurity(), false]
         , ["About Watchlog", "version, licence", 0xE946, () => ShowAbout(), false]
-        , ["Save window layout", "Ctrl+Alt+Shift+S", 0xE74E, () => SaveLayout(), false]])
+        , ["Save window layout", HK("savelayout"), 0xE74E, () => SaveLayout(), false]])
 
     ; How this PC is doing
     fullW := per * W + (per - 1) * gap
@@ -7856,7 +8758,7 @@ HomeLogin(rec) {
 ;  Shortcuts don't fire while the editor is in front, so typing ;jack
 ;  into it doesn't open the jackpot form.
 ; =====================================================================
-$^!e:: ShowEditor()
+; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ; The kinds of box, in the order the box form lists them
 BoxKinds() {
@@ -8255,7 +9157,7 @@ EdPreview(body, doc) {
 }
 
 ; ---- The editor window ------------------------------------------------
-ShowEditor() {
+ShowEditor(startTab := 1) {
     global EditorWin
     if IsObject(EditorWin) {
         try WinActivate "ahk_id " EditorWin.Hwnd
@@ -8281,7 +9183,7 @@ ShowEditor() {
     g.AddText("xm y+2", "Editing:")
     fileDD := g.AddDropDownList("x+8 yp-3 w380", [teamName (Cfg["SharedTemplates"] != "" ? " (everyone's)" : ""), "My own templates (my-templates.txt, just me)"])
     fileT := g.AddText("x+12 yp+3 w440 c707070", "")
-    tabs := g.AddTab2("xm y+12 w960 h650", ["Templates", "Shared lists"])
+    tabs := g.AddTab2("xm y+12 w960 h650 Choose" startTab, ["Templates", "Shared lists"])
 
     ; ---- Templates tab
     tabs.UseTab(1)

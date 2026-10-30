@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.20.3  -  README
+  WATCHLOG  v3.21.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -729,11 +729,43 @@ and the less-used items sit in sub-menus):
   Exit Watchlog                 Closes it (start it again from the
                                 Start menu)
 
+CUSTOMIZE WATCHLOG  (v3.21.0: tray menu > Customize Watchlog, or the Customize button on the home window)
+  Screens for the things that used to mean editing a file. Each opens in its own
+  window and applies when you save. Nothing here touches your passwords.
+  - Full-entry daily logs: a list of the logs Ctrl+Alt+F fills in. Add, Edit, Copy,
+    Delete; the Edit box has Name, Location, Topic, Reference, Synopsis and a tick for
+    "Click End Time's Now button". "Try it in iTrak" runs the picked log for real. Saved
+    as the + lines in templates.txt (or my-templates.txt), the old file kept as .bak.
+    A log from the team's shared file can't be changed here (copy it first).
+  - Shortcut keys: pick a different key for any Ctrl+Alt shortcut (find a template, the
+    call pad, quick note, notes, journal, start and end of shift, home, template editor,
+    window info, save/put back layout, log out of SDS, the Alert Grid and iTrak keys, the
+    full-entry log and its teach key, the dashboard, the cheat sheet). Click a box and
+    press the keys; use Ctrl, Alt or Win with them; two shortcuts can't share a key. Not
+    changeable: pause (Ctrl+Alt+P or X), reload (Ctrl+Alt+R), the app keys, the keys
+    inside forms. Kept in settings.ini [Hotkeys] (id=key); "Back to the standard keys"
+    clears them. Saving restarts Watchlog. The tray menu, home window and cheat sheet show
+    the keys you picked; some messages elsewhere may still show the standard names.
+  - Start and end of shift: the programs Ctrl+Alt+L opens, in order (Add, Edit, Remove,
+    Move up/down; a * in a path means any version; "spot it by" is how it tells a program
+    is already open) and the list of programs the end of shift closes. Kept in
+    settings.ini [StartOfShift] Run1...Run9, Window1...Window9 and [EndOfShift] Close.
+  - Shared lists: opens the template editor on its Shared lists tab (tables, machines...).
+  - Autocorrect words: the list in autocorrect.txt as a table: tick = on, Add, Edit,
+    Delete, search, "Back to the built-in list", and a switch for autocorrect as a whole.
+    The old file is kept as autocorrect.txt.bak.
+  - Speed and timing: the waits for Alert Grid (between clicks, for Select All) and iTrak
+    (between clicks, for a new log, after the form opens). Standard values are shown;
+    "Back to the standard values" clears them. settings.ini [AlertGrid] and [ITrak].
+  - Logins and reminders, Caps Lock, journal, updates: open Settings on the right tab.
+  Settings, the template editor and the autocorrect editor all still work as before.
+
 WATCHLOG HOME  (click the icon, or Ctrl+Alt+M)
   Big buttons in three groups: Logs (call pad, find a template, cheat
   sheet, journal, quick notes, time saved, shift count, dashboard), Logins
   (one button per saved login) and Set up (template editor, settings,
-  tutorial, security and status, about, save window layout). The Shift
+  tutorial, security and status, about, save window layout) plus a Customize
+  button (see above). The Shift
   buttons (start, end, log out of SDS, clear Alert Grid, new iTrak daily
   log, put windows back) were removed in v3.20.0: use the shortcuts, or the
   cheat sheet (Ctrl+Alt+H) if you forget them. Each button shows its shortcut, so new
