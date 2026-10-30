@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.20.2 (Oct 30, 2026).
+Current version: v3.20.3 (Oct 30, 2026).
 
 ## Waiting to be built
 
@@ -13,7 +13,11 @@ Current version: v3.20.2 (Oct 30, 2026).
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
 
+## Done in v3.20.3 (Oct 30)
+- Start of shift full-entry log: "start" in the Ctrl+Alt+F list. Surveillance, Duty, NA, synopsis "Start of Shift Bay (bay) Operator". It always asks which bay (offering the last one) and keeps the answer for the shift; the End log and ;end then use it without asking. It leaves End Time alone (add `| end` to its line in templates.txt if you want the Now click too).
+
 ## Done in v3.20.2 (Oct 30)
+- Confirmed on Jakob's PC: the End log fills in about 4 seconds, against about 15 s by hand (7 s was his best). Real timing for the manager pitch.
 - End of shift full-entry log: type "end" in the Ctrl+Alt+F list: Surveillance, Duty, NA, synopsis "End of Shift Bay (your bay) Operator", then End Time's Now button is clicked. New fifth teach step (End Time's Now button): run Ctrl+Alt+Shift+F again.
 - The bay entered at the start of shift is kept for the shift (14 hours): the ;end template and the End log no longer ask for it (new box option {Bay: saved}; asks as before if no bay was entered at the start).
 

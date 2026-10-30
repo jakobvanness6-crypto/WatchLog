@@ -15,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 26, 2026 (1)
-# Program version: 3.20.2
+# Program version: 3.20.3
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -131,11 +131,13 @@
 #  Topic, Reference and the Synopsis (End Time and Save are left to you).
 #  One line each:   +Name = Location | Topic | Reference | Synopsis
 #  Add  | end  at the end of a line to click End Time's Now button when the
-#  log is filled; {Bay} in the synopsis is the bay entered at the start of shift.
+#  log is filled; {Bay} in the synopsis is the bay entered at the start of shift,
+#  and {Bay?} asks which bay (offering the last one) and keeps it for the shift.
 #  (teach the spots once with Ctrl+Alt+Shift+F; see README section 10)
 
 +Break = Surveillance | Duty | NA | Break
 +Table Drop = Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690) | Security Officers performed Table Drop
++Start = Surveillance | Duty | NA | Start of Shift Bay {Bay?} Operator
 +End = Surveillance | Duty | NA | End of Shift Bay {Bay} Operator | end
 +Card Destruction = Card Destruction Room | Card Destruction | M6 (750,751,749) | Security Officers entered Card Destruction Room for Card Destruction.
 

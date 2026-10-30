@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.20.2  -  README
+  WATCHLOG  v3.20.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -220,10 +220,12 @@ couple of seconds. No need to press anything.
                     The logs are lines in templates.txt (or my-templates.txt):
                       +Name = Location | Topic | Reference | Synopsis
                     e.g. +Break = Surveillance | Duty | NA | Break
-                    Four come ready-made: Break, Table Drop, End (end of shift) and
-                    Card Destruction. A line that ends with | end also clicks End Time's
+                    Five come ready-made: Break, Table Drop, Start (start of shift), End
+                    (end of shift) and Card Destruction. Start asks which bay (offering
+                    the last one) and keeps it for the shift; End uses it without asking. A line that ends with | end also clicks End Time's
                     Now button once the log is filled (the End log does); {Bay} in a
-                    synopsis is the bay entered at the start of shift (v3.20.2).
+                    synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
+                    asks which bay and keeps the answer for the shift (v3.20.3).
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
                     run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
                     on each (nothing is clicked for you). The daily log form is its own window

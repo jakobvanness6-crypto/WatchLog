@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.20.2   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.20.3   (called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.20.2"
+VERSION := "3.20.3"
 VERSION_DATE := "Oct 29, 2026"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
@@ -4241,6 +4241,23 @@ RunEntry(e) {
         return
     }
     syn := e.syn
+    ; {Bay?}: always asks which bay (start of shift), offering the last one,
+    ; and keeps the answer for the rest of the shift (v3.20.3)
+    if InStr(syn, "{Bay?}") {
+        last := ""
+        try last := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
+        ib := InputBox("Which bay are you on?`n`nKept for the rest of the shift.", "Watchlog - " e.name, "w320 h160", last)
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        bay := Trim(ib.Value)
+        try {
+            if !DirExist(DataDir)
+                DirCreate DataDir
+            IniWrite bay, LastUsedFile, "LastUsed", "Bay"
+            IniWrite A_Now, LastUsedFile, "LastUsed", "Bay.at"
+        }
+        syn := StrReplace(syn, "{Bay?}", bay)
+    }
     if InStr(syn, "{Bay}") {
         bay := SavedBay()
         if bay = "" {
