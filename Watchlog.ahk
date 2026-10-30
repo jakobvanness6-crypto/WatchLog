@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.20.0   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.20.1   (called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.20.0"
+VERSION := "3.20.1"
 VERSION_DATE := "Oct 29, 2026"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
@@ -4046,18 +4046,39 @@ ITrakNewLog(count := true) {
 ;  For logs that never change (Break, Table Drop, Card Destruction...):
 ;  +Break = Surveillance | Duty | NA | Break    in templates.txt
 ;  Ctrl+Alt+F shows the list; type the first letters, Enter. Watchlog
-;  clicks New daily log (taught with Ctrl+Alt+Shift+I), then clicks each
+;  clicks New daily log (taught with Ctrl+Alt+Shift+I), waits for the new
+;  "Daily Log Entry" window to open, then clicks each
 ;  field it was taught (Ctrl+Alt+Shift+F: open a daily log, hover over
 ;  Location, Topic, Reference and Synopsis, F8 on each) and types the
 ;  wording: the drop-downs are typed in full and accepted with Enter, the
 ;  Reference is typed, the Synopsis is pasted. End Time is left alone and
 ;  nothing is saved: you click Now and Save yourself. Spots are numbers
-;  measured from inside the iTrak window, like the new-log click.
+;  measured from inside that Daily Log Entry window, so it can open anywhere.
 ; =====================================================================
 ^!f:: ShowEntryPick()
 ^!+f:: TeachEntryFields()
 
 EntryFields := ["Location", "Topic", "Reference", "Synopsis"]
+
+; The daily log form opens as its OWN Citrix window, titled like
+; "Daily Log Entry - N/A - \\Remote" (not "iTrak"), so the field spots are
+; measured from it and not from the main iTrak window (v3.20.1).
+; [ITrak] EntryWindow= changes what it looks for.
+EntryWin() {
+    SetTitleMatchMode 2
+    spec := Trim(IniRead(SettingsFile, "ITrak", "EntryWindow", "Daily Log Entry ahk_exe wfica32.exe"))
+    return WinExist(spec)
+}
+
+; Every open daily log form's window id, as a Map
+EntryWins() {
+    SetTitleMatchMode 2
+    m := Map()
+    spec := Trim(IniRead(SettingsFile, "ITrak", "EntryWindow", "Daily Log Entry ahk_exe wfica32.exe"))
+    for h in WinGetList(spec)
+        m[h] := true
+    return m
+}
 
 ; The taught field spots as a Map (LocX LocY ... W H), or "" when none
 EntryLoad() {
@@ -4166,14 +4187,30 @@ RunEntry(e) {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
         return
     }
+    before := EntryWins()
     if !ITrakNewLog(false)
         return
-    win := ITrakWin()
-    wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "1500"))
-    Sleep wait          ; the new log takes a moment to open in Citrix
-    if !win || !WinActive("ahk_id " win) {
-        Tip("iTrak lost the front. Nothing was filled in.", 3000, true)
-        Activity("Full-entry log " e.name ": stopped (iTrak lost the front after New daily log)")
+    ; wait (at most EntryWait ms) for the NEW Daily Log Entry window
+    wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "8000"))
+    deadline := A_TickCount + wait
+    win := 0
+    while !win && A_TickCount < deadline {
+        for h in EntryWins()
+            if !before.Has(h)
+                win := h
+        if !win
+            Sleep 100
+    }
+    if !win {
+        Tip("The new daily log window didn't open. Nothing was filled in.", 4000, true)
+        Activity("Full-entry log " e.name ": no new Daily Log Entry window appeared within " wait " ms")
+        return
+    }
+    Sleep Integer(IniRead(SettingsFile, "ITrak", "EntrySettle", "600"))      ; let it finish drawing
+    try WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 3) {
+        Tip("Couldn't bring the daily log to the front. Nothing was filled in.", 4000, true)
+        Activity("Full-entry log " e.name ": couldn't activate the Daily Log Entry window")
         return
     }
     w0 := Integer(f["W"]), h0 := Integer(f["H"])
@@ -4239,21 +4276,21 @@ TeachEntryFields() {
 
 TeachEntryFieldsRun() {
     global ITrakFile, EntryFields
-    win := ITrakWin()
+    win := EntryWin()
     if !win {
-        MsgBox "Open iTrak first, then open a new daily log (the empty Daily Log Entry form).", "Teach daily log fields", "Icon!"
+        MsgBox "Open a new daily log in iTrak first, so the empty Daily Log Entry form is showing (its window title starts with Daily Log Entry), then run this again.", "Teach daily log fields", "Icon!"
         return
     }
-    if MsgBox("Open a new daily log in iTrak so the empty form is showing.`n`nThen, for each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
+    if MsgBox("Leave the empty Daily Log Entry form showing.`n`nFor each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
         return
     SetTitleMatchMode 2
     pts := Map()
     for i, k in EntryFields {
         if !TeachWait(i " of 4`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
             return
-        win := ITrakWin()
+        win := EntryWin()
         if !win || !ITrakPoint(win, &x, &y) {
-            MsgBox "That spot isn't inside the iTrak window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+            MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
             return
         }
         pts[k] := [x, y]
@@ -4271,7 +4308,7 @@ TeachEntryFieldsRun() {
         return
     }
     Activity("iTrak: daily log fields taught (window " cw "x" ch ")")
-    MsgBox "Saved. Ctrl+Alt+F now fills in a full-entry log (add them to templates.txt as lines like  +Break = Surveillance | Duty | NA | Break ).`n`nThe new daily log's form has to open in the same place each time.", "Teach daily log fields"
+    MsgBox "Saved. Ctrl+Alt+F now fills in a full-entry log (add them to templates.txt as lines like  +Break = Surveillance | Duty | NA | Break ).`n`nThe form can open anywhere, but keep it the same size.", "Teach daily log fields"
 }
 
 TeachITrak() {

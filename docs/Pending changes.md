@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.20.0 (Oct 30, 2026).
+Current version: v3.20.1 (Oct 30, 2026).
 
 ## Waiting to be built
 
@@ -12,6 +12,9 @@ Current version: v3.20.0 (Oct 30, 2026).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.20.1 (Oct 30)
+- Fix for the daily log teach step ("the click position wasn't in the iTrak window"): the daily log form is its own window titled "Daily Log Entry - N/A - \\Remote", so the field spots are now measured from that window, and the fill waits for the new form to open instead of a fixed pause.
 
 ## Done in v3.20.0 (Oct 30)
 - Full-entry daily logs: Ctrl+Alt+F opens a pick list (type the first letters, Enter) of never-changing logs; Watchlog opens a new daily log in iTrak and fills Location, Topic, Reference and Synopsis with no questions. Break, Table Drop and Card Destruction are ready-made in templates.txt (lines `+Name = Location | Topic | Reference | Synopsis`). End Time and Save stay yours. Ctrl+Alt+Shift+F teaches the four field spots once per PC. Counted in Time saved and the journal ("Full log: Break"): 5 keystrokes per drop-down, full length of Reference and Synopsis plus 1 per click, 2 for the new-log click.

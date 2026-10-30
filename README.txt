@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.20.0  -  README
+  WATCHLOG  v3.20.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -208,8 +208,9 @@ couple of seconds. No need to press anything.
   Ctrl+Alt+F        (v3.20.0) FULL-ENTRY DAILY LOGS, for logs that never change (Break,
                     Table Drop, Card Destruction). A short list opens: type the first
                     letters of the log's name (br, ta, ca), press Enter. Watchlog clicks
-                    New daily log (the Ctrl+Alt+D click), then clicks Location, Topic,
-                    Reference and Synopsis in turn: Location and Topic are typed in full
+                    New daily log (the Ctrl+Alt+D click), waits for the new "Daily Log
+                    Entry" window to open, then clicks Location, Topic, Reference and
+                    Synopsis in turn: Location and Topic are typed in full
                     and accepted with Enter, Reference is typed, the Synopsis is pasted.
                     It asks nothing. It does not touch End Time and does not save: you
                     click Now and Save yourself. Each is counted in Time saved and the
@@ -222,10 +223,13 @@ couple of seconds. No need to press anything.
                     Three come ready-made: Break, Table Drop, Card Destruction.
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
                     run this, hover over Location, Topic, Reference and Synopsis and press F8
-                    on each (nothing is clicked for you). Measured from inside the iTrak window
-                    like the new-log click, so the new log's form has to open in the same place
-                    each time. settings.ini [ITrak] EntryWait= (ms to wait after New daily log
-                    before filling, default 1500). Not shared with the team yet.
+                    on each (nothing is clicked for you). The daily log form is its own window
+                    (title "Daily Log Entry - N/A - \\Remote"), and the spots are measured from
+                    inside it, so it can open anywhere but should stay the same size.
+                    settings.ini [ITrak]: EntryWindow= (what to look for, default "Daily Log
+                    Entry ahk_exe wfica32.exe"), EntryWait= (most ms to wait for the form after
+                    New daily log, default 8000), EntrySettle= (ms to let it draw, default 600).
+                    Not shared with the team yet.
   Tray > iTrak > Share my setup with the team   (v3.19.0) puts this PC's iTrak click
                     in itrak.ini in the team folder, filed by screen scaling, for PCs
                     that haven't been taught. A PC's own teach always wins.
