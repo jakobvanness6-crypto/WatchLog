@@ -14,7 +14,7 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 30, 2026 (1)
+# Wording version: Oct 30, 2026 (2)
 # Program version: 3.25.1
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
@@ -106,23 +106,23 @@
 
 # ----- START / END OF SHIFT (asks which bay, remembers the last one) -
 
-;start (Start of shift) = Start of Shift Bay {Bay: last} Operator
-;end (End of shift) = End of Shift Bay {Bay: saved} Operator
+;start (Start of shift) = Start of Shift Bay {Bay: last} Operator >> Surveillance | Duty | NA | end
+;end (End of shift) = End of Shift Bay {Bay: saved} Operator >> Surveillance | Duty | NA | end
 
 
 # ----- QUICK TEMPLATES -----------------------------------------------
 
-;interior (Interior door check) = Security Supervisor performed interior door check
-;exterior (Exterior door check) = Security Officer performed exterior door check
-;parking (Parking lot patrol) = Security Officer performed parking lot patrol
+;interior (Interior door check) = Security {Rank: pick | Supervisor | Officer} performed interior door check >> Back of House - Non Sensitive | Call - Radio | NA
+;exterior (Exterior door check) = Security {Rank: pick | Officer | Supervisor} performed exterior door check >> Parking Lot | Call - Radio | NA
+;parking (Parking lot patrol) = Security {Rank: pick | Officer | Supervisor} performed parking lot patrol >> Parking Lot | Call - Radio | NA
 
 ;refuse (Refused entry) = Security Officer refused entry to {Patrons: one patron | 2 patrons | 3 patrons | 4 patrons | 5 patrons} due to {Reason: no ID | insufficient ID | expired ID | showing signs of intox} {Signs observed: prefix=( | suffix=) | blank=}.
 ;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
 
 ;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
 ;account (Account review) = Account #{Account #: blank=} reviewed, not banned player, Guest Services notified
-;drop (Table drop) = Security Officers performed Table Drop
-;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep.
+;drop (Table drop) = Security Officers performed Table Drop >> Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690)
+;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep. >> Cage ManTrap | Security Escort | M6 (972,973)
 
 
 # ----- FULL DAILY LOGS -----------------------------------------------
@@ -188,5 +188,5 @@
 
 # ----- OTHER ---------------------------------------------------------
 
-;destroy (Card destruction) = Security Officers entered Card Destruction Room for Card Destruction.
+;destroy (Card destruction) = Security Officers entered Card Destruction Room for Card Destruction. >> Card Destruction Room | Card Destruction | M6 (750,751,749)
 ;badge (Contractor pass) = Pass #17-0{Pass # (1-9): pick | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9} issued {Issued: to XXXXX employee | for interview}.
