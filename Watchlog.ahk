@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.22.0"
+VERSION := "3.22.1"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -401,8 +401,8 @@ LoadSettings() {
     Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
     ; The plain Caps Lock key (which does nothing with the guard on) clears the Alert Grid alerts
     Cfg["CapsClearsAlerts"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "AlertGrid", "CapsLockClears", "yes"))), "^(no|off|0|false)$")
-    ; Dark look for every Watchlog window (Customize Watchlog turns it off)
-    Cfg["Dark"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Look", "Dark", "yes"))), "^(no|off|0|false)$")
+    ; Dark look for every Watchlog window (off unless turned on in the tray menu or Customize)
+    Cfg["Dark"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Look", "Dark", "no"))), "^(no|off|0|false)$")
     ; Minutes after an SDS login to sign back into SDS by itself (0 = off)
     sr := Trim(IniRead(SettingsFile, "SDS", "ResignMinutes", "62"))
     Cfg["SdsResign"] := IsInteger(sr) && sr >= 0 && sr <= 600 ? Integer(sr) : 62
@@ -7611,8 +7611,7 @@ MenuItem(m, name, fn, glyph := 0) {
 ; A big button with a picture on the left and one or two lines of text
 IconButton(g, opt, text, glyph, color, fn) {
     b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
-    if LookOn()
-        color := Integer("0x" LookText(Format("{:06X}", color)))
+    color := Integer("0x" LookText(Format("{:06X}", color)))
     if glyph && (h := GlyphIcon(glyph, color, 24))
         SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
     b.OnEvent("Click", fn)
@@ -7672,6 +7671,9 @@ BuildTrayMenu() {
 
     MenuItem(tm, "Template editor  (" HK("editor") ")", (*) => ShowEditor(), 0xE70F)
     MenuItem(tm, "Customize Watchlog...", (*) => ShowCustomize(), 0xE713)
+    tm.Add("Dark look", (*) => SetDarkLook(!Cfg["Dark"]))
+    if Cfg["Dark"]
+        tm.Check("Dark look")
     MenuItem(tm, "Settings", (*) => ShowSettings(), 0xE713)
     MenuItem(tm, "Tutorial", (*) => ShowTutorial(), 0xE7BE)
     MenuItem(tm, "About Watchlog", (*) => ShowAbout(), 0xE946)
@@ -7737,7 +7739,7 @@ ShowCustomize() {
         g.AddButton("xm y+10 w220 h36", it[1]).OnEvent("Click", Open.Bind(it[3]))
         g.AddText("x+14 yp+8 w330", it[2])
     }
-    darkCB := g.AddCheckbox("xm y+22" (Cfg["Dark"] ? " Checked" : ""), "Dark look  (applies to windows opened from now on)")
+    darkCB := g.AddCheckbox("xm y+22" (Cfg["Dark"] ? " Checked" : ""), "Dark look  (also in the tray menu; applies to windows opened from now on)")
     darkCB.OnEvent("Click", SetDark)
     g.AddButton("xm y+14 w120 Default", "Close").OnEvent("Click", Close)
     g.OnEvent("Escape", Close)
@@ -7745,10 +7747,7 @@ ShowCustomize() {
     g.Show()
 
     SetDark(*) {
-        Cfg["Dark"] := darkCB.Value ? true : false
-        try IniWrite(Cfg["Dark"] ? "yes" : "no", SettingsFile, "Look", "Dark")
-        NoteOwnWrites()
-        Tip("Saved. Windows you open from now on use the " (Cfg["Dark"] ? "dark" : "light") " look.", 2500, true)
+        SetDarkLook(darkCB.Value ? true : false)
     }
     Open(fn, *) {
         Close()
@@ -10002,6 +10001,15 @@ MakeMineFile() {
 
 LookOn() => Cfg.Has("Dark") && Cfg["Dark"]
 
+; Dark or light for the windows opened from now on
+SetDarkLook(on) {
+    Cfg["Dark"] := on
+    try IniWrite(on ? "yes" : "no", SettingsFile, "Look", "Dark")
+    NoteOwnWrites()
+    Tip("Saved. Windows you open from now on use the " (on ? "dark" : "light") " look.", 2500, true)
+    BuildTrayMenu()
+}
+
 ; The panel colour behind the numbers on the home window
 LookCard() => LookOn() ? "262C34" : "E3EEEE"
 
@@ -10016,8 +10024,10 @@ LookLum(rgb) => (0.299 * rgb[1] + 0.587 * rgb[2] + 0.114 * rgb[3]) / 255
 
 ; A text colour for the dark look
 LookText(c) {
-    if !LookOn() || (rgb := LookRGB(c)) = ""
+    if (rgb := LookRGB(c)) = ""
         return c
+    if !LookOn()                                                                       ; light look: only the old teal changes
+        return rgb[1] + 40 < rgb[2] && rgb[1] + 40 < rgb[3] && Abs(rgb[2] - rgb[3]) < 40 ? "1F6FEB" : c
     mx := Max(rgb[1], rgb[2], rgb[3]), mn := Min(rgb[1], rgb[2], rgb[3])
     lum := LookLum(rgb)
     if mx - mn < 40
@@ -10038,8 +10048,6 @@ LookBack(c) {
 
 ; "s10 norm c606060" -> the same with the colour fixed
 LookFontOpts(o) {
-    if !LookOn()
-        return o
     out := "", pos := 1
     while RegExMatch(o, "i)(?<![A-Za-z0-9])c([0-9A-F]{6})(?![A-Za-z0-9])", &m, pos) {
         out .= SubStr(o, pos, m.Pos - pos) "c" LookText(m[1])

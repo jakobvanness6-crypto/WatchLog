@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.22.0  -  README
+  WATCHLOG  v3.22.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -760,17 +760,16 @@ CUSTOMIZE WATCHLOG  (v3.21.0: tray menu > Customize Watchlog, or the Customize b
   - Logins and reminders, Caps Lock, journal, updates: open Settings on the right tab.
   Settings, the template editor and the autocorrect editor all still work as before.
 
-DARK LOOK  (v3.22.0)
-  Every Watchlog window (home, Customize, Settings, the pick lists, the journal,
-  the dashboard, the cheat sheet and the rest) uses a dark look with a blue accent.
-  Dark text turns light, white panels turn dark and the old teal turns blue, so
-  nothing becomes unreadable. The home window has three panels at the top: logs
-  this shift, logins this shift and typing saved this shift. Tabs (Settings, the
-  template editor, the dashboard) are drawn as a row of buttons.
-  Customize Watchlog > the "Dark look" tick box turns it off (settings.ini [Look]
-  Dark=no) for windows opened from then on. The Caps Lock banner stays red. On
-  Windows 10/11 the buttons, lists and scroll bars go dark too; on an older
-  Windows they stay light, which is still readable.
+LOOK  (v3.22.0, light by default since v3.22.1)
+  Every Watchlog window uses a blue accent (the old teal is gone). The home window
+  has three panels at the top: logs this shift, logins this shift and typing saved
+  this shift. Tabs (Settings, the template editor, the dashboard) are drawn as a
+  row of buttons.
+  There is also a dark look: tray menu > Dark look (a tick shows when it is on), or
+  Customize Watchlog > the "Dark look" tick box (settings.ini [Look] Dark=yes or no).
+  It applies to windows opened from then on. In the dark look, dark text turns light and
+  white panels turn dark; on Windows 10/11 the buttons, lists and scroll bars go dark
+  too. The Caps Lock banner stays red.
 
 WATCHLOG HOME  (click the icon, or Ctrl+Alt+M)
   Big buttons in three groups: Logs (call pad, find a template, cheat
