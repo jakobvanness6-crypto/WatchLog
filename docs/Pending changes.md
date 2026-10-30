@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.24.0 (Oct 30, 2026): code words that fill the daily log (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.24.1 (Oct 30, 2026): Alert Grid clears acknowledged alerts first when the menu won't open (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -97,6 +97,9 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.24.1 (Oct 30)
+- Alert Grid: when acknowledged alerts are in the list, the right-click menu won't open. Now, if the Acknowledge box doesn't show, Watchlog clicks the clear-acknowledged button first (and the no-more-alerts click), then clears the unacknowledged alerts as usual. Once per clear; costs nothing when there are no acknowledged alerts. Needs the clear button taught. Jakob to say what Alert Grid shows when the right-click is refused (a popup? its title).
 
 ## Done in v3.24.0 (Oct 30)
 - Code words that fill the whole iTrak daily log: end a templates.txt line with ` >> Location | Topic | Reference` (add `| end` last to click End Time Now). Typing the code word (and answering its boxes) fills the open daily log, or opens a new one if none is open, from any window. Shift+Enter on the form, or Shift held when a no-box code word fires, pastes just the wording instead. First one: `;cards` (Card change) with GUESSED Location/Topic/Reference "Pit 2 | Card Change | NA": Jakob to correct.

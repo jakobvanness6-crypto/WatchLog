@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.24.0"
+VERSION := "3.24.1"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -3866,6 +3866,7 @@ ClearAlerts() {
     ; menu spot would miss: use the arrow keys there (when the line is known)
     useKeys := line && AlertMenuFlips(px, py, dy)
     keysUsed := false
+    ackedFirst := false
     done := false
     checked := false
     ; A new alert arriving while this runs re-draws the list and drops the
@@ -3919,6 +3920,22 @@ ClearAlerts() {
             dlg := WinWait("^Acknowledge$ ahk_exe javaw.exe", , 1.5)
             if !dlg {
                 Send "{Escape}"
+                ; Alert Grid only lets you right-click unacknowledged alerts: with
+                ; acknowledged ones in the selection the menu doesn't open. Clear
+                ; the acknowledged ones first (once), then go again (v3.24.1)
+                if !ackedFirst && IsInteger(c["ClearX"]) && IsInteger(c["ClearY"]) {
+                    ackedFirst := true
+                    if WinExist("ahk_id " grid) {
+                        WinActivate "ahk_id " grid
+                        WinWaitActive "ahk_id " grid, , 2
+                    }
+                    cleared := AlertClearAcked(c, grid, gap)
+                    Activity("Alert Grid: the right-click menu didn't open, so the acknowledged alerts were cleared first" (cleared ? "" : " (the clear button spot was outside the window)"))
+                    if cleared {
+                        attempts -= 1       ; this try doesn't count against the three
+                        continue
+                    }
+                }
                 ; the menu spot missed (menu somewhere else): try the arrow keys next time
                 if line && !useKeys
                     useKeys := true
@@ -3948,35 +3965,11 @@ ClearAlerts() {
                 Send "{Enter}"
             WinWaitClose "ahk_id " ok, , 2
             done := true
-            ; the little button that clears the acknowledged alerts (it follows
-            ; the edge it was nearest when Alert Grid has been resized)
-            if IsInteger(c["ClearX"]) && IsInteger(c["ClearY"]) && WinExist("ahk_id " grid) {
-                WinActivate "ahk_id " grid
-                WinWaitActive "ahk_id " grid, , 2
-                if AlertSpot(c, grid, "ClearX", "ClearY", false, &bx, &by) {
-                    Click bx, by
-                    Sleep gap
-                } else
-                    Activity("Alert Grid: the clear-acknowledged button spot is outside the window now (skipped it)")
-            }
-            ; the box (or button) that says there are no more alerts (v3.19.2).
-            ; Only if it was taught; an older teach skips it.
-            if IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
-                if c["NoMoreBox"] != "" {
-                    SetTitleMatchMode 3
-                    nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 0.8)
-                    SetTitleMatchMode "RegEx"
-                    if nb {
-                        WinActivate "ahk_id " nb
-                        WinGetPos &nbx, &nby, , , "ahk_id " nb
-                        Click nbx + Integer(c["NoMoreX"]), nby + Integer(c["NoMoreY"])
-                        WinWaitClose "ahk_id " nb, , 1
-                    }
-                } else if WinExist("ahk_id " grid) && AlertSpot(c, grid, "NoMoreX", "NoMoreY", false, &nmx, &nmy) {
-                    Click nmx, nmy
-                    Sleep gap
-                }
-            }
+            ; the little button that clears the acknowledged alerts, then the
+            ; "no more alerts" step (skipped when the acknowledged alerts were
+            ; already cleared first, below)
+            if !ackedFirst
+                AlertClearAcked(c, grid, gap)
         }
     }
     if done {
@@ -3990,6 +3983,45 @@ ClearAlerts() {
     }
     MouseMove ox, oy, 0
     AlertBack(prev, grid)
+}
+
+; Clears the acknowledged alerts: the little button (it follows the edge it was
+; nearest when Alert Grid has been resized), then the "no more alerts" box or
+; button. Returns true when the clear button was clicked.
+AlertClearAcked(c, grid, gap) {
+    clicked := false
+    ; the little button that clears the acknowledged alerts (it follows
+    ; the edge it was nearest when Alert Grid has been resized)
+    if IsInteger(c["ClearX"]) && IsInteger(c["ClearY"]) && WinExist("ahk_id " grid) {
+        WinActivate "ahk_id " grid
+        WinWaitActive "ahk_id " grid, , 2
+        if AlertSpot(c, grid, "ClearX", "ClearY", false, &bx, &by) {
+            Click bx, by
+            clicked := true
+            Sleep gap
+        } else
+            Activity("Alert Grid: the clear-acknowledged button spot is outside the window now (skipped it)")
+    }
+    ; the box (or button) that says there are no more alerts (v3.19.2).
+    ; Only if it was taught; an older teach skips it.
+    if IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
+        if c["NoMoreBox"] != "" {
+            SetTitleMatchMode 3
+            nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 0.8)
+            SetTitleMatchMode "RegEx"
+            if nb {
+                WinActivate "ahk_id " nb
+                WinGetPos &nbx, &nby, , , "ahk_id " nb
+                Click nbx + Integer(c["NoMoreX"]), nby + Integer(c["NoMoreY"])
+                WinWaitClose "ahk_id " nb, , 1
+            }
+        } else if WinExist("ahk_id " grid) && AlertSpot(c, grid, "NoMoreX", "NoMoreY", false, &nmx, &nmy) {
+            Click nmx, nmy
+            Sleep gap
+        }
+    }
+
+    return clicked
 }
 
 ; Puts back the window that was in front before a clear

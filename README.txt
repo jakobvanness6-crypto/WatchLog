@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.24.0  -  README
+  WATCHLOG  v3.24.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.24.0 (Documents, or the program folder).
+                      v3.24.1 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -185,6 +185,11 @@ couple of seconds. No need to press anything.
                     A teach from an older version is changed over by itself the first
                     time. If Alert Grid is too small or off the screen it says so and
                     clicks nothing.
+                    v3.24.1: if the right-click menu doesn't open because acknowledged
+                    alerts are in the list (Alert Grid only allows the menu on unacknowledged
+                    ones), the clear-acknowledged button is clicked first (and the no-more-
+                    alerts click), then the unacknowledged alerts are cleared as usual. It
+                    needs the clear-acknowledged button taught (step 5 of the teach).
                     v3.19.2: after the clear button there's one more click, the box that
                     says there are no more alerts. It's step 6 of the teach (re-teach once:
                     an older teach still works but skips that click).
