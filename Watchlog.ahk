@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.20.1   (called Log Templates before v3.0.1)
+;  WATCHLOG  v3.20.2   (called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.20.1"
+VERSION := "3.20.2"
 VERSION_DATE := "Oct 29, 2026"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
@@ -1291,7 +1291,33 @@ RunTemplate(text, title, repeat := false, trig := "") {
         CountSaved("log", saved, title)
         return
     }
-    FormPaste(title, fields, vals => FillTemplate(text, fields, vals), repeat, StrLen(trig))
+    ; "saved" boxes with a value from this shift aren't asked (v3.20.2)
+    fixed := Map(), shown := []
+    for f in fields {
+        if f.HasOwnProp("savedVal")
+            fixed[f.key] := f.savedVal
+        else
+            shown.Push(f)
+    }
+    if !fixed.Count {
+        FormPaste(title, fields, vals => FillTemplate(text, fields, vals), repeat, StrLen(trig))
+        return
+    }
+    merge(vals) {
+        out := [], j := 0
+        for f in fields
+            out.Push(fixed.Has(f.key) ? fixed[f.key] : vals[++j])
+        return out
+    }
+    if !shown.Length {
+        out := FillTemplate(text, fields, merge([]))
+        Paste(out)
+        saved := StrLen(out) - StrLen(trig)
+        Journal(title, out, saved)
+        CountSaved("log", saved, title)
+        return
+    }
+    FormPaste(title, shown, vals => FillTemplate(text, fields, merge(vals)), repeat, StrLen(trig))
 }
 
 ; ---- Facial rec copies (v3.6.0) ---------------------------------------
@@ -1362,7 +1388,7 @@ ParseFields(text) {
     ; syncs); before v3.3 they were in settings.ini, so that's the fallback.
     last := Map()
     last.CaseSense := false
-    if InStr(text, "last") || InStr(text, "next") || InStr(text, "alertcopy") {
+    if InStr(text, "last") || InStr(text, "next") || InStr(text, "alertcopy") || InStr(text, "saved") {
         section := ""
         try section := IniRead(LastUsedFile, "LastUsed")
         if section = ""
@@ -1383,6 +1409,8 @@ ParseFields(text) {
     }
     return fields
 }
+
+IsTimeStamp(v) => RegExMatch(v, "^\d{14}$")
 
 ParseField(spec, last := Map()) {
     c := InStr(spec, ":")
@@ -1441,6 +1469,13 @@ ParseField(spec, last := Map()) {
         } else if low = "last" {
             f.remember := true
             f.def := last.Has(key) ? last[key] : ""
+        } else if low = "saved" {
+            ; like last, but when a value was entered in the last 14 hours
+            ; (the bay at the start of shift) it is used without asking (v3.20.2)
+            f.remember := true
+            f.def := last.Has(key) ? last[key] : ""
+            if f.def != "" && last.Has(key ".at") && IsTimeStamp(last[key ".at"]) && DateDiff(A_Now, last[key ".at"], "Hours") < 14
+                f.savedVal := f.def
         } else if low = "next" {
             f.remember := true, f.nextStep := true
         } else if low = "pick" {
@@ -1852,6 +1887,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0) {
                     if !DirExist(DataDir)
                         DirCreate DataDir
                     IniWrite v, LastUsedFile, "LastUsed", f.key
+                    IniWrite A_Now, LastUsedFile, "LastUsed", f.key ".at"
                 }
             }
             if save && f.HasOwnProp("alertCopy")
@@ -4095,6 +4131,12 @@ EntryLoad() {
     for k, v in c
         if !IsInteger(v)
             return ""
+    ; End Time's Now button (v3.20.2): optional, only for logs that end with | end
+    try {
+        ex := Trim(IniRead(ITrakFile, "Fields", "EndNowX", "")), ey := Trim(IniRead(ITrakFile, "Fields", "EndNowY", ""))
+        if IsInteger(ex) && IsInteger(ey)
+            c["EndNowX"] := ex, c["EndNowY"] := ey
+    }
     return c
 }
 
@@ -4177,6 +4219,17 @@ EntryPickMove(d) {
     lb.Choose(Max(1, Min(n, i)))
 }
 
+; The bay entered at the start of this shift (last 14 hours), or "" when none
+SavedBay() {
+    try {
+        v := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
+        at := IniRead(LastUsedFile, "LastUsed", "Bay.at", "")
+        if v != "" && IsTimeStamp(at) && DateDiff(A_Now, at, "Hours") < 14
+            return v
+    }
+    return ""
+}
+
 ; Fills a new daily log. Keys counted as saved: 5 for each drop-down (a
 ; few letters, Enter, the click), the full length of the Reference and
 ; the Synopsis plus a click each, and the 2 for the new-log click.
@@ -4186,6 +4239,23 @@ RunEntry(e) {
     if !f {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
         return
+    }
+    syn := e.syn
+    if InStr(syn, "{Bay}") {
+        bay := SavedBay()
+        if bay = "" {
+            ib := InputBox("Which bay are you on? (Start of shift keeps it for the rest of the shift.)", "Watchlog - " e.name, "w320 h140")
+            if ib.Result != "OK" || Trim(ib.Value) = ""
+                return
+            bay := Trim(ib.Value)
+            try {
+                if !DirExist(DataDir)
+                    DirCreate DataDir
+                IniWrite bay, LastUsedFile, "LastUsed", "Bay"
+                IniWrite A_Now, LastUsedFile, "LastUsed", "Bay.at"
+            }
+        }
+        syn := StrReplace(syn, "{Bay}", bay)
     }
     before := EntryWins()
     if !ITrakNewLog(false)
@@ -4216,7 +4286,7 @@ RunEntry(e) {
     w0 := Integer(f["W"]), h0 := Integer(f["H"])
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
-    vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", e.syn)
+    vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
     keys := 2
     for k in EntryFields {
@@ -4250,11 +4320,26 @@ RunEntry(e) {
         }
         Sleep 120
     }
+    ; End Time's Now button, for logs that end with | end (the log is complete)
+    if e.end {
+        if !f.Has("EndNowX") {
+            Tip("End Time's Now button isn't taught yet: press Ctrl+Alt+Shift+F to teach it.", 5000, true)
+            Activity("Full-entry log " e.name ": End Time Now not clicked (not taught; run Ctrl+Alt+Shift+F again)")
+        } else if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), w0, h0, &x, &y) && AlertOnScreen(x, y) && WinActive("ahk_id " win) {
+            Sleep 300
+            MouseMove x, y, 0
+            Sleep 60
+            Click
+            keys += 1
+            Sleep 120
+        } else
+            Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
+    }
     MouseMove ox, oy, 0
     Tip("Filled in: " e.name, 1500)
     Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
     CountSaved("log", keys, "Full log: " e.name)
-    Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " e.syn, keys)
+    Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
 }
 
 ; Types text key by key (what Citrix handles best), a little slower than normal
@@ -4281,12 +4366,12 @@ TeachEntryFieldsRun() {
         MsgBox "Open a new daily log in iTrak first, so the empty Daily Log Entry form is showing (its window title starts with Daily Log Entry), then run this again.", "Teach daily log fields", "Icon!"
         return
     }
-    if MsgBox("Leave the empty Daily Log Entry form showing.`n`nFor each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
+    if MsgBox("Leave the empty Daily Log Entry form showing.`n`nFor each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching. The fifth spot is End Time's Now button.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
         return
     SetTitleMatchMode 2
     pts := Map()
     for i, k in EntryFields {
-        if !TeachWait(i " of 4`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        if !TeachWait(i " of 5`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
             return
         win := EntryWin()
         if !win || !ITrakPoint(win, &x, &y) {
@@ -4295,12 +4380,22 @@ TeachEntryFieldsRun() {
         }
         pts[k] := [x, y]
     }
+    if !TeachWait("5 of 5`nHover over End Time's  Now  button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    win := EntryWin()
+    if !win || !ITrakPoint(win, &x, &y) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+        return
+    }
+    pts["EndNow"] := [x, y]
     WinGetClientPos , , &cw, &ch, "ahk_id " win
     try {
         for k in EntryFields {
             IniWrite pts[k][1], ITrakFile, "Fields", k "X"
             IniWrite pts[k][2], ITrakFile, "Fields", k "Y"
         }
+        IniWrite pts["EndNow"][1], ITrakFile, "Fields", "EndNowX"
+        IniWrite pts["EndNow"][2], ITrakFile, "Fields", "EndNowY"
         IniWrite cw, ITrakFile, "Fields", "W"
         IniWrite ch, ITrakFile, "Fields", "H"
     } catch {
@@ -7979,7 +8074,7 @@ BoxParse(spec) {
             b.caps := true
         else if low = "upper"
             b.upper := true
-        else if low = "tidy" || low = "several"
+        else if low = "tidy" || low = "several" || low = "saved"
             b.keep.Push(opt)       ; bvs -> BVs, several (no tick box for them): kept as they are
         else if SubStr(opt, 1, 1) = "@" && b.list = ""
             b.list := SubStr(opt, 2)

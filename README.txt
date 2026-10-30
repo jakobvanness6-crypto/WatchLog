@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.20.1  -  README
+  WATCHLOG  v3.20.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -220,9 +220,12 @@ couple of seconds. No need to press anything.
                     The logs are lines in templates.txt (or my-templates.txt):
                       +Name = Location | Topic | Reference | Synopsis
                     e.g. +Break = Surveillance | Duty | NA | Break
-                    Three come ready-made: Break, Table Drop, Card Destruction.
+                    Four come ready-made: Break, Table Drop, End (end of shift) and
+                    Card Destruction. A line that ends with | end also clicks End Time's
+                    Now button once the log is filled (the End log does); {Bay} in a
+                    synopsis is the bay entered at the start of shift (v3.20.2).
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
-                    run this, hover over Location, Topic, Reference and Synopsis and press F8
+                    run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
                     on each (nothing is clicked for you). The daily log form is its own window
                     (title "Daily Log Entry - N/A - \\Remote"), and the spots are measured from
                     inside it, so it can open anywhere but should stay the same size.
@@ -905,6 +908,9 @@ Blanks (any of these makes the template a form):
                                by ;face), checked against the last one
   {Match: matchcopy}           the match % copied in Edge (used by ;face)
   {Bay: last}                  remembers what you typed last time
+  {Bay: saved}                 like last, but a bay entered in the last 14
+                               hours (at the start of shift) is used without
+                               asking; asks as usual if there isn't one (v3.20.2)
   {Step: next | A | B | C}     opens on the step after last time's
   {Machine: blank=AXXXX}       what to leave if the box is empty
                                (otherwise it leaves XX)

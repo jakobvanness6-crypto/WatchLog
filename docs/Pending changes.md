@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.20.1 (Oct 30, 2026).
+Current version: v3.20.2 (Oct 30, 2026).
 
 ## Waiting to be built
 
@@ -12,6 +12,10 @@ Current version: v3.20.1 (Oct 30, 2026).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.20.2 (Oct 30)
+- End of shift full-entry log: type "end" in the Ctrl+Alt+F list: Surveillance, Duty, NA, synopsis "End of Shift Bay (your bay) Operator", then End Time's Now button is clicked. New fifth teach step (End Time's Now button): run Ctrl+Alt+Shift+F again.
+- The bay entered at the start of shift is kept for the shift (14 hours): the ;end template and the End log no longer ask for it (new box option {Bay: saved}; asks as before if no bay was entered at the start).
 
 ## Done in v3.20.1 (Oct 30)
 - Fix for the daily log teach step ("the click position wasn't in the iTrak window"): the daily log form is its own window titled "Daily Log Entry - N/A - \\Remote", so the field spots are now measured from that window, and the fill waits for the new form to open instead of a fixed pause.
