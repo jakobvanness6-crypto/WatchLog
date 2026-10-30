@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.24.1  -  README
+  WATCHLOG  v3.25.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.24.1 (Documents, or the program folder).
+                      v3.25.0 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -732,6 +732,18 @@ and the less-used items sit in sub-menus):
                                 Reload
   Exit Watchlog                 Closes it (start it again from the
                                 Start menu)
+
+CHANGING THE ; IN FRONT OF CODE WORDS  (v3.25.0)
+  Settings > General > "Type this in front of code words and logins" (settings.ini
+  [Triggers] Prefix=). Use 1 to 3 symbols, no letters, digits, spaces or colons (for
+  example . or // or \). After you Save, Watchlog reloads and every code word, login
+  shortcut that starts with ; and the time and date stamps (;t ;dd ;dt) are typed with
+  your prefix instead: with . you type .jack, .t, .dd. It is per PC (settings.ini), so
+  each operator picks their own. templates.txt, my-templates.txt and the shared team
+  file keep the ; in them, so they work the same everywhere. The cheat sheet (Ctrl+Alt+H),
+  the template finder and the login list show your prefix. Pick one you don't type in
+  normal writing, because a code word fires the moment it is typed. Messages in the
+  template editor still show the ; from the file.
 
 CODE WORDS THAT FILL THE DAILY LOG  (v3.24.0)
   A code word can fill a whole iTrak daily log instead of pasting text. In templates.txt

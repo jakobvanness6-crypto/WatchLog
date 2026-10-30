@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.24.1"
+VERSION := "3.25.0"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -175,6 +175,7 @@ LoadSettings()
 LoadTemplates()
 LoadApps()
 RegisterHotkeys()
+RegisterStamps()
 ResumeSdsResign()
 StartWatching()
 CleanJournal()
@@ -397,6 +398,10 @@ LoadSettings() {
     keep := Trim(IniRead(SettingsFile, "Journal", "KeepDays", "30"))
     Cfg["KeepDays"] := IsInteger(keep) && keep >= 0 ? Integer(keep) : 30
     ; Ctrl+Alt+L puts the saved window layout back at the end (only if one was saved)
+    ; the character(s) typed in front of code words instead of ; (v3.25.0):
+    ; 1 to 3 symbols, no letters, digits, spaces or : or `
+    pfx := Trim(IniRead(SettingsFile, "Triggers", "Prefix", ";"))
+    Cfg["Prefix"] := pfx != "" && StrLen(pfx) <= 3 && !RegExMatch(pfx, "[\s:a-zA-Z0-9]") && !InStr(pfx, "``") ? pfx : ";"
     Cfg["LayoutAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Layout", "AfterStart", "yes"))), "^(no|off|0|false)$")
     ; Ctrl+Alt+L signs into the Bally programs it just opened (after asking)
     Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
@@ -505,7 +510,7 @@ AddLogin(trig, user, fallbackPw, win, remind := 0) {
     rec := {trig: trig, user: user, win: win, remind: remind, pw: fallbackPw}
     rec.timer := ShowLoginReminder.Bind(rec)
     HotIf(win != "" ? MakeWindowCheck(win) : NotInSettings)
-    Hotstring(":*C:" trig, (*) => DoLogin(trig, user, fallbackPw, rec))
+    Hotstring(":*C:" TrigKey(trig), (*) => DoLogin(trig, user, fallbackPw, rec))
     HotIf
     LoginList.Push(rec)
     if remind && !(Cfg["SdsResign"] && (InStr(win, "SDS") || IsSdsLogin(rec)))
@@ -589,6 +594,13 @@ PickWindow() {
 ; typing ;me into a Shortcut box doesn't type a password there
 SettingsActive() => (IsObject(SettingsWin) || IsObject(EditorWin)) && WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
 NotInSettings(*) => !SettingsActive()
+
+; What you type for a code word: the files keep the ; in front (so they work
+; the same on every PC), and the PC's own prefix is typed instead (v3.25.0)
+TrigKey(t) {
+    pfx := Cfg.Has("Prefix") ? Cfg["Prefix"] : ";"
+    return pfx != ";" && SubStr(t, 1, 1) = ";" ? pfx SubStr(t, 2) : t
+}
 
 ; Types the username, Tab, the password, Enter.
 ; The password comes from Windows Credential Manager on this PC. If there
@@ -778,7 +790,7 @@ ShowLoginReminder(rec) {
     g := WGui("+AlwaysOnTop +ToolWindow", "Login reminder")
     g.SetFont("s11", "Segoe UI")
     g.MarginX := 16, g.MarginY := 12
-    g.AddText(, "Time to log in again  (" rec.remind " minutes since the last one)`n`n      " rec.trig "      " rec.user)
+    g.AddText(, "Time to log in again  (" rec.remind " minutes since the last one)`n`n      " TrigKey(rec.trig) "      " rec.user)
     g.AddButton("Default w100", "OK").OnEvent("Click", (*) => CloseReminder())
     g.SetFont("s9")
     g.AddText("x+12 yp+6", "(or press Esc)")
@@ -1303,7 +1315,7 @@ AddTemplates(content, src, label, trigs, &problems) {
         }
         isForm := RegExMatch(text, "\{[^{}]+\}") > 0
         HotIf NotInSettings
-        Hotstring(":*C:" trig, MakeTemplateHandler(text, name != "" ? name : trig, repeat, trig, fill))
+        Hotstring(":*C:" TrigKey(trig), MakeTemplateHandler(text, name != "" ? name : trig, repeat, trig, fill))
         HotIf
         TemplateList.Push({trig: trig, name: name, text: text, form: isForm, repeat: repeat, fill: fill, src: src})
         added += 1
@@ -5287,22 +5299,31 @@ Tiles(g, tiles) {
 ;  (not in the template finder's search box, so ;t can be searched for,
 ;  and not in Settings)
 ; =====================================================================
-#HotIf !PickerActive() && !SettingsActive()
-:*:;t:: {
+StampsOK(*) => !PickerActive() && !SettingsActive()
+
+; Registered here (not as fixed hotstrings) so the prefix can be changed
+RegisterStamps() {
+    HotIf StampsOK
+    Hotstring(":*:" TrigKey(";t"), StampTime)
+    Hotstring(":*:" TrigKey(";dd"), StampDate)
+    Hotstring(":*:" TrigKey(";dt"), StampDateTime)
+    HotIf
+}
+
+StampTime(*) {
     SendInput "{Text}@" FormatTime(, "HH:mm")
     CountSaved("stamp", 6 - 2, "Stamp `;t")
 }
 
-:*:;dd:: {
+StampDate(*) {
     SendInput "{Text}" FormatTime(, "yyyy-MM-dd")
     CountSaved("stamp", 10 - 3, "Stamp `;dd")
 }
 
-:*:;dt:: {
+StampDateTime(*) {
     SendInput "{Text}" FormatTime(, "yyyy-MM-dd") " @" FormatTime(, "HH:mm")
     CountSaved("stamp", 17 - 3, "Stamp `;dt")
 }
-#HotIf
 
 
 ; =====================================================================
@@ -5970,7 +5991,7 @@ ShowPicker() {
         lv.Delete()
         for i in found.rows {
             t := TemplateList[i]
-            lv.Add(, t.trig, t.name != "" ? t.name : t.trig, (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : ""))
+            lv.Add(, TrigKey(t.trig), t.name != "" ? t.name : t.trig, (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : ""))
         }
         lv.Opt("+Redraw")
         if found.rows.Length
@@ -5988,7 +6009,7 @@ ShowPicker() {
         }
         t := TemplateList[found.rows[row]]
         prev.Value := RegExReplace(t.text, "\{([^{}:]+)(:[^{}]*)?\}", "[$1]")
-        tip.Text := "Next time you can type  " t.trig "  anywhere instead of opening this. "
+        tip.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
             . (t.repeat ? "It opens a form, and Ctrl+Enter adds another." : t.form ? "It opens a form to fill in." : "It goes in straight away.")
             . (t.src = "mine" ? " (One of yours, from my-templates.txt.)" : "")
     }
@@ -6232,6 +6253,10 @@ ShowSettings(welcome := false, startTab := 1) {
     g.SetFont("s10 norm")
     capsCB := g.AddCheckbox("xs y+6" (CapsGuard ? " Checked" : ""), "Caps Lock guard: plain Caps Lock can't turn it on by accident (Shift+Caps Lock does), red tag while it's on")
     startCB := g.AddCheckbox("xs y+6" (StartupShortcuts().Length ? " Checked" : ""), "Start Watchlog when I sign in to Windows")
+    g.AddText("xs y+14", "Type this in front of code words and logins:")
+    prefE := g.AddEdit("x+8 yp-3 w60 Limit3", Cfg["Prefix"])
+    g.AddText("x+8 yp+3 w330", "(a ; by default; 1 to 3 symbols, no letters or digits)")
+    g.AddText("xs y+4 w" W, "The templates and shared files keep the ; in them: this PC just types your prefix instead. Press Ctrl+Alt+H after saving to see your shortcuts.")
     tabs.UseTab()
 
     tabs.GetPos(&tx, &ty, &tw, &th)
@@ -6250,7 +6275,7 @@ ShowSettings(welcome := false, startTab := 1) {
     Refresh(sel := 0) {
         lv.Delete()
         for x in st.logins
-            lv.Add(, x.trig, x.user, x.win != "" ? x.win : "(any program)", x.remind ? x.remind " min" : ""
+            lv.Add(, TrigKey(x.trig), x.user, x.win != "" ? x.win : "(any program)", x.remind ? x.remind " min" : ""
                 , x.pw != "" ? "new one, saved on Save" : CredExists(x.user) ? "saved" : "not yet (asks once)")
         if sel
             lv.Modify(sel, "Select Focus Vis")
@@ -6455,6 +6480,14 @@ ShowSettings(welcome := false, startTab := 1) {
             MsgBox "Type which line of Alert Grid's right-click menu 'Acknowledge as received' is, like 2 (1 = top), or leave it blank.", "Watchlog", "Icon!"
             return
         }
+        newPfx := Trim(prefE.Value)
+        if newPfx = ""
+            newPfx := ";"
+        if StrLen(newPfx) > 3 || RegExMatch(newPfx, "[\s:a-zA-Z0-9]") || InStr(newPfx, "``") {
+            tabs.Choose(6)
+            MsgBox "The prefix must be 1 to 3 symbols, like ; or . or // (no letters, digits, spaces or colons).", "Watchlog", "Icon!"
+            return
+        }
         failed := ""
         ; New passwords go into Credential Manager first
         for x in st.logins {
@@ -6504,6 +6537,12 @@ ShowSettings(welcome := false, startTab := 1) {
             }
             if st.upd != Cfg["UpdateFolder"]
                 IniWrite st.upd, SettingsFile, "Updates", "Folder"
+            if newPfx != Cfg["Prefix"] {
+                if newPfx = ";" {
+                    try IniDelete SettingsFile, "Triggers", "Prefix"
+                } else
+                    IniWrite newPfx, SettingsFile, "Triggers", "Prefix"
+            }
         } catch as e {
             MsgBox "Couldn't save settings.ini:`n" e.Message "`n`nIf OneDrive is syncing, press Save again in a moment.", "Watchlog", "Icon!"
             return
@@ -6522,7 +6561,8 @@ ShowSettings(welcome := false, startTab := 1) {
             . "; start with Windows " (startCB.Value ? "on" : "off")
             . "; sign in at start " yn(signCB.Value) ", windows back " yn(layCB.Value) ", wait " wait " s"
             . "; Caps Lock clears alerts " yn(capsClearCB.Value) ", click gap " gap " ms; Caps Lock guard " (capsCB.Value ? "on" : "off")
-            . "; update folder " (st.upd = "" ? "team folder" : st.upd))
+            . "; update folder " (st.upd = "" ? "team folder" : st.upd)
+            . "; code word prefix " newPfx)
         if failed != ""
             MsgBox "These passwords couldn't be saved in Credential Manager, so each one is asked for the first time you use it:`n`n" failed, "Watchlog", "Icon!"
         SetSettingsWin("")
@@ -6910,17 +6950,17 @@ ShowCheatSheet() {
     ; Three columns of sections. Each row is a shortcut and what it does.
     forms := [], quick := [], apps := []
     for t in TemplateList {
-        row := [t.trig, t.name (t.repeat ? "  (adds more)" : "") (t.src = "mine" ? "  (mine)" : "")]
+        row := [TrigKey(t.trig), t.name (t.repeat ? "  (adds more)" : "") (t.src = "mine" ? "  (mine)" : "")]
         if t.form
             forms.Push(row)
         else
             quick.Push(row)
     }
     for l in LoginList
-        quick.Push([l.trig, "Login: " l.user (l.win != "" ? "  (only in " l.win ")" : "")])
+        quick.Push([TrigKey(l.trig), "Login: " l.user (l.win != "" ? "  (only in " l.win ")" : "")])
     for a in AppList
         apps.Push([a.key, a.name])
-    stamps := [[";t", "time"], [";dd", "date"], [";dt", "date and time"]]
+    stamps := [[TrigKey(";t"), "time"], [TrigKey(";dd"), "date"], [TrigKey(";dt"), "date and time"]]
     keys := []
     for d in HotkeyDefs
         keys.Push([HKShort(d.id), d.label])
