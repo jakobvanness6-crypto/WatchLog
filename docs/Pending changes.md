@@ -3,16 +3,68 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.19.1 (Oct 27, 2026).
+Current version: v3.22.2 (Oct 30, 2026).
 
 ## Waiting to be built
 
-- **Casino autocorrect in every program** (Jakob, Oct 26: "add it to the rest of the programs"). Today it only runs in the call pad and the log form boxes. Plan: an optional system-wide mode ([CallPad] Autocorrect=everywhere, plus a tick in Settings) that fixes a word when a space, Enter or punctuation follows it, in any window. Open points: it must stay out of password and login fields and out of Watchlog's own typing (logins, templates); in Citrix/iTrak a fix means Backspaces plus retyping, which can be slow or drop keys, so it needs its own test there; IT should hear about it (it watches typed words, stores nothing). Same autocorrect.txt list. Wait for the full test pass (docs checklist) before building.
+- **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Waiting on Location, Topic, Reference and End Time click for those three.
+- **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
+
+
 - Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
 - Shorthand for other logs (which ones, with his real examples).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.22.2 (Oct 30)
+- Settings window: the tab area is taller (350 -> 400), so the "Beep when a log-in-again reminder pops up" tick on the Logins tab is no longer cut off by Save and Cancel (Jakob's screenshot, display scaling makes text taller than under Wine).
+
+## Done in v3.22.1 (Oct 30)
+- Jakob's first look at the dark theme: dark text on a dark background somewhere, so light is now the default (blue accent kept, teal gone) and dark is a switch: tray menu > Dark look, or Customize. Dark text on dark probably came from a colour I did not remap; if he turns dark on again and sees it, ask for a screenshot.
+
+## Done in v3.22.0 (Oct 30)
+- Dark look with a blue accent in every window (Jakob: "I like a dark colour scheme", blue or forest green, my pick: blue). Built as a WGui class that remaps the colours each window asks for; Customize > "Dark look" turns it off ([Look] Dark=no). Tabs show as a row of buttons.
+- Home window: three panels at the top (logs, logins, typing saved this shift).
+- Interior, Exterior and Parking Officer/Supervisor full-entry logs (six, in templates.txt, no End Time click).
+- Docs brought up to v3.22.0: README, QUICK START, the plain Overview, the IT Summary and the one-page Summary (Word and PDF). The "(with screenshots)" overview was NOT redone (needs new screenshots).
+- Not tested on a real Windows PC: only under Wine, which draws buttons and lists light. The dark buttons, list headers and scroll bars rely on Windows' own dark mode, so check them on the bay.
+
+## Done in v3.21.0 (Oct 30)
+- The Start full-entry log also clicks End Time's Now button (Jakob asked; goes out with this build).
+- Customize Watchlog (tray menu and a Customize button on the home window): screens for the full-entry daily logs (add, edit, copy, delete, try), the shortcut keys (21 of them can be changed; pause, reload, app keys and form keys stay), the programs opened and closed at the start and end of shift, the shared lists (opens the template editor on that tab), the autocorrect words, and the speed and timing values; logins, reminders, Caps Lock, journal and updates open Settings on the right tab.
+- The tray menu, home window and cheat sheet show the shortcut keys you picked.
+- Saving from these screens applies right away, with no automatic restart (the hotkey screen restarts Watchlog).
+- Not tested: pressing the shortcut keys (Wine can't fire hotkeys), so a changed key is checked only for being registered.
+
+## Done in v3.20.3 (Oct 30)
+- Start of shift full-entry log: "start" in the Ctrl+Alt+F list. Surveillance, Duty, NA, synopsis "Start of Shift Bay (bay) Operator". It always asks which bay (offering the last one) and keeps the answer for the shift; the End log and ;end then use it without asking. It leaves End Time alone (add `| end` to its line in templates.txt if you want the Now click too).
+
+## Done in v3.20.2 (Oct 30)
+- Confirmed on Jakob's PC: the End log fills in about 4 seconds, against about 15 s by hand (7 s was his best). Real timing for the manager pitch.
+- End of shift full-entry log: type "end" in the Ctrl+Alt+F list: Surveillance, Duty, NA, synopsis "End of Shift Bay (your bay) Operator", then End Time's Now button is clicked. New fifth teach step (End Time's Now button): run Ctrl+Alt+Shift+F again.
+- The bay entered at the start of shift is kept for the shift (14 hours): the ;end template and the End log no longer ask for it (new box option {Bay: saved}; asks as before if no bay was entered at the start).
+
+## Done in v3.20.1 (Oct 30)
+- Fix for the daily log teach step ("the click position wasn't in the iTrak window"): the daily log form is its own window titled "Daily Log Entry - N/A - \\Remote", so the field spots are now measured from that window, and the fill waits for the new form to open instead of a fixed pause.
+
+## Done in v3.20.0 (Oct 30)
+- Full-entry daily logs: Ctrl+Alt+F opens a pick list (type the first letters, Enter) of never-changing logs; Watchlog opens a new daily log in iTrak and fills Location, Topic, Reference and Synopsis with no questions. Break, Table Drop and Card Destruction are ready-made in templates.txt (lines `+Name = Location | Topic | Reference | Synopsis`). End Time and Save stay yours. Ctrl+Alt+Shift+F teaches the four field spots once per PC. Counted in Time saved and the journal ("Full log: Break"): 5 keystrokes per drop-down, full length of Reference and Synopsis plus 1 per click, 2 for the new-log click.
+- SDS login reminder: no "log in again" reminder for a login typed into SDS while "Sign back into SDS by itself" is ticked (it was only skipped when the login was locked to SDS with Window=). Untick the box to get the reminder back.
+- Home window: the whole Shift section is gone (shortcuts and the cheat sheet remain).
+- Not tried on a real iTrak/Citrix: Wine test with a fake iTrak window passed (pick list, clicks, typing, paste, counts).
+- Still open from this thread: more full-entry logs from Jakob (he is sending 3-5; 3 done), End Time Now click is NOT used, sharing the field spots with the team, other home window trimming.
+
+## Shipped without a version (templates.txt only)
+- Oct 29: ;open and ;auto got {repeat} (one table per line); replaced the same day by v3.19.3's one-line list.
+
+## Done in v3.19.3 (Oct 29)
+- Start of shift no longer puts SDS where Alert Grid goes. Both are the same Java program (javaw.exe) and the layout matched them by front-to-back order, so after the start of shift sign-in left SDS in front it took Alert Grid's spot. Save window layout now notes which one each Java window is (Alert Grid, SDS or other, from the start of its title; the title isn't saved) and Put windows back matches on that. A layout saved before v3.19.3 still works the old way and asks once to be saved again (Ctrl+Alt+Shift+S).
+- Several tables on one line: ;open and ;auto take Add another (Ctrl+Enter) and paste "BJ205, BJ206 and RO204 Opened." New box option | several (README, template options). The table box starts empty; a table added twice is listed once.
+- Tested under Wine with fake SDS and Alert Grid windows (the old matching swapped them, the new one doesn't) and the forms. The real Bally windows only on a bay.
+
+## Done in v3.19.2 (Oct 29)
+- Alert Grid teach has a new step 6 (the casino added a click that says there are no more alerts, last in the sequence, after the clear-acknowledged button). Hover over the box's button and press F8. Saved as NoMoreX/NoMoreY (+ NoMoreBox, the box's title, when it's a separate box; measured from that box) in alertgrid.ini and included in Share my setup with the team. Old teaches work and skip the click until re-taught. Waits up to 0.8 s for the box, so no extra delay when it isn't there. Built without running AutoHotkey (not run under Wine).
 
 ## Done in v3.19.1 (Oct 27)
 - Copyright and licence (step 1 of making Watchlog proprietary): "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved." and a short licence (permission only, no copying/sharing/changing/redistributing, provided as is). New About Watchlog window (tray menu and home window); the line also shows under the tutorial, in the version box, at the bottom of the cheat sheet and in Security and status; Copyright field in the exe's file properties; block at the top of README, QUICK START, templates.txt and Watchlog.ahk; LICENCE.txt in the zip, built into the exe and in Make a copy to share.
@@ -329,3 +381,10 @@ Added Oct 16 (templates.txt only): `;selfex` Self-exclusion and `;found` Abandon
 - Templates fire instantly; `;count` renamed `;countstep`; clashing triggers are refused with a message.
 - App hotkeys: Ctrl+Alt+T Teams, U Outlook, Y Spotify, G Chrome.
 - Ctrl+Alt+T find notes by tag removed.
+
+## Queued (Jakob 2026-10-30, build only when he says "build it")
+Six full-entry logs, none click End Time Now, Reference NA:
+- +Interior Officer / +Interior Supervisor: Back of House - Non Sensitive | Call - Radio | NA | Security Officer (or Supervisor) performed interior door check
+- +Exterior Officer / +Exterior Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed exterior door check
+- +Parking Officer / +Parking Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed parking lot patrol
+(templates.txt only, no version bump.)

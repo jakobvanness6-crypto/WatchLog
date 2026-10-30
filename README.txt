@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.19.1  -  README
+  WATCHLOG  v3.22.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -184,6 +184,9 @@ couple of seconds. No need to press anything.
                     A teach from an older version is changed over by itself the first
                     time. If Alert Grid is too small or off the screen it says so and
                     clicks nothing.
+                    v3.19.2: after the clear button there's one more click, the box that
+                    says there are no more alerts. It's step 6 of the teach (re-teach once:
+                    an older teach still works but skips that click).
   Ctrl+Alt+D        (v3.19.0) Opens a NEW DAILY LOG in iTrak. iTrak has no keyboard
                     shortcut for it, so Watchlog brings the iTrak window (the Citrix
                     window, title "iTrak - [Daily Log]") to the front, moves the mouse
@@ -202,6 +205,36 @@ couple of seconds. No need to press anything.
                     clicks, default 300), RefuseIfResized=yes (don't click if the
                     window isn't the size it was when taught). Numbers only are kept,
                     in %LOCALAPPDATA%\Watchlog\itrak.ini.
+  Ctrl+Alt+F        (v3.20.0) FULL-ENTRY DAILY LOGS, for logs that never change (Break,
+                    Table Drop, Card Destruction). A short list opens: type the first
+                    letters of the log's name (br, ta, ca), press Enter. Watchlog clicks
+                    New daily log (the Ctrl+Alt+D click), waits for the new "Daily Log
+                    Entry" window to open, then clicks Location, Topic, Reference and
+                    Synopsis in turn: Location and Topic are typed in full
+                    and accepted with Enter, Reference is typed, the Synopsis is pasted.
+                    It asks nothing. It does not touch End Time and does not save: you
+                    click Now and Save yourself. Each is counted in Time saved and the
+                    shift journal ("Full log: Break"): 5 keystrokes for each drop-down,
+                    the full length of the Reference and Synopsis plus 1 for each click,
+                    and 2 for the new-log click.
+                    The logs are lines in templates.txt (or my-templates.txt):
+                      +Name = Location | Topic | Reference | Synopsis
+                    e.g. +Break = Surveillance | Duty | NA | Break
+                    Five come ready-made: Break, Table Drop, Start (start of shift), End
+                    (end of shift) and Card Destruction. Start asks which bay (offering
+                    the last one) and keeps it for the shift; End uses it without asking. A line that ends with | end also clicks End Time's
+                    Now button once the log is filled (the End log does); {Bay} in a
+                    synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
+                    asks which bay and keeps the answer for the shift (v3.20.3).
+  Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
+                    run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
+                    on each (nothing is clicked for you). The daily log form is its own window
+                    (title "Daily Log Entry - N/A - \\Remote"), and the spots are measured from
+                    inside it, so it can open anywhere but should stay the same size.
+                    settings.ini [ITrak]: EntryWindow= (what to look for, default "Daily Log
+                    Entry ahk_exe wfica32.exe"), EntryWait= (most ms to wait for the form after
+                    New daily log, default 8000), EntrySettle= (ms to let it draw, default 600).
+                    Not shared with the team yet.
   Tray > iTrak > Share my setup with the team   (v3.19.0) puts this PC's iTrak click
                     in itrak.ini in the team folder, filed by screen scaling, for PCs
                     that haven't been taught. A PC's own teach always wins.
@@ -344,6 +377,11 @@ were typing.
         B2345 (Defective)
     If the boxes are empty when you press Insert, that last one is
     skipped. The shift journal counts it as one log.
+  - Several tables on one line (;open, ;auto, v3.19.3): pick a table,
+    press "Add another" (or Ctrl+Enter) and pick the next. The table box
+    starts empty and clears each time; Insert pastes one line:
+        BJ205, BJ206 and RO204 Opened.
+    A table added twice is only listed once.
 
 
 -----------------------------------------------------------------------
@@ -359,8 +397,9 @@ Forms (open a form):
   ;face         Facial recognition alert: alert #, result, match %
   ;start        Start of shift, Bay (remembers last bay)
   ;end          End of shift, Bay (remembers last bay)
-  ;open         Table opened: table
-  ;auto         Table closed and auto-close started: table
+  ;open         Table opened: table (Ctrl+Enter adds another, same line)
+  ;auto         Table closed and auto-close started: table (Ctrl+Enter
+                adds another, same line)
   ;cards        Card change on a table
   ;fill         Table fill: table and amount (Ctrl+Enter adds another table)
   ;mfill        Machine fill: NRT or ATM and amount (Ctrl+Enter adds another)
@@ -669,7 +708,9 @@ and the less-used items sit in sub-menus):
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
-                                (Ctrl+Alt+Shift+I), Share my setup (v3.19.0)
+                                (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
+                                Teach the daily log fields (Ctrl+Alt+Shift+F),
+                                Share my setup (v3.19.0)
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -688,12 +729,57 @@ and the less-used items sit in sub-menus):
   Exit Watchlog                 Closes it (start it again from the
                                 Start menu)
 
+CUSTOMIZE WATCHLOG  (v3.21.0: tray menu > Customize Watchlog, or the Customize button on the home window)
+  Screens for the things that used to mean editing a file. Each opens in its own
+  window and applies when you save. Nothing here touches your passwords.
+  - Full-entry daily logs: a list of the logs Ctrl+Alt+F fills in. Add, Edit, Copy,
+    Delete; the Edit box has Name, Location, Topic, Reference, Synopsis and a tick for
+    "Click End Time's Now button". "Try it in iTrak" runs the picked log for real. Saved
+    as the + lines in templates.txt (or my-templates.txt), the old file kept as .bak.
+    A log from the team's shared file can't be changed here (copy it first).
+  - Shortcut keys: pick a different key for any Ctrl+Alt shortcut (find a template, the
+    call pad, quick note, notes, journal, start and end of shift, home, template editor,
+    window info, save/put back layout, log out of SDS, the Alert Grid and iTrak keys, the
+    full-entry log and its teach key, the dashboard, the cheat sheet). Click a box and
+    press the keys; use Ctrl, Alt or Win with them; two shortcuts can't share a key. Not
+    changeable: pause (Ctrl+Alt+P or X), reload (Ctrl+Alt+R), the app keys, the keys
+    inside forms. Kept in settings.ini [Hotkeys] (id=key); "Back to the standard keys"
+    clears them. Saving restarts Watchlog. The tray menu, home window and cheat sheet show
+    the keys you picked; some messages elsewhere may still show the standard names.
+  - Start and end of shift: the programs Ctrl+Alt+L opens, in order (Add, Edit, Remove,
+    Move up/down; a * in a path means any version; "spot it by" is how it tells a program
+    is already open) and the list of programs the end of shift closes. Kept in
+    settings.ini [StartOfShift] Run1...Run9, Window1...Window9 and [EndOfShift] Close.
+  - Shared lists: opens the template editor on its Shared lists tab (tables, machines...).
+  - Autocorrect words: the list in autocorrect.txt as a table: tick = on, Add, Edit,
+    Delete, search, "Back to the built-in list", and a switch for autocorrect as a whole.
+    The old file is kept as autocorrect.txt.bak.
+  - Speed and timing: the waits for Alert Grid (between clicks, for Select All) and iTrak
+    (between clicks, for a new log, after the form opens). Standard values are shown;
+    "Back to the standard values" clears them. settings.ini [AlertGrid] and [ITrak].
+  - Logins and reminders, Caps Lock, journal, updates: open Settings on the right tab.
+  Settings, the template editor and the autocorrect editor all still work as before.
+
+LOOK  (v3.22.0, light by default since v3.22.1)
+  Every Watchlog window uses a blue accent (the old teal is gone). The home window
+  has three panels at the top: logs this shift, logins this shift and typing saved
+  this shift. Tabs (Settings, the template editor, the dashboard) are drawn as a
+  row of buttons.
+  There is also a dark look: tray menu > Dark look (a tick shows when it is on), or
+  Customize Watchlog > the "Dark look" tick box (settings.ini [Look] Dark=yes or no).
+  It applies to windows opened from then on. In the dark look, dark text turns light and
+  white panels turn dark; on Windows 10/11 the buttons, lists and scroll bars go dark
+  too. The Caps Lock banner stays red.
+
 WATCHLOG HOME  (click the icon, or Ctrl+Alt+M)
-  Big buttons in four groups: Logs (find a template, cheat sheet,
-  journal, quick notes, time saved), Shift (start, end, log out of SDS,
-  clear Alert Grid, put windows back), Logins (one button per saved
-  login) and Set up (template editor, settings, tutorial, security and
-  status, save window layout). Each button shows its shortcut, so new
+  Big buttons in three groups: Logs (call pad, find a template, cheat
+  sheet, journal, quick notes, time saved, shift count, dashboard), Logins
+  (one button per saved login) and Set up (template editor, settings,
+  tutorial, security and status, about, save window layout) plus a Customize
+  button (see above). The Shift
+  buttons (start, end, log out of SDS, clear Alert Grid, new iTrak daily
+  log, put windows back) were removed in v3.20.0: use the shortcuts, or the
+  cheat sheet (Ctrl+Alt+H) if you forget them. Each button shows its shortcut, so new
   operators learn them as they go. It closes when you press a button,
   and anything that types goes into the window you were in before.
   A login button brings up the program its login is locked to; a login
@@ -867,6 +953,9 @@ Blanks (any of these makes the template a form):
                                by ;face), checked against the last one
   {Match: matchcopy}           the match % copied in Edge (used by ;face)
   {Bay: last}                  remembers what you typed last time
+  {Bay: saved}                 like last, but a bay entered in the last 14
+                               hours (at the start of shift) is used without
+                               asking; asks as usual if there isn't one (v3.20.2)
   {Step: next | A | B | C}     opens on the step after last time's
   {Machine: blank=AXXXX}       what to leave if the box is empty
                                (otherwise it leaves XX)
@@ -882,6 +971,9 @@ Blanks (any of these makes the template a form):
   {repeat}                     at the end of a form: adds an "Add
                                another" button (several in one log,
                                one per line)
+  {Table: @tables | several}   with {repeat}: Add another adds to this
+                               box instead, all on one line
+                               ("BJ205, BJ206 and RO204 Opened.")
   Combine options with |, e.g. {Employee #: clip | blank=XXXXXXX}
   The same blank used twice in one template is one box that fills both.
 
@@ -1116,6 +1208,10 @@ WINDOW LAYOUT (v3.7.0)
   - Windows are matched by program, in the order they sit on the screen, so
     two Chrome windows go back to the first and second spots saved.
     Minimised windows and Watchlog's own windows are left alone.
+  - SDS and Alert Grid are the same program (Java), so since v3.19.3 the
+    layout also notes which one each window is (from the start of its
+    title; the title itself isn't kept) and they can't swap spots. A
+    layout saved before v3.19.3 asks once to be saved again.
   - W is no longer free for an app hotkey ([AppN] Key=W is skipped).
 
 CAPS LOCK GUARD (v3.7.0)
