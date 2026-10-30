@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 30, 2026 (2)
-# Program version: 3.25.1
+# Wording version: Oct 30, 2026 (3)
+# Program version: 3.26.1
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -120,7 +120,7 @@
 ;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
 
 ;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
-;account (Account review) = Account #{Account #: blank=} reviewed, not banned player, Guest Services notified
+;account (Account under review) = Account #{Account #: blank=XXXXXX} reviewed, not banned player. Account cleared and Guest Services notified. >> Guest Services | Account under review | M6 (417)
 ;drop (Table drop) = Security Officers performed Table Drop >> Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690)
 ;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep. >> Cage ManTrap | Security Escort | M6 (972,973)
 

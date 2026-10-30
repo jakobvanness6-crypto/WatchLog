@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.25.1"
+VERSION := "3.26.1"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -112,6 +112,7 @@ PickMode := false        ; true while Pick window waits for a click
 PickHwnd := 0
 TeachBusy := false       ; true while the Alert Grid teach step runs
 NotesWin := ""           ; the quick notes window while it's open
+PadShort := ""           ; a shorthand line being run from the call pad (v3.26.0)
 LeftOnClip := ""         ; the last log Watchlog left on the clipboard (not your own copy)
 CallPadWin := ""         ; the call pad window (hidden, not closed, when you press Esc)
 CallPadTarget := 0       ; the window you were in when the pad opened
@@ -1863,6 +1864,9 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         padUsed := padRows.Length
         Changed()
     }
+    ; a shorthand line that had everything: make the log without waiting for Enter (v3.26.0)
+    if padUsed && hints.Has("go") && hints["go"] && (!hints.Has("expect") || padUsed >= hints["expect"])
+        Submit()
 
     Cancel(*) {
         SetForm("")
@@ -2549,6 +2553,18 @@ CallPadMakeLog() {
         CallPadWin.Hide()
     if CallPadTarget
         ReturnTo(CallPadTarget)
+    ; a code word first on the pad (fill 205 5.5) runs that log now (v3.26.0)
+    global PadShort
+    sc := PadShortcut(PadText)
+    if IsObject(sc) {
+        for t in TemplateList
+            if t.trig = sc.trig {
+                PadShort := sc
+                RunTemplate(t.text, t.name != "" ? t.name : t.trig, t.repeat, t.trig, t.fill)
+                PadShort := ""
+                return
+            }
+    }
     Tip("Call saved. Now type the trigger of the log (like `;jack) and it fills in the boxes.", 3500)
 }
 
@@ -2646,6 +2662,8 @@ CallPadEndShift() {
 ; used when the pad holds exactly one of that kind. Expires after 90
 ; minutes without typing on the pad.
 PadHints() {
+    if IsObject(PadShort) && IsObject(PadShort.hints)
+        return PadShort.hints
     hints := Map()
     if Trim(PadText) = "" || A_TickCount - PadStamp > 5400000
         return hints
@@ -2721,6 +2739,150 @@ PadParse(text) {
     return {fills: fills, jack: jacks.Length = 1 ? jacks[1] : ""}
 }
 
+; A shorthand line on the pad that starts with a code word (v3.26.0):
+;   fill 205 5.5          table fill (5.5 = $5,500; 5k = $5,000; 500 = $500)
+;   open 201 202 203      tables opened      201 auto   tables auto-closed
+;   jack c2102 11421.11 w3 cash [2130]      bv c2102 4471 full      account 123456
+; Any other template's code word first (cards ry301) just opens that form
+; with the pad filled in. Returns "" when the first line isn't one.
+; hints.go = the line had everything, so the log is made without the form.
+PadShortcut(text) {
+    line := ""
+    for l in StrSplit(text, "`n", "`r") {
+        l := Trim(l)
+        if l != "" {
+            line := l
+            break
+        }
+    }
+    if line = ""
+        return ""
+    words := StrSplit(RegExReplace(line, "\s+", " "), " ")
+    code := StrLower(words[1])
+    rest := []
+    known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1)
+    if known.Has(code) {
+        loop words.Length - 1
+            rest.Push(words[A_Index + 1])
+    } else if words.Length > 1 && StrLower(words[words.Length]) = "auto" {
+        code := "auto"
+        loop words.Length - 1
+            rest.Push(words[A_Index])
+    } else {
+        for t in TemplateList
+            if t.trig = ";" code
+                return {trig: t.trig, hints: ""}
+        return ""
+    }
+    trig := ";" code
+    hints := Map("go", false)
+    if code = "fill" {
+        rows := [], ok := rest.Length >= 2 && Mod(rest.Length, 2) = 0
+        loop rest.Length // 2 {
+            t := PadTable(rest[2 * A_Index - 1]), a := PadAmount(rest[2 * A_Index], true)
+            if t = "" || a = ""
+                ok := false
+            else
+                rows.Push({table: t, amount: a})
+        }
+        hints["rows"] := rows, hints["go"] := ok && rows.Length > 0
+    } else if code = "open" || code = "auto" {
+        rows := [], ok := rest.Length > 0
+        for w in rest {
+            t := PadTable(w)
+            if t = ""
+                ok := false
+            else
+                rows.Push({table: t})
+        }
+        hints["rows"] := rows, hints["go"] := ok && rows.Length > 0
+    } else if code = "jack" {
+        machine := "", amount := "", window := "", time := "", afterWin := false
+        k := 1
+        while k <= rest.Length {
+            w := rest[k]
+            if machine = "" && RegExMatch(w, "^[A-Za-z]\d{3,5}$") {
+                machine := StrUpper(w)
+            } else if window = "" && RegExMatch(w, "i)^w(?:in(?:dow)?)?\.?#?(\d*)$", &m) {
+                if m[1] != ""
+                    window := m[1]
+                else if k < rest.Length && RegExMatch(rest[k + 1], "^#?(\d+)$", &m2)
+                    window := m2[1], k += 1
+                afterWin := true
+            } else if afterWin && time = "" && RegExMatch(w, "^(\d{4}|\d{1,2}:\d\d)$") {
+                time := w
+            } else if amount = "" && RegExMatch(w, "^\$?[\d,]+(?:\.\d+)?k?$") {
+                amount := PadAmount(w)
+            }
+            k += 1
+        }
+        if machine != "" && amount != "" && window != "" {
+            hints["jack"] := {machine: machine, amount: amount, window: window}
+            hints["machine"] := machine
+            if time != ""
+                hints["time"] := time
+            hints["expect"] := 3 + (time != "" ? 1 : 0)
+            hints["go"] := true
+        }
+    } else if code = "bv" {
+        machine := "", asset := "", reason := ""
+        for w in rest {
+            if machine = "" && RegExMatch(w, "^[A-Za-z]\d{3,5}$")
+                machine := StrUpper(w)
+            else if asset = "" && RegExMatch(w, "^\d{3,}$")
+                asset := w
+            else if reason = "" && RegExMatch(w, "i)^f")
+                reason := "Full"
+            else if reason = "" && RegExMatch(w, "i)^d")
+                reason := "Defective"
+        }
+        if machine != ""
+            hints["machine"] := machine
+        if asset != ""
+            hints["asset"] := asset
+        if reason != ""
+            hints["reason"] := reason
+        hints["expect"] := 3
+        hints["go"] := machine != "" && asset != "" && reason != ""
+    } else if code = "account" {
+        if rest.Length && RegExMatch(rest[1], "^\d{3,}$") {
+            hints["account"] := rest[1]
+            hints["expect"] := 1
+            hints["go"] := true
+        }
+    }
+    return {trig: trig, hints: hints}
+}
+
+; "5.5" -> 5500, "5k" -> 5000, "11421.11" -> 11421.11. small = a plain number
+; under 100 counts as thousands too (table fills: 5.5 is $5,500)
+PadAmount(tok, small := false) {
+    t := StrReplace(StrReplace(tok, "$"), ",")
+    if !RegExMatch(t, "i)^(\d+(?:\.\d+)?)(k?)$", &m)
+        return ""
+    v := m[1] + 0
+    if m[2] != "" || (small && v < 100)
+        v *= 1000
+    return v = Floor(v) ? String(Integer(v)) : Format("{:.2f}", v)
+}
+
+; A table typed as 205, bj205 or BJ205 -> the table in the @tables list ("" if none or two match)
+PadTable(tok) {
+    if !Lists.Has("tables")
+        return ""
+    hit := ""
+    for it in Lists["tables"] {
+        if StrLower(it) = StrLower(tok)
+            return it
+        if RegExMatch(tok, "^\d+$") && RegExMatch(it, "^\D*" tok "$") {
+            if hit != ""
+                return ""
+            hit := it
+        }
+    }
+    return hit
+}
+
 ; The words after an amount on a fill line, as the note in brackets
 PadNote(words) {
     r := StrLower(Trim(RegExReplace(words, "[()]")))
@@ -2759,9 +2921,23 @@ PadFill(fields, ctrls, labs, hints, marks) {
             if StrLower(f.key) = "machine" && f.HasOwnProp("items") && HasVal(f.items, fills[1].machine)
                 return {n: 0, rows: fills}
     }
+    ; a table fill / opening / auto-close from a shorthand line: one row per table
+    rows := hints.Has("rows") ? hints["rows"] : []
+    if rows.Length {
+        for f in fields
+            if RegExMatch(StrLower(f.key), "^table")
+                return {n: 0, rows: rows}
+    }
     jack := hints.Has("jack") && hasWindow ? hints["jack"] : ""
     for i, f in fields {
         kind := f.HasOwnProp("kind") ? f.kind : ""
+        if kind = "time" && hints.Has("time") {
+            ctrls[i].Value := hints["time"]
+            labs[i].Text := f.label "  (from your call pad)"
+            marks[i] := true
+            n += 1
+            continue
+        }
         if f.HasOwnProp("alertCopy") || f.HasOwnProp("matchCopy") || kind = "time"
             continue
         k := StrLower(f.key)
@@ -2774,6 +2950,12 @@ PadFill(fields, ctrls, labs, hints, marks) {
             val := IsObject(jack) ? jack.amount : hints.Get("money", "")
         else if RegExMatch(k, "^alert #")
             val := hints.Get("alert", "")
+        else if RegExMatch(k, "^asset #")
+            val := hints.Get("asset", "")
+        else if k = "reason"
+            val := hints.Get("reason", "")
+        else if RegExMatch(k, "^account #")
+            val := hints.Get("account", "")
         else if RegExMatch(k, "^window") && IsObject(jack)
             val := jack.window
         if val = ""
@@ -2813,11 +2995,13 @@ PadSetRow(fields, ctrls, labs, row, marks) {
     for i, f in fields {
         k := StrLower(f.key)
         val := ""
-        if k = "machine"
+        if k = "machine" && row.HasOwnProp("machine")
             val := row.machine
-        else if k = "amount"
+        else if RegExMatch(k, "^table") && row.HasOwnProp("table")
+            val := row.table
+        else if k = "amount" && row.HasOwnProp("amount")
             val := row.amount
-        else if k = "note"
+        else if k = "note" && row.HasOwnProp("note")
             val := row.note
         if val = ""
             continue
@@ -3941,7 +4125,7 @@ ClearAlerts() {
                         WinActivate "ahk_id " grid
                         WinWaitActive "ahk_id " grid, , 2
                     }
-                    cleared := AlertClearAcked(c, grid, gap)
+                    cleared := AlertClearAcked(c, grid, gap, false)
                     Activity("Alert Grid: the right-click menu didn't open, so the acknowledged alerts were cleared first" (cleared ? "" : " (the clear button spot was outside the window)"))
                     if cleared {
                         attempts -= 1       ; this try doesn't count against the three
@@ -3977,12 +4161,17 @@ ClearAlerts() {
                 Send "{Enter}"
             WinWaitClose "ahk_id " ok, , 2
             done := true
-            ; the little button that clears the acknowledged alerts, then the
-            ; "no more alerts" step (skipped when the acknowledged alerts were
-            ; already cleared first, below)
-            if !ackedFirst
-                AlertClearAcked(c, grid, gap)
+            ; the little button that clears the acknowledged alerts (the ones just
+            ; acknowledged), then the "no more alerts" step. Always: also after the
+            ; acknowledged ones were cleared first, below (v3.26.1)
+            AlertClearAcked(c, grid, gap)
         }
+    }
+    ; only acknowledged alerts were there: they were cleared first, so finish with
+    ; the "no more alerts" step
+    if !done && ackedFirst {
+        AlertClearAcked(c, grid, gap)
+        done := true
     }
     if done {
         Tip("Alerts cleared", 1000)
@@ -4000,7 +4189,7 @@ ClearAlerts() {
 ; Clears the acknowledged alerts: the little button (it follows the edge it was
 ; nearest when Alert Grid has been resized), then the "no more alerts" box or
 ; button. Returns true when the clear button was clicked.
-AlertClearAcked(c, grid, gap) {
+AlertClearAcked(c, grid, gap, noMore := true) {
     clicked := false
     ; the little button that clears the acknowledged alerts (it follows
     ; the edge it was nearest when Alert Grid has been resized)
@@ -4016,7 +4205,7 @@ AlertClearAcked(c, grid, gap) {
     }
     ; the box (or button) that says there are no more alerts (v3.19.2).
     ; Only if it was taught; an older teach skips it.
-    if IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
+    if noMore && IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) {
         if c["NoMoreBox"] != "" {
             SetTitleMatchMode 3
             nb := WinWait(c["NoMoreBox"] " ahk_exe javaw.exe", , 0.8)

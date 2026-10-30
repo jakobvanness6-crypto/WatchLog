@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.25.1 (Oct 30, 2026): fix so v3.25.0's Settings text loads (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.26.1 (Oct 30, 2026): Alert Grid fix plus shorthand lines on the call pad (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -97,6 +97,14 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.26.1 (Oct 30)
+- Fix: Alert Grid clearing no longer skips the final clear-acknowledged click (step 5) after the acknowledged-alerts fallback of v3.24.1 (Jakob: it stopped finishing). v3.26.0 was never sent on its own; 3.26.1 includes its shorthand lines.
+
+## Done in v3.26.0 (Oct 30)
+- Shorthand lines on the call pad: first word a code word, then Ctrl+Enter makes the log with no form when the line is complete. `fill 205 5.5`, `open 201 202 203`, `201 auto`, `jack c2102 11421.11 w3 cash 2130`, `bv c2102 4471 full`, `account 123456`. Any other code word first opens its form with the pad filled in.
+- ;account is now a daily-log fill: Guest Services | Account under review | M6 (417), "Account #XXXXXX reviewed, not banned player. Account cleared and Guest Services notified."
+- Not done: `;found` and `;aml` shorthand (Jakob said leave them). Still open: shorthand for more logs, optional short codes (f for fill) in Customize, typing a shorthand line outside the pad.
 
 ## Done in v3.25.1 (Oct 30)
 - Fix: v3.25.0 failed to start with Missing quote on line 6258 (a space then ; inside a string is a comment in AutoHotkey). The new prefix text in Settings now escapes it.

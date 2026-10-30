@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.25.1  -  README
+  WATCHLOG  v3.26.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.25.1 (Documents, or the program folder).
+                      v3.26.1 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -185,6 +185,8 @@ couple of seconds. No need to press anything.
                     A teach from an older version is changed over by itself the first
                     time. If Alert Grid is too small or off the screen it says so and
                     clicks nothing.
+                    v3.26.1: fixes v3.24.1, which skipped the final clear-acknowledged click
+                    after the fallback below. That button is now always clicked at the end.
                     v3.24.1: if the right-click menu doesn't open because acknowledged
                     alerts are in the list (Alert Grid only allows the menu on unacknowledged
                     ones), the clear-acknowledged button is clicked first (and the no-more-
@@ -856,6 +858,24 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
+SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
+  Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and
+  the log is made. If the line has everything it goes in with no form; if something is
+  missing the form opens with what it found already filled in.
+      fill 205 5.5            table fill BJ205 $5,500  (5.5 and 5 mean thousands, 5k = $5,000,
+                              500 = $500; two fills: fill 205 5.5 303 10)
+      open 201 202 203        tables opened, on one line (a number is enough: 201 = UT201)
+      201 auto                tables auto-closed (auto can come first or last: 201 202 auto)
+      jack c2102 11421.11 w3 cash 2130      jackpot: machine, amount, window, time paid (military
+                              time, optional; cash is the default wording)
+      bv c2102 4471 full      emergency BV pull (full or def, for defective)
+      account 123456          account under review: fills the iTrak daily log (Guest
+                              Services | Account under review | M6 (417))
+  Any other code word first (cards ry301, aml 123 b1410) opens that log's form with the
+  pad filled in as before. The older way still works: jot, Ctrl+Enter, then type the
+  trigger. Careful: a call that starts with one of your code words as its first word will
+  open that log's form when you press Ctrl+Enter.
+
 CALL PAD AND AUTOCORRECT  (Numpad +, v3.12.0; shorthand v3.13.0)
 Most of what goes into a log arrives on a phone call. The call pad is a
 small window to jot it into while you talk, so it replaces the paper
