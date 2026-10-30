@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.26.1  -  README
+  WATCHLOG  v3.26.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.26.1 (Documents, or the program folder).
+                      v3.26.2 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -734,6 +734,22 @@ and the less-used items sit in sub-menus):
                                 Reload
   Exit Watchlog                 Closes it (start it again from the
                                 Start menu)
+
+DAILY LOG FILLS FOR THE SHORTHAND LOGS  (v3.26.2)
+  ;fill, ;open, ;auto, ;jack, ;bv and ;mfill (and so the call pad shorthand for them) now also
+  open a new daily log in iTrak, or use the one already open, and fill Location, Topic and
+  Reference, like ;cards and ;break. Reference is left empty on purpose where you fill it
+  yourself (fill, jack, bv, mfill). Shift+Enter on the form still pastes just the wording.
+      ;fill   Pit | Table Fill |            ;open, ;auto   Pit | Table Opening/Closing | NA
+      ;jack   Slots | Jackpot/Table Win |   ;bv   Slots | Emergency BV Pull |
+      ;mfill  ABM/NRT | ATM/NRT/CTR fill |
+  The Pit and Slots come from the log itself: %pit% in a code word's Location is the pit of
+  the first table (2xx = Pit 2, 3xx = Pit 3) and %slots% the area of the first machine (the
+  letter: C2102 = Charlie Slots). They are looked up in two lists near the top of templates.txt
+  that you can change or extend (a new letter, a new pit) without a new program version:
+      @pit = 2=Pit 2 | 3=Pit 3
+      @slots = A=Alpha Slots | B=Bravo Slots | C=Charlie Slots | D=Delta Slots
+  If it can't tell, that box is left empty and a short message says so.
 
 CHANGING THE ; IN FRONT OF CODE WORDS  (v3.25.0)
   Settings > General > "Type this in front of code words and logins" (settings.ini

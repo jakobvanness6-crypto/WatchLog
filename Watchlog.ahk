@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.26.1"
+VERSION := "3.26.2"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -1312,7 +1312,6 @@ AddTemplates(content, src, label, trigs, &problems) {
                 fill := false
                 text := SubStr(text, 1, InStr(text, " >> ", , -1) - 1)
             }
-            repeat := false
         }
         isForm := RegExMatch(text, "\{[^{}]+\}") > 0
         HotIf NotInSettings
@@ -1357,19 +1356,64 @@ TemplateFill(out, title) {
     parts := StrSplit(SubStr(out, i + 4), "|")
     if parts.Length < 3
         return false
-    RunEntry({name: title, loc: Trim(parts[1]), topic: Trim(parts[2]), ref: Trim(parts[3])
-        , syn: Trim(SubStr(out, 1, i - 1)), end: parts.Length >= 4 && StrLower(Trim(parts[4])) = "end", src: "code"}, true)
+    ; several lines (Add another): each ends with its own  >> ..., the last one is used
+    syn := Trim(RegExReplace(out, " >> [^\r\n]*", ""))
+    RunEntry({name: title, loc: FillDerive(Trim(parts[1]), syn), topic: FillDerive(Trim(parts[2]), syn)
+        , ref: FillDerive(Trim(parts[3]), syn), syn: syn
+        , end: parts.Length >= 4 && StrLower(Trim(parts[4])) = "end", src: "code"}, true)
     return true
+}
+
+; %pit% and %slots% in the Location, Topic or Reference of a code word (v3.26.2):
+; %pit% = the pit of the first table in the log (UT201 -> 2), looked up in the
+; list @pit = 2=Pit 2 | 3=Pit 3; %slots% = the slots area of the first machine
+; (C2102 -> C), looked up in @slots = A=Alpha Slots | B=Bravo Slots ... Both lists
+; live in templates.txt, so they can be changed or added to without the program.
+FillDerive(s, syn) {
+    if InStr(s, "%pit%") {
+        v := ""
+        if Lists.Has("tables") {
+            for it in Lists["tables"] {
+                if RegExMatch(syn, "i)(?<![A-Za-z0-9])" it "(?![A-Za-z0-9])") && RegExMatch(it, "\d", &d) {
+                    v := ListMapGet("pit", d[0])
+                    break
+                }
+            }
+        }
+        if v = ""
+            Tip("Couldn't tell which pit: Location left empty.", 3000, true)
+        s := StrReplace(s, "%pit%", v)
+    }
+    if InStr(s, "%slots%") {
+        v := ""
+        if RegExMatch(syn, "(?<![A-Za-z0-9])([A-Za-z])\d{3,5}(?!\d)", &m)
+            v := ListMapGet("slots", m[1])
+        if v = ""
+            Tip("Couldn't tell which slots area: Location left empty.", 3000, true)
+        s := StrReplace(s, "%slots%", v)
+    }
+    return s
+}
+
+; In a list like  @slots = A=Alpha Slots | B=Bravo Slots , the text after key=
+ListMapGet(name, key) {
+    if !Lists.Has(name)
+        return ""
+    for it in Lists[name] {
+        p := InStr(it, "=")
+        if p && StrUpper(Trim(SubStr(it, 1, p - 1))) = StrUpper(key)
+            return Trim(SubStr(it, p + 1))
+    }
+    return ""
 }
 
 ; Just the wording of a finished code word line (the part before >>), for pasting
 FillWording(out) {
-    i := InStr(out, " >> ", , -1)
     ; Shift is still down: let go first, or the paste becomes Ctrl+Shift+V
     held := A_TickCount + 400
     while A_TickCount < held && GetKeyState("Shift", "P")
         Sleep 10
-    return i ? Trim(SubStr(out, 1, i - 1)) : out
+    return Trim(RegExReplace(out, " >> [^\r\n]*", ""))
 }
 
 ; trig = the shortcut typed, for the time saved tracker
