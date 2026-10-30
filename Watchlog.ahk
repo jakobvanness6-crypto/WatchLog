@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.22.2"
+VERSION := "3.23.0"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -384,7 +384,8 @@ LoadSettings() {
         Cfg["LaunchWork"] := HomeDir "\LaunchWork.bat"
     Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
     Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "20"))
-    Cfg["ChromeAccount"] := Trim(IniRead(SettingsFile, "Paths", "ChromeAccount", ""))
+    Cfg["FaceUrl"] := Trim(IniRead(SettingsFile, "Paths", "FaceUrl", "https://itrakappprod.olgnetwork.ca/iTrak/login.aspx"))
+    Cfg["CitrixUrl"] := Trim(IniRead(SettingsFile, "Paths", "CitrixUrl", "https://apps.gcgaming.com/Citrix/GCGCWeb/"))
     ; The team's shared templates file (blank = templates.txt in this folder)
     Cfg["SharedTemplates"] := Trim(IniRead(SettingsFile, "Templates", "Shared", ""), " `t`"")
     ; Shift journal: full = time, name and text of every log; counts = time
@@ -414,7 +415,7 @@ LoadSettings() {
     Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
     ; A folder of your own to take updates from, instead of the team folder
     Cfg["UpdateFolder"] := Trim(IniRead(SettingsFile, "Updates", "Folder", ""), " `t`"")
-    Cfg["CloseApps"] := Trim(IniRead(SettingsFile, "EndOfShift", "Close", "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, chrome.exe, msedge.exe, explorer.exe"))
+    Cfg["CloseApps"] := Trim(IniRead(SettingsFile, "EndOfShift", "Close", "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe"))
 
     ; Programs Ctrl+Alt+L opens before LaunchWork.bat: [StartOfShift] Run1 ... Run9
     ; A * in a path means "any version" (the newest one found is used).
@@ -958,15 +959,15 @@ Save=full
 KeepDays=30
 
 [Paths]
-LaunchWork=LAUNCHPATH
 LaunchWait=20
 CitrixTab=Citrix|apps.gcgaming.com
-; Optional: the Google account the start-of-shift websites open in
-; (blank = Chrome's last used one)
-ChromeAccount=
+; The two web pages Ctrl+Alt+L opens, in Microsoft Edge: iTrak facial rec
+; (blank = not opened) and the Citrix Receiver page (opened last)
+FaceUrl=https://itrakappprod.olgnetwork.ca/iTrak/login.aspx
+CitrixUrl=https://apps.gcgaming.com/Citrix/GCGCWeb/
 
 [StartOfShift]
-; Programs Ctrl+Alt+L opens first (up to Run9), then it runs LaunchWork.
+; Programs Ctrl+Alt+L opens first (up to Run9), then it opens the Citrix page in Edge.
 ; A * means any version, so upgrades don't break these.
 Run1=C:\BallyTechnologies\AlertGridUI*\AlertGridUI\AlertGridUI.bat
 Run2=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
@@ -974,12 +975,12 @@ Run3=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
 
 [EndOfShift]
 ; Programs Ctrl+Alt+Shift+L closes (separate with commas)
-Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, chrome.exe, msedge.exe, explorer.exe
+Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe
 
 ; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
 ; Add more as [App3], [App4] ... up to [App9].
 ; Taken keys: Q O I H P X R L E J K W A M N
-; Built in already: T Teams, U Outlook, Y Spotify, G Chrome. To change one,
+; Built in already: T Teams, U Outlook, Y Spotify, G Edge. To change one,
 ; add an [AppN] with the same Name and a new Key (Key=none turns it off).
 [App1]
 Name=SDS
@@ -998,7 +999,6 @@ Window=ahk_exe CMPDesktop.exe
 ; works in that program) and Remind (minutes until a log-in-again
 ; reminder).
     )"
-    text := StrReplace(text, "LAUNCHPATH", A_MyDocuments "\LaunchWork.bat")
     FileAppend text "`n", SettingsFile, "UTF-16"
     FirstRun := true
     Activity("First run on this PC: new settings.ini made in " HomeDir)
@@ -5217,7 +5217,7 @@ LoadApps() {
     for a in [{name: "Teams",   key: "T", win: "ahk_exe ms-teams.exe", path: "msteams:"}
             , {name: "Outlook", key: "U", win: "ahk_exe olk.exe",      path: "shell:AppsFolder\Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows"}
             , {name: "Spotify", key: "Y", win: "ahk_exe Spotify.exe",  path: "spotify:"}
-            , {name: "Chrome",  key: "G", win: "ahk_exe chrome.exe",   path: "chrome.exe"}] {
+            , {name: "Edge",    key: "G", win: "ahk_exe msedge.exe",   path: "msedge.exe"}] {
         if InStr(named, "|" a.name "|") || InStr(taken, a.key)
             continue
         Hotkey "^!" StrLower(a.key), MakeSwitchHandler(a.name, a.win, a.path)
@@ -5367,31 +5367,29 @@ WindowInfo() {
 }
 
 
-; "Chrome" or "Edge" if one has a window open, otherwise ""
-; (both can run in the background with no window, which doesn't count)
+; True if Edge has a window open
+; (it can run in the background with no window, which doesn't count)
 BrowserOpen() {
-    for exe, name in Map("chrome.exe", "Chrome", "msedge.exe", "Edge")
-        for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe " exe)
-            if SafeTitle(id) != ""
-                return name
-    return ""
+    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe msedge.exe")
+        if SafeTitle(id) != ""
+            return true
+    return false
 }
 
 ; =====================================================================
 ;  START OF SHIFT  -  Ctrl+Alt+L
 ;  Opens the programs in [StartOfShift] (any version) first, waits for
-;  their windows, then runs LaunchWork.bat for the websites and switches
-;  Chrome to the Citrix Receiver tab last.
-;  If Chrome or Edge is already open, it asks before opening the websites
-;  again, so you don't end up with every tab twice.
+;  their windows, then opens the Citrix Receiver page in Edge (the only web
+;  page it opens, so there is no tab to hunt for).
+;  If Edge is already open, it asks before opening the page again.
 ; =====================================================================
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 StartOfShift() {
     sites := true
-    if (browser := BrowserOpen()) != ""
-        sites := MsgBox(browser " is already open, so the work websites are probably open too.`n`n"
-            . "Open them again?", "Start of shift", "YesNo Icon? Default2") = "Yes"
+    if BrowserOpen()
+        sites := MsgBox("Edge is already open, so the Citrix page is probably open too.`n`n"
+            . "Open it again?", "Start of shift", "YesNo Icon? Default2") = "Yes"
     CoordMode "ToolTip", "Screen"
     began := A_TickCount
     secs := IsNumber(Cfg["LaunchWait"]) ? Max(Cfg["LaunchWait"], 20) : 20   ; the apps get at least 20 s
@@ -5424,7 +5422,7 @@ StartOfShift() {
     }
 
     ; Wait until the apps it opened have their windows up, so they don't
-    ; pop up over Chrome afterwards. LaunchWait = the most it waits (seconds
+    ; pop up over Edge afterwards. LaunchWait = the most it waits (seconds
     ; from pressing Ctrl+Alt+L); anything slower than that is left to finish.
     deadline := began + secs * 1000
     for w in started {
@@ -5436,30 +5434,28 @@ StartOfShift() {
     Sleep 800           ; let the apps finish drawing
     if Cfg["SignInAfterStart"]
         SignInStarted(startedApps)
-    Tip("Opening websites...", 0, true)
-    ; Websites next, once the apps are up, so the Citrix tab is the last thing to take the screen
-    path := Cfg["LaunchWork"]
-    if !sites {
-        ; skipped - the browser was already open
-    } else if FileExist(path) {
-        ; Tell LaunchWork which Chrome profile has the ChromeAccount signed in
-        prof := ChromeProfileFor(Cfg["ChromeAccount"])
-        if Cfg["ChromeAccount"] != "" && prof = ""
-            missing .= "   Chrome profile for " Cfg["ChromeAccount"] "   (sign in to it in Chrome on this PC once)`n"
-        SplitPath path, , &dir
-        ; cmd /c strips the outer pair of quotes, so the whole line gets an extra pair
-        Run A_ComSpec ' /c ""' path '"' (prof != "" ? ' "' prof '"' : "") '"', dir, "Hide"
-    } else {
-        missing .= "   " path "   (LaunchWork in settings.ini)`n"
+    Tip("Opening Citrix page...", 0, true)
+    ; The Citrix page opens last, so it is the thing left on screen
+    if sites {
+        if Cfg["CitrixUrl"] = ""
+            missing .= "   CitrixUrl in settings.ini is empty`n"
+        else {
+            ; one command, facial rec first and Citrix last, so Edge ends on the Citrix tab
+            try Run 'msedge.exe ' (Cfg["FaceUrl"] != "" ? '"' Cfg["FaceUrl"] '" ' : "") '"' Cfg["CitrixUrl"] '"'
+            catch
+                missing .= "   Microsoft Edge (msedge.exe)`n"
+        }
     }
 
     Tip("")
-    CitrixTab(sites)
+    if sites
+        EdgeToFront(true)
     if Cfg["LayoutAfterStart"]
         RestoreLayout(true)
-    KeepChromeFront(started)
+    if sites
+        EdgeToFront(false)
     if missing != ""
-        MsgBox "These weren't found, so they didn't open:`n`n" missing "`nCheck [StartOfShift] and LaunchWork in settings.ini", "Watchlog", "Icon!"
+        MsgBox "These weren't found, so they didn't open:`n`n" missing "`nCheck [StartOfShift] in settings.ini", "Watchlog", "Icon!"
 }
 
 
@@ -5524,131 +5520,48 @@ ChooseUpdateFolder() {
 }
 
 
-; Switches Chrome to the Citrix Receiver tab: the one whose title has
-; CitrixTab (settings.ini, default "Citrix") in it. A tab still loading
-; shows its address as the title, which has Citrix in it too.
-; wait = true when the websites were just opened: Chrome gets up to 15
-; seconds to open its window, and three goes round the tabs. If the tab
-; isn't there, Chrome ends up back on the tab it started on. It stops if
-; you click into another window meanwhile.
-CitrixTab(wait) {
-    want := Cfg["CitrixTab"]
-    if want = ""
-        return
-    ; a tab that is still opening is named after its address, not "Citrix Workspace"
-    if !InStr(want, "apps.gcgaming.com")
-        want .= "|apps.gcgaming.com"
+; Brings the Edge window with the Citrix page to the front. wait = true
+; when the page was just opened: Edge gets up to 15 seconds to show it. No
+; tabs are searched; a window counts when its title has CitrixTab
+; (settings.ini, default "Citrix|apps.gcgaming.com") in it, and a page still
+; loading is named after its address, which has apps.gcgaming.com in it.
+EdgeToFront(wait) {
+    want := Cfg["CitrixTab"] "|apps.gcgaming.com"
     stopAt := A_TickCount + (wait ? 15000 : 0)
-    rounds := wait ? 3 : 1
-    drift := 0
     Loop {
-        ; the Citrix tab may already be showing in one of the Chrome windows
-        for id in ChromeWindows() {
+        for id in EdgeWindows() {
             if TabHas(SafeTitle(id), want) {
-                WinActivate "ahk_id " id
-                Activity("Citrix tab: already showing in a Chrome window (" SafeTitle(id) ")")
-                return
-            }
-        }
-        if hwnd := ChromeWindow() {
-            WinActivate "ahk_id " hwnd
-            if !WinWaitActive("ahk_id " hwnd, , 2) {
-                Activity("Citrix tab: Chrome would not come to the front (front window is " WinGetTitle("A") ")")
-                return
-            }
-            ; Ctrl+Tab through the tabs until it's back where it started
-            first := SafeTitle(hwnd)
-            seen := first
-            Loop 30 {
-                if TabHas(SafeTitle(hwnd), want) {
-                    Activity("Citrix tab: found it (" SafeTitle(hwnd) ")")
-                    return
-                }
-                if !WinActive("ahk_id " hwnd) {
-                    ; another window (a Java app opening, say) took the focus: take it back, a few times
-                    if ++drift > 3 {
-                        Activity("Citrix tab: gave up, focus kept leaving Chrome (now " WinGetTitle("A") ")")
-                        return
-                    }
-                    WinActivate "ahk_id " hwnd
-                    if !WinWaitActive("ahk_id " hwnd, , 2)
-                        return
-                }
-                SendInput "^{Tab}"
-                Sleep 150
-                seen .= " | " SafeTitle(hwnd)
-                if SafeTitle(hwnd) = first
-                    break
-            }
-            if --rounds <= 0 {
-                Activity("Citrix tab: not found. Tab titles seen: " seen)
+                try WinActivate "ahk_id " id
+                Activity("Citrix page: Edge window brought to the front (" SafeTitle(id) ")")
                 return
             }
         }
         if A_TickCount >= stopAt {
-            Activity("Citrix tab: gave up, " (hwnd ? "tab not found" : "no Chrome window appeared"))
+            if wait
+                Activity("Citrix page: no Edge window with the page appeared")
+            if wait && (ids := EdgeWindows()).Length
+                try WinActivate "ahk_id " ids[1]
             return
         }
-        Sleep 1000          ; Chrome or its tabs still opening
+        Sleep 500
     }
 }
 
-; The front-most Chrome window with a title (Chrome also keeps hidden
-; windows with no title in the background), or 0
-ChromeWindow() {
-    for id in ChromeWindows()
-        return id
-    return 0
-}
-
-; A window's title, or "" if the window closed while Chrome was opening
+; A window's title, or "" if the window closed while Edge was opening
 ; or closing tabs
 SafeTitle(id) {
     try return WinGetTitle("ahk_id " id)
     return ""
 }
 
-; Every Chrome window that has a title, front-most first
-ChromeWindows() {
+; Every Edge window that has a title (Edge also keeps hidden windows with
+; no title in the background), front-most first
+EdgeWindows() {
     list := []
-    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe chrome.exe")
+    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe msedge.exe")
         if SafeTitle(id) != ""
             list.Push(id)
     return list
-}
-
-; The Java apps sometimes open their windows late and jump to the front over
-; Chrome. For 25 seconds after the start-of-shift tabs are done, whenever one
-; of the apps it opened takes the front, Chrome goes back on top (at most 6
-; times), so the Citrix tab is what you see first.
-KeepChromeFront(started) {
-    stopAt := A_TickCount + 25000
-    st := {tries: 0}
-    Guard() {
-        if A_TickCount > stopAt || st.tries >= 6 {
-            SetTimer Guard, 0
-            return
-        }
-        for w in started {
-            if w = "" || !WinActive(w)
-                continue
-            target := 0
-            for id in ChromeWindows()
-                if TabHas(SafeTitle(id), Cfg["CitrixTab"] "|apps.gcgaming.com") {
-                    target := id
-                    break
-                }
-            if !target
-                target := ChromeWindow()
-            if target {
-                st.tries += 1
-                WinActivate "ahk_id " target
-                Activity("Citrix tab: " w " came to the front, Chrome put back on top")
-            }
-            break
-        }
-    }
-    SetTimer Guard, 500
 }
 
 ; True when the title has any of the "|"-separated words in it
@@ -5657,32 +5570,6 @@ TabHas(title, words) {
         if w != "" && InStr(title, w)
             return true
     return false
-}
-
-
-; Finds which Chrome profile folder ("Default", "Profile 2" ...) has this
-; Google account signed in, by reading Chrome's own "Local State" file.
-; Each PC can have a different folder for the same account, so it's
-; looked up every time. Returns "" if the account isn't found.
-ChromeProfileFor(email) {
-    if email = ""
-        return ""
-    stateFile := EnvGet("LOCALAPPDATA") "\Google\Chrome\User Data\Local State"
-    if !FileExist(stateFile)
-        return ""
-    try json := FileRead(stateFile, "UTF-8")
-    catch
-        return ""
-    at := RegExMatch(json, 'i)"user_name"\s*:\s*"\Q' email '\E"')
-    if !at
-        return ""
-    ; the profile's folder name is the nearest "Default": { or "Profile N": { before it
-    prof := "", pos := 1
-    while (p := RegExMatch(json, '"(Default|Profile \d+)"\s*:\s*\{', &m, pos)) && p < at {
-        prof := m[1]
-        pos := p + m.Len
-    }
-    return prof
 }
 
 
@@ -6162,17 +6049,16 @@ ShowSettings(welcome := false, startTab := 1) {
 
     ; ---- Start / end of shift
     tabs.UseTab(3)
-    g.AddText("Section w" W, "Start of shift (Ctrl+Alt+L) opens your work programs (Alert Grid, SDS, CMP), waits for them, then opens the work websites and ends on the Citrix page.")
+    g.AddText("Section w" W, "Start of shift (Ctrl+Alt+L) opens your work programs (Alert Grid, SDS, CMP), waits for them, then opens iTrak facial rec and the Citrix page in Edge (Citrix last, so you can start iTrak).")
     signCB := g.AddCheckbox("xs y+10" (Cfg["SignInAfterStart"] ? " Checked" : ""), "Then sign in to the Bally programs it opened with my saved logins (asks first)")
     layCB := g.AddCheckbox("xs" (Cfg["LayoutAfterStart"] ? " Checked" : ""), "Then put my windows back where I saved them (Ctrl+Alt+Shift+S saves)")
     g.AddText("xs y+12", "Wait for the programs for up to")
     waitE := g.AddEdit("x+6 yp-3 w60 Number", Cfg["LaunchWait"])
     g.AddText("x+6 yp+3", "seconds (20 or more)")
-    g.AddText("xs y+12 w" W, "The websites file (LaunchWork.bat):")
-    lwE := g.AddEdit("xs w526 r1", Cfg["LaunchWork"])
-    g.AddButton("x+6 w100", "Browse...").OnEvent("Click", BrowseLaunch)
-    g.AddText("xs y+10 w" W, "Google account the websites open in (blank = Chrome's last used one):")
-    acctE := g.AddEdit("xs w420 r1", Cfg["ChromeAccount"])
+    g.AddText("xs y+12 w" W, "The page Ctrl+Alt+L opens in Edge (Citrix Receiver):")
+    urlE := g.AddEdit("xs w526 r1", Cfg["CitrixUrl"])
+    g.AddText("xs y+10 w" W, "The iTrak facial rec page Ctrl+Alt+L opens first (blank = don't open it):")
+    faceE := g.AddEdit("xs w526 r1", Cfg["FaceUrl"])
     g.AddText("xs y+14 w" W, "End of shift (Ctrl+Alt+Shift+L) logs out of SDS, then closes these programs (separate them with commas):")
     closeE := g.AddEdit("xs w" W " r3", Cfg["CloseApps"])
 
@@ -6410,13 +6296,6 @@ ShowSettings(welcome := false, startTab := 1) {
         ShowUpd()
     }
 
-    BrowseLaunch(*) {
-        g.Opt("+OwnDialogs")
-        chosen := FileSelect(3, lwE.Value, "Pick LaunchWork.bat (the file that opens the work websites)", "Batch files (*.bat; *.cmd)")
-        if chosen != ""
-            lwE.Value := chosen
-    }
-
     BrowseUpd(*) {
         g.Opt("+OwnDialogs")
         dir := DirSelect("*" (st.upd != "" ? st.upd : A_MyDocuments), 3, "Pick the folder where you put new Watchlog builds")
@@ -6486,10 +6365,10 @@ ShowSettings(welcome := false, startTab := 1) {
                 IniWrite yn(layCB.Value), SettingsFile, "Layout", "AfterStart"
             if wait != Cfg["LaunchWait"]
                 IniWrite wait, SettingsFile, "Paths", "LaunchWait"
-            if Trim(lwE.Value) != Cfg["LaunchWork"]
-                IniWrite Trim(lwE.Value), SettingsFile, "Paths", "LaunchWork"
-            if Trim(acctE.Value) != Cfg["ChromeAccount"]
-                IniWrite Trim(acctE.Value), SettingsFile, "Paths", "ChromeAccount"
+            if Trim(faceE.Value) != Cfg["FaceUrl"]
+                IniWrite Trim(faceE.Value), SettingsFile, "Paths", "FaceUrl"
+            if Trim(urlE.Value) != Cfg["CitrixUrl"]
+                IniWrite Trim(urlE.Value), SettingsFile, "Paths", "CitrixUrl"
             apps := Trim(RegExReplace(closeE.Value, "\s*[\r\n]+\s*", ", "), " ,")
             if apps != Cfg["CloseApps"]
                 IniWrite apps, SettingsFile, "EndOfShift", "Close"
@@ -6998,7 +6877,7 @@ TogglePause() {
 ;  position and the size of each window, as numbers, on this PC only
 ;  (each bay's screens are different, so it isn't synced). No titles,
 ;  no contents. Windows are matched by program, in the order they sit
-;  on screen, so two Chrome windows go back to the first and second
+;  on screen, so two Edge windows go back to the first and second
 ;  spots saved. Watchlog's own windows and minimised windows are left alone.
 ;  v3.19.3: SDS and Alert Grid are both javaw.exe (Java), so front-to-back
 ;  order alone let them swap spots (the start of shift sign-in brings SDS

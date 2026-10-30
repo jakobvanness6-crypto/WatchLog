@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.22.2  -  README
+  WATCHLOG  v3.23.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -79,8 +79,9 @@ Documents\AutoHotkey). Either way:
                       used.
 
 Elsewhere:
-  LaunchWork.bat      Opens the work websites at the start of a shift
-                      (Documents, or the program folder).
+  LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
+                      double-clicking. Ctrl+Alt+L no longer uses it since
+                      v3.23.0 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -118,8 +119,8 @@ couple of seconds. No need to press anything.
                     this PC is doing. Clicking the tray icon opens it too.
 
   Ctrl+Alt+L        Start of shift. Opens the Bally apps (AlertGrid,
-                    SDS, CMP) first, skips any already open, then the
-                    websites, then brings the Citrix tab to the front.
+                    SDS, CMP) first, skips any already open, then opens
+                    iTrak facial rec and the Citrix page in Edge.
                     See section 8.
   Ctrl+Alt+Shift+L  End of shift. Asks first (default No), logs you out
                     of SDS properly, then closes all work apps. See
@@ -139,9 +140,9 @@ couple of seconds. No need to press anything.
   Ctrl+Alt+T        Teams         (same: switch, minimise or open)
   Ctrl+Alt+U        Outlook
   Ctrl+Alt+Y        Spotify
-  Ctrl+Alt+G        Chrome
+  Ctrl+Alt+G        Edge
                     (SDS and CMP come from [App1]/[App2] in settings.ini.
-                    Teams, Outlook, Spotify and Chrome are built in. You
+                    Teams, Outlook, Spotify and Edge are built in. You
                     can change their letters or add more, see section 14.)
 
   Ctrl+Alt+Q        Quick note. Type a note starting with a tag like
@@ -532,17 +533,15 @@ What happens, in order (about 20 seconds):
      window title, so an app still starting up can be missed.)
   3. It waits until those programs have their windows up (LaunchWait
      seconds at most, never less than 20).
-  4. LaunchWork.bat runs in the background and opens the websites
-     (if Chrome or Edge is already open, it asks first whether to open
-     them again; No is the default, so you don't get every tab twice):
-     facial rec (OLG iTrak) in Edge, then the Citrix Receiver page,
-     scheduling, Names & Photos, GIO, the training folder and Oracle
-     learning in Chrome.
-     Chrome opens them in the profile signed in to ChromeAccount from
-     settings.ini, whichever profile that is on this PC.
-  5. It switches Chrome to the Citrix Receiver tab, so you can launch
-     iTrak from there, and keeps Chrome on top for 25 seconds if an
-     app jumps to the front.
+  4. It opens two tabs in one Edge window (if Edge is already open, it
+     asks first whether to open them again; No is the default, so you
+     don't get every tab twice): facial rec (OLG iTrak) first, then the
+     Citrix Receiver page, so Citrix is the tab you see and you can
+     launch iTrak from there. Since v3.23.0 nothing else is opened and
+     no tabs are searched for. The addresses are FaceUrl and CitrixUrl
+     in settings.ini (also in Settings); blank FaceUrl = not opened.
+  5. It puts your saved window layout back, then brings the Edge window
+     with the Citrix page to the front.
   6. If anything couldn't be found, a message lists it.
 
 Still manual: launching iTrak itself from the Citrix page (its launch
@@ -570,7 +569,7 @@ updating.
   3. Closes every window of the programs in [EndOfShift] Close= the
      normal way, so anything unsaved can still ask you.
      Default list: Outlook (old and new), Teams, the Bally apps, CMP,
-     iTrak (Citrix), Spotify, Chrome, Edge, and File Explorer windows.
+     iTrak (Citrix), Spotify, Edge, and File Explorer windows.
   4. Waits 5 seconds. If anything is still open, it lists it and offers
      to force it closed (default No; unsaved work in it would be lost).
 
@@ -1051,8 +1050,8 @@ a PC. Since v3.10.0 it has tabs:
   Start / end of shift
                   sign in to the Bally programs after Ctrl+Alt+L (SignIn),
                   put the windows back after it (AfterStart), how long it
-                  waits for the programs (LaunchWait), LaunchWork.bat,
-                  the Google account (ChromeAccount), and what end of
+                  waits for the programs (LaunchWait), the Edge pages
+                  (FaceUrl, CitrixUrl), and what end of
                   shift closes ([EndOfShift] Close)
   Alert Grid      taught on this PC, using the team's setup, or not; Teach
                   and Share buttons, Caps Lock clears (CapsLockClears), wait
@@ -1083,17 +1082,17 @@ Save it and it reloads itself.
   (No password here. See section 6.)
 
 [Paths]
-  LaunchWork=     full path to LaunchWork.bat (if it isn't there, a
-                  LaunchWork.bat in the program folder is used)
   LaunchWait=     the most seconds Ctrl+Alt+L waits for the programs'
-                  windows before opening the websites (default 20, never less)
-  CitrixTab=      words from the Citrix Receiver tab's title, split with |,
-                  so Ctrl+Alt+L can switch Chrome to it. A tab still opening
-                  is named after its address, so apps.gcgaming.com is
-                  always tried too (default: Citrix|apps.gcgaming.com;
-                  blank = off)
-  ChromeAccount=  optional: the Google account the websites open in.
-                  Blank = Chrome's last used profile.
+                  windows before opening the Edge pages (default 20, never less)
+  FaceUrl=        the iTrak facial rec page Ctrl+Alt+L opens in Edge first
+                  (blank = not opened)
+  CitrixUrl=      the Citrix Receiver page it opens last in Edge
+  CitrixTab=      words from the Citrix page's window title, split with |,
+                  so Ctrl+Alt+L can bring that Edge window to the front. A
+                  page still opening is named after its address, so
+                  apps.gcgaming.com is always tried too (default:
+                  Citrix|apps.gcgaming.com)
+  (LaunchWork= and ChromeAccount= from older versions are ignored.)
 
 [StartOfShift]
   Run1= ... Run9=        programs Ctrl+Alt+L opens. * = any version.
@@ -1115,7 +1114,7 @@ Save it and it reloads itself.
            you keep SDS and CMP). Key=none turns an app off.
   Path=    the program or .bat that opens it (* = any version), or a
            link like msteams: for Microsoft Store apps
-  Built in: T Teams, U Outlook, Y Spotify, G Chrome. To give one a
+  Built in: T Teams, U Outlook, Y Spotify, G Edge. To give one a
   different letter, add an [AppN] with the same Name and a new Key.
   Window=  how to find its window (Ctrl+Alt+I shows a window's info)
 
@@ -1162,8 +1161,8 @@ WHAT IT KEEPS, AND WHERE
 WHAT IT NEVER DOES
   - It makes no internet connections and sends nothing anywhere itself.
     Files reach other PCs only through your own OneDrive and SharePoint
-    sync, under your Microsoft 365 permissions. (Ctrl+Alt+L opens your
-    work websites in the browser, the same as clicking their links.)
+    sync, under your Microsoft 365 permissions. (Ctrl+Alt+L opens two
+    work pages in Edge, the same as clicking their links.)
   - It doesn't keep what you type. It only watches for its own
     shortcuts.
   - It types a password only when you type that login's shortcut, and
@@ -1206,7 +1205,7 @@ WINDOW LAYOUT (v3.7.0)
     not synced, because each bay's screens are different. No titles and no
     contents.
   - Windows are matched by program, in the order they sit on the screen, so
-    two Chrome windows go back to the first and second spots saved.
+    two Edge windows go back to the first and second spots saved.
     Minimised windows and Watchlog's own windows are left alone.
   - SDS and Alert Grid are the same program (Java), so since v3.19.3 the
     layout also notes which one each window is (from the start of its
@@ -1264,12 +1263,11 @@ THE SCRIPT VERSION (for IT, on request)
 
 YOUR OWN OTHER BAY PCs (script version)
   1. AutoHotkey v2 must be installed on that PC.
-  2. Make sure OneDrive has synced the AutoHotkey folder (and
-     LaunchWork.bat).
+  2. Make sure OneDrive has synced the AutoHotkey folder.
   3. Double-click Watchlog.ahk. Then tray menu > Settings: tick
      "Start Watchlog when I sign in to Windows" and Save. (The
      Startup folder doesn't sync, so each PC needs this once.)
-  4. If you use ChromeAccount, sign in to it in Chrome once on that PC.
+  4. Sign in to Edge with your work account once on that PC.
   5. The first time you use each login there, type its password once.
 
 A NEW OPERATOR
@@ -1321,8 +1319,8 @@ Apps open twice at the start of shift
 Ctrl+Alt+L says a Bally app wasn't found
   Check the path in [StartOfShift]. Keep the * in place of the version.
 
-Ctrl+Alt+L says the Chrome profile wasn't found
-  Sign in to the ChromeAccount in Chrome on that PC once.
+Ctrl+Alt+L opens Edge but not the Citrix page
+  Check CitrixUrl in Settings (Start / end of shift).
 
 "Some templates weren't loaded"
   The message gives the file and line numbers. Usually a missing = or a
