@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.22.1 (Oct 30, 2026).
+Current version: v3.22.2 (Oct 30, 2026).
 
 ## Waiting to be built
 
@@ -16,6 +16,9 @@ Current version: v3.22.1 (Oct 30, 2026).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.22.2 (Oct 30)
+- Settings window: the tab area is taller (350 -> 400), so the "Beep when a log-in-again reminder pops up" tick on the Logins tab is no longer cut off by Save and Cancel (Jakob's screenshot, display scaling makes text taller than under Wine).
 
 ## Done in v3.22.1 (Oct 30)
 - Jakob's first look at the dark theme: dark text on a dark background somewhere, so light is now the default (blue accent kept, teal gone) and dark is a switch: tray menu > Dark look, or Customize. Dark text on dark probably came from a colour I did not remap; if he turns dark on again and sees it, ask for a screenshot.

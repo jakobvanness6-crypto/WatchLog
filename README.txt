@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.22.1  -  README
+  WATCHLOG  v3.22.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.

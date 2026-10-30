@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.22.1"
+VERSION := "3.22.2"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -6133,7 +6133,7 @@ ShowSettings(welcome := false, startTab := 1) {
             . "2.   If your team keeps its templates on SharePoint, pick that file on the Templates tab.`n"
             . "Then press Save. You can change any of this later: click the teal icon near the clock > Settings.")
     }
-    tabs := g.AddTab2("xm w" (W + 36) " h350 Choose" startTab, ["Logins", "Templates", "Start / end of shift", "Alert Grid", "Updates", "General"])
+    tabs := g.AddTab2("xm w" (W + 36) " h400 Choose" startTab, ["Logins", "Templates", "Start / end of shift", "Alert Grid", "Updates", "General"])
 
     ; ---- Logins
     tabs.UseTab(1)
