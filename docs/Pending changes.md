@@ -7,13 +7,61 @@ Current version: v3.23.0 (Oct 30, 2026): Edge-only start of shift (built, not ru
 
 ## Waiting to be built
 
+### Plan: shorthand line to finished log (Oct 30, step 1 of 2, NOT built, waiting on Jakob's examples and "build it")
+
+**The idea.** You write one short line the way you jot it on paper, and Watchlog turns it into the finished log using the template you already have. No form when the line has everything; the form only opens when something is missing, with what it found already filled in.
+
+**Where you type it.** On the call pad (Numpad +, as now). The first word is the code word of a template, with or without the `;`. Ctrl+Enter makes the log as it does today. Plain jottings with no code word in front keep working exactly as now (they still fill the next form).
+
+**What happens.**
+- Every box in that template has an answer from the line: the finished log goes straight into the window you were in (iTrak, Notepad...), counted in Time saved. No form.
+- Something is missing: the usual form opens, found boxes say "(from your call pad)", the cursor sits in the first empty one.
+- Boxes with a `blank=` that can stay empty (Note, Signs observed, Reason (only if up)...) do not count as missing.
+
+**How the words are read** (order does not matter for most):
+- Money: `5k`, `5000`, `5,000`, `$5000`, `11421.11` -> $5,000 / $11,421.11 (same as the pad does now).
+- Table: any table in your tables list, any case; the number alone works when it is unique (`205` -> BJ205).
+- Machine: a letter + 3 to 5 digits -> caps (`b1410` -> B1410); `n3` -> NRT3, `a1` -> ATM1.
+- Pick lists: the first letters of a choice (`def` -> Defective, `exp` -> expired ID, `up`/`dn` -> Up/Down, `24`/`ind` -> 24 hour/indefinite).
+- Numbers for # boxes (Alert #, Asset #, Player #, Window #) are taken in the order the template asks for them; `w3` or `win 3` always means the window.
+- Anything left over goes into the one free-text box, if the template has one (Note, What the review showed...).
+- Several items in a "several" or "Add another" template are all used (`open 201 202 203`, two fills in one line).
+
+**Examples with today's templates** (made-up values):
+
+| You type | You get |
+|---|---|
+| `fill 205 5k` | BJ205 $5,000 |
+| `fill 205 5k 303 10k` | BJ205 $5,000 / BJ303 $10,000 (two lines, as Add another does) |
+| `open 201 202 203` | UT201, FB202, UT203 Opened. (one line, as the several box does) |
+| `cards ry301` | Card change on RY301. |
+| `bv c2102 4471 full` | C2102 #4471 (Full) |
+| `found b1410 45.20` | Operations Supervisor advised printing off abandoned credits in the amount of $45.20 from B1410. Funds taken to Security as found. |
+| `aml 123 b1410` | AML Alert #123 populated at B1410 (time now). Review showed nothing suspicious. |
+| `maint n2 n4` | NRT2 and NRT4 Maintenance. |
+| `refuse 2 exp` | Security Officer refused entry to 2 patrons due to expired ID. |
+| `jack c2102 11421.11 w3 2130` | the full jackpot sentence, time paid 21:30 (time format to confirm) |
+| `player 123456 3 205 2k up 5k` | Player #123456 playing Spot 3, BJ205, In $2,000, Up $5,000. |
+| `medical guest kitchen` | form opens (What the review showed / Outcome still needed), Who and Location already filled |
+
+**Your own short codes (optional).** You can give any template a second, shorter code just for the pad, for example `f` for fill or `o` for open, in Customize. Safer than changing the real code words.
+
+**Questions for Jakob before building:**
+1. Five to ten real lines the way you jot them on the paper pad (fake numbers are fine), and what each should become.
+2. How do you write times (2130, 9:30p, 930)? 24-hour in the log?
+3. Should it also work outside the call pad, for example typing `;fill 205 5k` straight into iTrak and pressing a key? (Harder inside Citrix: see step 2.)
+
+### Step 2 (after step 1): autocorrect everywhere, including Citrix/iTrak
+Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Design comes after step 1 ships.
+
+
 
 - **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Waiting on Location, Topic, Reference and End Time click for those three.
 - **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
 
 
 - Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
-- Shorthand for other logs (which ones, with his real examples).
+- Shorthand for other logs: see the plan at the top (step 1).
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
