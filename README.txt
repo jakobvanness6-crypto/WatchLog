@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.26.3  -  README
+  WATCHLOG  v3.27.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.26.3 (Documents, or the program folder).
+                      v3.27.0 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -874,6 +874,26 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
+SAFEGUARDS  (v3.27.0)
+  Things Watchlog now refuses or warns about, instead of failing quietly:
+  - A login with no program set (no Window= / Only in) is never typed into Notepad,
+    Outlook, Teams, Word, Excel, OneNote, Slack, WhatsApp, Discord, Watchlog's own windows
+    or the iTrak Daily Log Entry window. It says so on screen. Set Only in for a login to
+    lock it to its program. A refused login of any kind (wrong window in front) now also
+    shows a message, not just an Activity log line.
+  - A form's log is pasted only if the window you started it in comes back to the front
+    (it waits up to 2 seconds). If not, nothing is pasted, it beeps, and the log stays on the
+    clipboard: click where it goes and press Ctrl+V.
+  - Alert Grid clearing stops if a pop-up takes the front before the first click or the
+    right-click (it gets one second to bring Alert Grid back).
+  - At start-up Watchlog compares the Windows display scale with the one the iTrak and Alert
+    Grid clicks were taught at, and warns if it changed. Alert Grid clicks taught before
+    v3.27.0 have no scale saved: teach once (Ctrl+Alt+Shift+A) to get the warning.
+  - A form closed with Esc keeps what you typed for 10 minutes: opening the same log again
+    puts it back (Esc again, without changing anything, throws it away). Kept in memory only.
+  - An unexpected error now shows a short plain box ("That didn't finish, but Watchlog is
+    still running") with the line number, instead of AutoHotkey's error window.
+
 SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
   Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and
   the log is made. If the line has everything it goes in with no form; if something is

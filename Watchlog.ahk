@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.26.3"
+VERSION := "3.27.0"
 VERSION_DATE := "Oct 30, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -113,6 +113,8 @@ PickHwnd := 0
 TeachBusy := false       ; true while the Alert Grid teach step runs
 NotesWin := ""           ; the quick notes window while it's open
 PadShort := ""           ; a shorthand line being run from the call pad (v3.26.0)
+Cancelled := ""          ; the last form closed with Esc: its title, boxes and time (v3.27.0)
+InErr := false
 LeftOnClip := ""         ; the last log Watchlog left on the clipboard (not your own copy)
 CallPadWin := ""         ; the call pad window (hidden, not closed, when you press Esc)
 CallPadTarget := 0       ; the window you were in when the pad opened
@@ -176,6 +178,7 @@ LoadSettings()
 LoadTemplates()
 LoadApps()
 RegisterHotkeys()
+CheckScale()
 RegisterStamps()
 ResumeSdsResign()
 StartWatching()
@@ -366,8 +369,16 @@ LogExit(reason, code) {
 ; Errors still show their usual message; the log gets the line number and
 ; message only (never the values involved, which could be anything)
 LogError(e, mode) {
+    global InErr
     Activity("Error on line " e.Line ": " e.Message)
-    return 0
+    if InErr
+        return 0
+    ; A short plain box instead of AutoHotkey's error window; Watchlog keeps
+    ; running (v3.27.0). The line number is what to report.
+    InErr := true
+    try MsgBox("That didn't finish, but Watchlog is still running.`n`nIf it keeps happening, tell whoever looks after the tool:`nline " e.Line ": " e.Message, "Watchlog", "Icon! T20")
+    InErr := false
+    return 1
 }
 
 
@@ -631,6 +642,14 @@ DoLogin(trig, user, fallbackPw, rec) {
     ; Last check before typing: the right window must still be in front
     if rec.win != "" && !LoginWindowActive(rec.win) {
         Activity("Login " trig " NOT typed: " "the window it is locked to wasn't in front")
+        Tip("Login not typed: the program it's for isn't in front.", 3500, true)
+        return
+    }
+    ; A login with no program set never goes into Notepad, mail, chat, Office,
+    ; Watchlog's own windows or the daily log (v3.27.0)
+    if rec.win = "" && (blocked := LoginBlockedWin()) != "" {
+        Activity("Login " trig " NOT typed: " blocked " was in front")
+        Tip("Login not typed: " blocked " is in front. Click the program it's for first.", 4000, true)
         return
     }
     SendInput "{Text}" user
@@ -656,6 +675,24 @@ DoLogin(trig, user, fallbackPw, rec) {
     exe := ""
     try exe := WinGetProcessName("A")
     Activity("Login typed: " trig " (" user ") into " (exe != "" ? exe : "an unknown window"))
+}
+
+
+; The window that must never get a typed password, or "" (v3.27.0)
+LoginBlockedWin() {
+    hwnd := WinExist("A")
+    if !hwnd
+        return ""
+    exe := "", title := ""
+    try exe := StrLower(WinGetProcessName("ahk_id " hwnd))
+    try title := WinGetTitle("ahk_id " hwnd)
+    if WinGetPID("ahk_id " hwnd) = ProcessExist()
+        return "a Watchlog window"
+    if RegExMatch(exe, "^(notepad|outlook|olk|ms-teams|teams|winword|excel|onenote|slack|whatsapp|discord)\.exe$")
+        return exe
+    if InStr(title, "Daily Log Entry")
+        return "the daily log"
+    return ""
 }
 
 
@@ -1760,8 +1797,20 @@ ClearTip() => ToolTip()
 ; pause so a paste lands there (Citrix needs a moment longer)
 ReturnTo(hwnd) {
     try WinActivate "ahk_id " hwnd
-    WinWaitActive "ahk_id " hwnd, , 2
+    ok := WinWaitActive("ahk_id " hwnd, , 2)
     Sleep WinActive("ahk_exe wfica32.exe") ? 400 : 50
+    return ok != 0
+}
+
+; The log couldn't be pasted (the window it was started in isn't in front):
+; it stays on the clipboard instead of going into whatever has the keyboard
+KeepOnClip(text) {
+    global LeftOnClip
+    A_Clipboard := StrReplace(StrReplace(text, "`r`n", "`n"), "`n", "`r`n")
+    LeftOnClip := text
+    SoundBeep 750, 120
+    Tip("The window you were in isn't in front, so nothing was pasted.`nThe log is on the clipboard: click where it goes and press Ctrl+V.", 7000, true)
+    Activity("Form log not pasted: the window it was started in wasn't in front (the log is on the clipboard)")
 }
 
 ; What you copied, for the clip and fromcopy boxes. A log Watchlog itself
@@ -1814,6 +1863,7 @@ SetForm(v) {
 }
 
 FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
+    global Cancelled
     target := WinExist("A")
     g := WGui("+AlwaysOnTop +ToolWindow", title)
     g.SetFont("s10", "Segoe UI")
@@ -1853,6 +1903,23 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
     if hints.Count {
         res := PadFill(fields, ctrls, labs, hints, padMarks)
         padUsed := res.n, padRows := res.rows
+    }
+    ; the same form closed with Esc in the last 10 minutes: what was typed comes back (v3.27.0)
+    restored := ""
+    if !padUsed && IsObject(Cancelled) && Cancelled.title = title && A_TickCount - Cancelled.at < 600000 && Cancelled.vals.Length = ctrls.Length {
+        restored := ""
+        for i, c in ctrls {
+            t := Cancelled.vals[i]
+            if fields[i].HasOwnProp("items") && fields[i].HasOwnProp("kind") && fields[i].kind = "list" {
+                for j, it in fields[i].items
+                    if it = t
+                        c.Choose(j)
+            } else
+                c.Text := t
+            restored .= t Chr(1)
+        }
+        Cancelled := ""
+        g.Title := title "  (what you typed before is back)"
     }
     LoadAutocorrect()
     for c in ctrls
@@ -1913,6 +1980,18 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         Submit()
 
     Cancel(*) {
+        global Cancelled
+        ; kept for 10 minutes so reopening the same log puts it back; not when it
+        ; is only what was put back last time (a second Esc clears it)
+        if !Untouched() {
+            vals := [], joined := ""
+            for c in ctrls {
+                vals.Push(c.Text)
+                joined .= c.Text Chr(1)
+            }
+            if joined != restored
+                Cancelled := {title: title, vals: vals, at: A_TickCount}
+        }
         SetForm("")
         g.Destroy()
     }
@@ -2170,8 +2249,11 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         CountSaved("log", saved, title)
         ; Give the window you were typing in a moment to take the keyboard
         ; back (Citrix needs longer) - otherwise the paste can get lost
-        ReturnTo(target)
-        Paste(out, true)
+        back := ReturnTo(target)
+        if target && !back {
+            KeepOnClip(out)
+        } else
+            Paste(out, true)
         Journal(title, out, saved)
         if padUsed
             CallPadUsed()
@@ -3932,6 +4014,7 @@ TeachRun() {
         IniWrite gw, AlertFile, "Clicks", "GridW"
         IniWrite gh, AlertFile, "Clicks", "GridH"
         IniWrite "client", AlertFile, "Clicks", "Basis"
+        IniWrite A_ScreenDPI, AlertFile, "Clicks", "DPI"
         ; an older teach's OK and clear button spots don't belong with these
         for k in ["OkX", "OkY", "ClearX", "ClearY", "NoMoreX", "NoMoreY", "NoMoreBox"]
             try IniDelete AlertFile, "Clicks", k
@@ -4138,9 +4221,15 @@ ClearAlerts() {
     SetMouseDelay 0
     SetKeyDelay 0
     attempts := 0
+    lostFront := false
     while !done && attempts < 3 {
         attempts += 1
         try {
+            ; a pop-up that took the front: stop before clicking anything (v3.27.0)
+            if !GridFront(grid) {
+                lostFront := true
+                break
+            }
             Click px, py
             Sleep gap
             ; the rows under the clicked one, before and after Ctrl+A: when
@@ -4164,6 +4253,10 @@ ClearAlerts() {
                     AlertSelectAll()
                     again := 0
                 }
+            }
+            if !GridFront(grid) {
+                lostFront := true
+                break
             }
             Click px, py, "Right"
             Sleep gap * 2
@@ -4226,6 +4319,10 @@ ClearAlerts() {
             AlertClearAcked(c, grid, gap)
         }
     }
+    if lostFront {
+        Tip("Alert Grid lost the front, so the clear was stopped. Press it again.", 3500, true)
+        Activity("Alert Grid: stopped, a window took the front before a click")
+    }
     ; only acknowledged alerts were there: they were cleared first, so finish with
     ; the "no more alerts" step
     if !done && ackedFirst {
@@ -4282,6 +4379,30 @@ AlertClearAcked(c, grid, gap, noMore := true) {
     }
 
     return clicked
+}
+
+; The Windows display scale is different from when the iTrak or Alert Grid
+; clicks were taught: they would land in the wrong place (v3.27.0)
+CheckScale() {
+    msgs := ""
+    for pair in [[ITrakFile, "iTrak"], [AlertFile, "Alert Grid"]] {
+        d := ""
+        try d := IniRead(pair[1], "Clicks", "DPI", "")
+        if IsInteger(d) && d != A_ScreenDPI
+            msgs .= pair[2] " was taught at " Round(d / 96 * 100) "% scaling, the screen is at " Round(A_ScreenDPI / 96 * 100) "% now.`n"
+    }
+    if msgs = ""
+        return
+    Activity("Display scale changed since the clicks were taught: " StrReplace(RTrim(msgs, "`n"), "`n", " "))
+    TrayTip msgs "Teach them again if a click lands in the wrong place.", "Watchlog: display scale", "Icon!"
+}
+
+; Alert Grid in front (it gets one second to come back)
+GridFront(grid) {
+    if WinActive("ahk_id " grid)
+        return true
+    try WinActivate "ahk_id " grid
+    return WinWaitActive("ahk_id " grid, , 1) != 0
 }
 
 ; Puts back the window that was in front before a clear
