@@ -92,11 +92,11 @@ Settings is now a window with tabs (Logins, Templates, Start / end of shift, Ale
 ### Everything around the logging
 
 - `;t`, `;dd` and `;dt` type the time, the date, or both.
-- Ctrl+Alt+L opens everything for the start of shift in about 20 seconds: SDS, Alert Grid and CMP first, then the work websites and iTrak facial recognition in Edge, skipping anything that's already open. It offers the sign-in above, puts the windows back where I like them, and ends with Chrome on the Citrix page ready to start iTrak.
+- Ctrl+Alt+L opens everything for the start of shift in about 20 seconds: SDS, Alert Grid and CMP first, then the iTrak facial recognition and the Citrix page in Edge, skipping anything that's already open. It offers the sign-in above, puts the windows back where I like them, and ends with Edge on the Citrix page ready to start iTrak.
 - Ctrl+Alt+Shift+L closes it all at the end of the shift, after confirming. It logs out of SDS properly first instead of just closing it, and Ctrl+Alt+K does that SDS logout on its own.
 - Window layout: Ctrl+Alt+Shift+S saves where every window is and Ctrl+Alt+W puts them back. The start of shift does this by itself.
 - Caps Lock guard: plain Caps Lock can't turn caps on by accident (Shift+Caps Lock does), and a red CAPS LOCK ON tag shows while it's on. That's what frees the Caps Lock key to clear Alert Grid. There are no beeps, so it doesn't bother anyone nearby.
-- Ctrl+Alt and a letter switches to SDS, CMP, Teams, Outlook or Chrome.
+- Ctrl+Alt and a letter switches to SDS, CMP, Teams, Outlook or Edge.
 - Ctrl+Alt+Q adds a quick note, with a tag like #todo if you want one. Ctrl+Alt+O shows all the notes in a window that always reads the latest copy, so an old Notepad tab can't save over newer notes.
 - The shift journal saves a copy of every entry you put in, with the time. Ctrl+Alt+J shows how many of each log you've done and gives you a one-line summary for the End of Shift entry, like "Shift summary (18:20 - 05:47): 47 logs. 12 Audit, ...". If iTrak loses an entry, you can copy it back from the journal.
 

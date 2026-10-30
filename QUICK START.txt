@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.22.2  -  QUICK START  (one page)
+  WATCHLOG  v3.23.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -49,7 +49,7 @@ USE IT
   Tab / Enter / Esc        In a form: next box / insert / cancel.
   Ctrl+Alt+J               This shift's log counts, with Copy summary.
   Ctrl+Alt+L               Start of shift: opens the work apps and
-                           websites.  Ctrl+Alt+Shift+L closes them.
+                           Edge (facial rec, Citrix).  Ctrl+Alt+Shift+L closes them.
   Ctrl+Alt+P               Pause all shortcuts (press again to resume).
 
   Ctrl+Alt+E               Template editor: change the wording, add
