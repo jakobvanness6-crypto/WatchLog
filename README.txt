@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.30.0  -  README
+  WATCHLOG  v3.30.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1358,7 +1358,7 @@ Something else broke
 -----------------------------------------------------------------------
 INFO FROM PEOPLE SEARCH  (v3.30.0)
   After a code word fills the daily log, Watchlog can attach the people for you, up to
-  the point where you choose who: it clicks the Info From arrow, Personnel, types the
+  the point where you choose who: it clicks the Info From button, Personnel, types the
   department into Look For and presses Enter. You pick the person and click Select (or
   Cancel to skip), and it goes on to the next department. A tip shows which one it is on.
       ;fill, ;mfill    cage, then security        ;open, ;auto   dealer
@@ -1367,7 +1367,9 @@ INFO FROM PEOPLE SEARCH  (v3.30.0)
   Set in templates.txt: end the code word's line with  | from cage, security  (the exact
   text that works in Look For: audit, security, marketing, F&B, dealer, HR, surveillance,
   property, slots, cage, OPS). Teach the three spots once per PC: open a daily log, then
-  tray > iTrak > Teach Info From (Info From arrow, Personnel line, Look For box).
+  tray > iTrak > Teach Info From (the Info From button itself, NOT the arrow beside the
+  box, which only lists recent names; then Personnel in its list; then the Look For box).
+  v3.30.1: spots taught with v3.30.0 (the arrow) are ignored: teach it again once.
   Keep the daily log and Personnel windows the same size as when taught. It stops if a
   window doesn't open, and waits up to 3 minutes for each pick.
   settings.ini [ITrak] PersonnelWindow= how to find the Personnel window (default

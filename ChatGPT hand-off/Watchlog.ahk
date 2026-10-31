@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.30.0"
+VERSION := "3.30.1"
 VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -4055,10 +4055,10 @@ TeachWait(msg) {
     KeyWait "F8", "T2"
     KeyWait "a", "T2"
     if !ok {
-        Tip(gaveUp ? "Teach Alert Grid cancelled. Nothing saved." : "Teach Alert Grid timed out. Nothing saved.", 3000, true)
-        Activity("Alert Grid teach: " (gaveUp ? "cancelled" : "timed out"))
+        Tip(gaveUp ? "Teaching cancelled. Nothing saved." : "Teaching timed out. Nothing saved.", 3000, true)
+        Activity("Teach: " (gaveUp ? "cancelled" : "timed out"))
     } else
-        Activity("Alert Grid teach: captured a spot")
+        Activity("Teach: captured a spot")
     return ok
 }
 
@@ -5189,18 +5189,30 @@ ShareITrakSetup() {
 ;  each department into Look For and presses Enter, then waits while you
 ;  pick the person and click Select (or Cancel to skip), and goes on to the
 ;  next one. Taught once per PC (tray > iTrak > Teach Info From): the Info
-;  From arrow and the Personnel line (from the daily log window) and the
-;  Look For box (from the Personnel window). Kept in itrak.ini [InfoFrom].
+;  From BUTTON (the label itself, not the arrow beside the box, which only
+;  lists recent names) and the Personnel line in the list it drops down
+;  (from the daily log window), and the Look For box (from the Personnel
+;  window). Kept in itrak.ini [InfoFrom]. v3.30.1: the button is saved as
+;  ButtonX/ButtonY; spots saved by v3.30.0 (ArrowX/ArrowY, the arrow) are
+;  ignored so it has to be taught again.
 ; =====================================================================
+; How to find the Personnel window: the title saved by Teach Info From on this
+; PC (itrak.ini [InfoFrom] Window=, v3.30.1) or settings.ini [ITrak] PersonnelWindow=
+PersonnelMatch() {
+    t := ""
+    try t := Trim(IniRead(ITrakFile, "InfoFrom", "Window", ""))
+    return t != "" ? t : Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe"))
+}
+
 PersonnelWin() {
     SetTitleMatchMode 2
-    return WinExist(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")))
+    return WinExist(PersonnelMatch())
 }
 
 ; The taught spots as a Map, or "" when not taught
 InfoFromLoad() {
     c := Map()
-    for k in ["ArrowX", "ArrowY", "PersonnelX", "PersonnelY", "W", "H", "LookX", "LookY", "PW", "PH"] {
+    for k in ["ButtonX", "ButtonY", "PersonnelX", "PersonnelY", "W", "H", "LookX", "LookY", "PW", "PH"] {
         v := ""
         try v := Trim(IniRead(ITrakFile, "InfoFrom", k, ""))
         if !IsInteger(v)
@@ -5213,7 +5225,12 @@ InfoFromLoad() {
 InfoFromRun(win, depts, name) {
     c := InfoFromLoad()
     if !c {
-        Tip("Info From isn't taught on this PC yet: tray > iTrak > Teach Info From.", 4000, true)
+        old := ""
+        try old := IniRead(ITrakFile, "InfoFrom", "ArrowX", "")
+        if old != ""
+            Tip("Info From needs teaching again (it now clicks the Info From button, not the arrow): tray > iTrak > Teach Info From.", 6000, true)
+        else
+            Tip("Info From isn't taught on this PC yet: tray > iTrak > Teach Info From.", 4000, true)
         return
     }
     CoordMode "Mouse", "Screen"
@@ -5228,9 +5245,9 @@ InfoFromRun(win, depts, name) {
             Tip("Couldn't bring the daily log to the front. Info From stopped.", 3000, true)
             return
         }
-        if !ITrakSpot(win, c["ArrowX"], c["ArrowY"], c["W"], c["H"], &x, &y) {
-            Tip("The Info From arrow is outside the daily log window. Info From stopped.", 3500, true)
-            Activity("Info From (" name "): arrow spot outside the window")
+        if !ITrakSpot(win, c["ButtonX"], c["ButtonY"], c["W"], c["H"], &x, &y) {
+            Tip("The Info From button is outside the daily log window. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): Info From button spot outside the window")
             return
         }
         Click x, y
@@ -5238,7 +5255,7 @@ InfoFromRun(win, depts, name) {
         ITrakSpot(win, c["PersonnelX"], c["PersonnelY"], c["W"], c["H"], &x, &y)
         Click x, y
         SetTitleMatchMode 2
-        pw := WinWait(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")), , 6)
+        pw := WinWait(PersonnelMatch(), , 6)
         if !pw {
             Tip("The Personnel window didn't open. Info From stopped.", 3500, true)
             Activity("Info From (" name "): the Personnel window didn't open for " d)
@@ -5287,23 +5304,33 @@ TeachInfoFromRun() {
         return
     }
     if MsgBox("Three spots, once per PC. For each one hover the mouse and press F8 (or Ctrl+Alt+Shift+A; Ctrl+Alt+Esc cancels).`n`n"
-        . "1. The arrow at the right end of the Info From box (don't click it yet).`n"
-        . "2. Click that arrow yourself so the list opens, then hover over Personnel.`n"
+        . "1. The Info From button itself (the button you click to search, NOT the arrow beside the box, which only shows recent names). Don't click it yet.`n"
+        . "2. Click the Info From button yourself so its list drops down (Personnel, Subject, Contact...), then hover over Personnel.`n"
         . "3. Click Personnel yourself so the Personnel window opens, then hover over the Look For box.`n`n"
         . "Afterwards press Cancel in the Personnel window. Start?", "Teach Info From", "YesNo Icon?") != "Yes"
         return
-    if !TeachWait("1 of 3`nHover over the Info From arrow and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+    if !TeachWait("1 of 3`nHover over the Info From button (not the arrow) and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
         return
     if !WinExist("ahk_id " win) || !ITrakPoint(win, &ax, &ay) {
         MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach Info From", "Icon!"
         return
     }
-    if !TeachWait("2 of 3`nClick the Info From arrow, then hover over Personnel and press F8   (Ctrl+Alt+Esc cancels)")
+    if !TeachWait("2 of 3`nClick the Info From button, then hover over Personnel in the list and press F8   (Ctrl+Alt+Esc cancels)")
         return
     ITrakPoint(win, &px, &py)          ; the list can hang outside the window: that's fine
     if !TeachWait("3 of 3`nClick Personnel, then hover over the Look For box and press F8   (Ctrl+Alt+Esc cancels)")
         return
     pw := PersonnelWin()
+    wtitle := ""
+    if !pw {
+        ; the window has another title on this PC: use the window under the mouse
+        CoordMode "Mouse", "Screen"
+        MouseGetPos , , &hw
+        if hw && hw != win && WinExist("ahk_id " hw) {
+            pw := hw
+            wtitle := WinGetTitle("ahk_id " hw)
+        }
+    }
     if !pw || !ITrakPoint(pw, &lx, &ly) {
         MsgBox "That spot isn't inside the Personnel window (or it isn't open). Nothing saved. Try again.", "Teach Info From", "Icon!"
         return
@@ -5311,7 +5338,11 @@ TeachInfoFromRun() {
     WinGetClientPos , , &cw, &ch, "ahk_id " win
     WinGetClientPos , , &pcw, &pch, "ahk_id " pw
     try {
-        for k, v in Map("ArrowX", ax, "ArrowY", ay, "PersonnelX", px, "PersonnelY", py, "W", cw, "H", ch
+        try IniDelete ITrakFile, "InfoFrom", "ArrowX"
+        try IniDelete ITrakFile, "InfoFrom", "ArrowY"
+        if wtitle != ""
+            IniWrite wtitle " ahk_exe " WinGetProcessName("ahk_id " pw), ITrakFile, "InfoFrom", "Window"
+        for k, v in Map("ButtonX", ax, "ButtonY", ay, "PersonnelX", px, "PersonnelY", py, "W", cw, "H", ch
                 , "LookX", lx, "LookY", ly, "PW", pcw, "PH", pch)
             IniWrite v, ITrakFile, "InfoFrom", k
     } catch {

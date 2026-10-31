@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 6 of 9 (lines 6251-7560 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 9 (lines 6282-7591 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; A row of big numbers with a small label under each
 Tiles(g, tiles) {
     ctrls := []

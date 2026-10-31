@@ -1,24 +1,4 @@
-; ===== Watchlog.ahk PART 3 of 9 (lines 2438-3834 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; =====================================================================
-;  AUTO-RELOAD  -  checks every 2 seconds whether templates.txt,
-;  my-templates.txt, settings.ini or the team's shared file was saved,
-;  and reloads if so (so a supervisor's change to the team file reaches
-;  every PC as soon as OneDrive syncs it). Waits while a form or window
-;  is open, and while settings.ini is missing (OneDrive can briefly
-;  remove a file while it syncs - reloading then would start with no
-;  settings). Any other file that goes missing is skipped until it's back.
-; =====================================================================
-StartWatching() {
-    files := [TemplatesFile, MyTemplatesFile, SettingsFile]
-    if Cfg["SharedTemplates"] != ""
-        files.Push(Cfg["SharedTemplates"])
-    if TeamProgramFile() != ""
-        files.Push(TeamProgramFile())
-    for f in files
-        WatchTimes[f] := FileTimeOf(f)
-    SetTimer CheckForEdits, 2000
-}
-
+; ===== Watchlog.ahk PART 3 of 9 (lines 2458-3834 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
 FileTimeOf(f) {
     try return FileGetTime(f, "M")
     return ""

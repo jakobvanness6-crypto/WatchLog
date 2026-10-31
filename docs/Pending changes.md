@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.30.0 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.30.1 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -18,7 +18,7 @@ Current version: v3.30.0 (Oct 31, 2026): code and docs review fixes (see PROJECT
   - mfill: cashier, officer
   - account: guest services
   Search text CONFIRMED (Oct 31): cashier = cage, officer = security, slot tech = slots, guest services = marketing. So: fill cage, security; open dealer; auto dealer; jack OPS, slots, cage; bv slots, security; mfill cage, security; account marketing.
-  A department word typed in a call pad shorthand line could still override. Everything is settled; waiting only on "build it". Needs a once-per-PC teach: Info From drop-down arrow, the Personnel line, and the Look For box in the Personnel window.
+  A department word typed in a call pad shorthand line could still override. Everything is settled; waiting only on "build it". Needs a once-per-PC teach: the Info From button (not the drop-down arrow, which only lists recent names; fixed in v3.30.1), the Personnel line, and the Look For box in the Personnel window.
 In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
 - How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
 - Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
@@ -48,7 +48,7 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Autocorrect list could be shared from the team folder beside templates.txt.
 
 ## Done in v3.30.0 (Oct 31)
-- Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From arrow, Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.
+- Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From button (v3.30.1; v3.30.0 wrongly taught the arrow), Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.
 
 ## Done in v3.29.2 (Oct 31)
 - ;cards logs the table's pit (%pit%, from @pit) instead of always Pit 2 (templates.txt, wording version Oct 31, 2026).

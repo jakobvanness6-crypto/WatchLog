@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 9 of 9 (lines 9825-11162 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 9 of 9 (lines 9856-11193 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; The kinds of box, in the order the box form lists them
 BoxKinds() {
     static kinds := [["plain", "Text you type"]

@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 8 of 9 (lines 8623-9824 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 8 of 9 (lines 8654-9855 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Adds a menu item with a picture from the icon font
 MenuItem(m, name, fn, glyph := 0) {
     m.Add(name, fn)
