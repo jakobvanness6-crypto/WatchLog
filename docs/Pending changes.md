@@ -17,8 +17,8 @@ Current version: v3.29.2 (Oct 31, 2026): code and docs review fixes (see PROJECT
   - bv: slot tech, security
   - mfill: cashier, officer
   - account: guest services
-  To confirm: cashier = search "cage"? officer = "security"? slot tech = "slots"? guest services = what search text (not in the 11 above)?
-  A department word typed in a call pad shorthand line could still override. Waiting on those answers and "build it".
+  Search text CONFIRMED (Oct 31): cashier = cage, officer = security, slot tech = slots, guest services = marketing. So: fill cage, security; open dealer; auto dealer; jack OPS, slots, cage; bv slots, security; mfill cage, security; account marketing.
+  A department word typed in a call pad shorthand line could still override. Everything is settled; waiting only on "build it". Needs a once-per-PC teach: Info From drop-down arrow, the Personnel line, and the Look For box in the Personnel window.
 In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
 - How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
 - Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
