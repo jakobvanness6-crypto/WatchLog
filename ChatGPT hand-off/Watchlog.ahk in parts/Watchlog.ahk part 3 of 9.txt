@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 3 of 9 (lines 2388-3750 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 3 of 9 (lines 2389-3751 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
 FileTimeOf(f) {
     try return FileGetTime(f, "M")
     return ""
@@ -534,12 +534,12 @@ PadShortcut(text) {
     code := StrLower(words[1])
     rest := []
     known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1, "mfill", 1)
-    padText := text
+    srcText := text
     if known.Has(code) {
         loop words.Length - 1
             rest.Push(words[A_Index + 1])
         if code = "mfill"
-            padText := RegExReplace(text, "i)^\s*mfill\s*", "")
+            srcText := RegExReplace(text, "i)^\s*mfill\s*", "")
     } else if words.Length > 1 && StrLower(words[words.Length]) = "auto" {
         code := "auto"
         loop words.Length - 1
@@ -629,7 +629,7 @@ PadShortcut(text) {
         hints["expect"] := 3
         hints["go"] := machine != "" && asset != "" && reason != ""
     } else if code = "mfill" {
-        fills := PadParse(padText).fills
+        fills := PadParse(srcText).fills
         if fills.Length
             hints["fills"] := fills, hints["go"] := true
     } else if code = "account" {

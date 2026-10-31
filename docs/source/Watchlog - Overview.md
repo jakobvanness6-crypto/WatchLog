@@ -1,6 +1,6 @@
 # Watchlog
 
-Oct 25, 2026 · Jakob
+Oct 31, 2026 · Jakob
 
 ## Summary
 
@@ -30,18 +30,18 @@ Security has its own section further down. In short: passwords are kept in Windo
 
 ## What it does
 
-It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.23.0 now.
+It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.29.1 now.
 
 <!-- fig: image4.png 1.7 | The Watchlog icon sits by the clock. Right-clicking it opens this menu. -->
 
 ### Log entries
 
-There are 35 templates so far. Every code starts with a semicolon so it never goes off in the middle of normal typing, and the entry appears as soon as the code is typed.
+There are 36 templates so far. Every code starts with a semicolon so it never goes off in the middle of normal typing, and the entry appears as soon as the code is typed. Anyone who uses the semicolon for something else can pick a different symbol for their own PC in Settings.
 
 | Area | Codes |
 | --- | --- |
 | Incidents and reviews | `;jack` jackpot · `;audit` employee audit · `;medical` · `;evict` trespass · `;face` facial recognition alert |
-| Start and end of shift | `;start` · `;end` (remembers which bay you were on last) |
+| Start and end of shift | `;start` · `;end` (remembers which bay you were on last) · `;break` (also keeps count of the 60 minutes of break) |
 | Security routines | `;interior` · `;exterior` door checks · `;parking` patrol · `;refuse` refused entry (one or several patrons) · `;selfex` self-exclusion · `;inventory` · `;account` review · `;drop` table drop · `;man` garbage sweep |
 | Tables | `;open` · `;close` · `;auto` auto-close · `;cards` card change · `;fill` table fill · `;player` player log |
 | Slots | `;bv` emergency BV pull · `;abandon` abandoned credits returned · `;found` abandoned credits taken to Security · `;aml` AML alert · `;maint` maintenance · `;mfill` ATM and NRT fill · `;firm` NRT firmware check |
@@ -68,11 +68,19 @@ When an entry has details that change, a small form pops up with a box for each 
 
 <!-- fig: image9.png 2.9, image10.png 2.9 | A BV pull and a machine fill with several lines in one entry. Add another (Ctrl+Enter) keeps the earlier ones in the preview. -->
 
+### Filling in the whole daily log
+
+Most codes can now do the whole iTrak entry, not just the wording. `;cards`, for example, opens a new daily log in iTrak (or uses the one already open), picks the Location, Topic and Reference, and puts the wording in the Synopsis. Seventeen codes work this way so far, including the door checks, patrols, table fills and openings, jackpots, BV pulls and machine fills. Where the Reference is a number I look up, it's left empty for me to fill in.
+
+Most of these entries start as a phone call. The call pad (the + key on the number pad) is a small box I jot the call into. If I write it in shorthand, like `fill 205 5.5` for a $5,500 fill on table 205, Ctrl+Enter turns it straight into the finished daily log. Ctrl+Alt+F opens a short list of logs that never change, like Break or Table Drop, and Ctrl+Alt+Shift+R repeats the last one.
+
+Each PC is taught once where the New daily log button and the boxes are, the same way as Alert Grid. Watchlog never clicks Save. I still read the entry over and save it myself.
+
 ### Clearing Alert Grid
 
 Most Alert Grid alerts need nothing from us, but each one still has to be acknowledged. By hand that's Ctrl+A on the list, right-click, Acknowledge as received, Submit, then OK, and I do it about 50 to 80 times a shift.
 
-With Watchlog I look over the list first, then press Caps Lock (or Ctrl+Alt+A). It brings Alert Grid to the front, does those same clicks, clears the acknowledged alerts, and puts me back in the window I was in. It works from any window. It clears everything in the list, so the operator still checks the alerts by eye before pressing the key, same as now.
+With Watchlog I look over the list first, then press Caps Lock (or Ctrl+Alt+A). It brings Alert Grid to the front, does those same clicks, clears the acknowledged alerts, answers the "no more alerts" step, and puts me back in the window I was in. If alerts that were already acknowledged are still in the list (Alert Grid won't acknowledge those again), it clears them first and then does the rest. It works from any window. It clears everything in the list, so the operator still checks the alerts by eye before pressing the key, same as now.
 
 The Acknowledge box already has the operator's own Alert Grid login filled in by Alert Grid itself. Watchlog never reads or types that password, it only clicks Submit. Each PC is taught where to click once: the operator clears alerts by hand one time and presses F8 over each spot (Ctrl+Alt+Shift+A starts it). Only those screen positions are saved, on that PC.
 
@@ -85,13 +93,16 @@ The Acknowledge box already has the operator's own Alert Grid login filled in by
 
 ### Finding your way around
 
-Clicking the Watchlog icon (or Ctrl+Alt+M) opens a home window with a button for every feature, grouped as Logs, Shift, Logins and Set up. Each button shows its shortcut, so new operators learn the keys as they go. A strip along the bottom shows the version, whether the templates are current, whether Alert Grid is taught on this PC and the time saved this shift. Right-clicking the icon gives the same things as a menu with small pictures, and the less-used items are tucked into Alert Grid, Windows and Advanced sub-menus.
+Clicking the Watchlog icon (or Ctrl+Alt+M) opens a home window with a button for every feature, grouped as Logs, Logins and Set up. Each button shows its shortcut, so new operators learn the keys as they go. A strip along the bottom shows the version, whether the templates are current, whether Alert Grid is taught on this PC, how much break time is left and the time saved this shift. Right-clicking the icon gives the same things as a menu with small pictures, and the less-used items are tucked into Alert Grid, Windows and Advanced sub-menus.
 
 Settings is now a window with tabs (Logins, Templates, Start / end of shift, Alert Grid, Updates, General), so nothing needs editing in settings.ini by hand. Ctrl+Alt+E opens a template editor for whoever looks after the wording. It lists the templates, shows the finished entry as you change it, flags clashes, and keeps a backup before saving. Saving the team's file asks first, because it changes every bay. Editing in Notepad still works under Advanced.
 
 ### Everything around the logging
 
 - `;t`, `;dd` and `;dt` type the time, the date, or both.
+- Break time: we get 60 minutes a shift, split however we like. Watchlog starts counting when `;break` fills the break log and stops when I save and close it, and shows the minutes left on the home window, the dashboard and the tray icon. It starts over at the next start of shift.
+- Ctrl+Alt+Shift+D opens a shift dashboard: logs by type, Alert Grid clears and time saved for this shift, the last 7 days and the last 30.
+- Backups: the first time Watchlog starts each day, it copies the operator's templates, settings and taught click spots (never passwords) to a backup folder on that PC and keeps the last 14. Any of them can be put back from the tray menu, and the previous version of Watchlog itself can be put back the same way.
 - Ctrl+Alt+L opens everything for the start of shift in about 20 seconds: SDS, Alert Grid and CMP first, then the iTrak facial recognition and the Citrix page in Edge, skipping anything that's already open. It offers the sign-in above, puts the windows back where I like them, and ends with Edge on the Citrix page ready to start iTrak.
 - Ctrl+Alt+Shift+L closes it all at the end of the shift, after confirming. It logs out of SDS properly first instead of just closing it, and Ctrl+Alt+K does that SDS logout on its own.
 - Window layout: Ctrl+Alt+Shift+S saves where every window is and Ctrl+Alt+W puts them back. The start of shift does this by itself.
@@ -106,7 +117,7 @@ Settings is now a window with tabs (Logins, Templates, Start / end of shift, Ale
 
 ### Using it as a team
 
-Everyone reads the same template file from a SharePoint folder, so the whole team writes from the same approved wording. When the supervisors change something, every bay picks it up as SharePoint syncs, without restarting anything. If SharePoint can't be reached, the tool keeps using the last copy it had and says so. Each PC also checks that it's on the same version as the rest of the team, and says if it needs an update. When a new Watchlog.exe is put in the shared folder, each PC asks before updating itself, checks that the new file works, and keeps a backup of the old one. I can also point my own PC at a separate folder, so I can try a new version on my bay before anyone else gets it.
+Everyone reads the same template file from a SharePoint folder, so the whole team writes from the same approved wording. When the supervisors change something, every bay picks it up as SharePoint syncs, without restarting anything. If SharePoint can't be reached, the tool keeps using the last copy it had and says so. Each PC also checks that it's on the same version as the rest of the team, and says if it needs an update. When a new Watchlog.exe is put in the shared folder, each PC asks before updating itself, checks that the new file works, and keeps a backup of the old one, which can be put back from the tray menu. I can also point my own PC at a separate folder, so I can try a new version on my bay before anyone else gets it.
 
 Setting up a new operator takes about 5 minutes. They run Watchlog.exe and say yes to installing it. That only puts it in their own Windows profile, with no administrator rights, adds it to the Start menu and starts it with Windows. It can be removed in Settings > Apps like any program. A short tutorial shows how codes, forms and the search work, with practice boxes, and a welcome window asks for their logins and where the team file is. After that, changes are made in a Settings window rather than by editing files, and there's a one-page quick start guide. Operators can add a few codes of their own in a separate file, but those can't override a team template.
 
@@ -139,7 +150,7 @@ The longer the entry, the more it saves. The player log saves the least because 
 | Logins (one app every hour) | 10 logins | about 240 keystrokes | about 50 keystrokes | about 190 |
 | Time stamps | 10 stamps | 60 keystrokes | 20 keystrokes | 40 |
 | **Total typing** | | **about 2,500** | **about 460** | **about 2,050 (82% less)** |
-| Opening apps and sites at start of shift | 3 apps, 7 sites | about 3 minutes | 1 key, about 20 seconds | about 3 min |
+| Opening apps and sites at start of shift | 3 apps, 2 web pages | about 3 minutes | 1 key, about 20 seconds | about 3 min |
 | Closing everything at end of shift | about 11 programs | about 1 minute | 1 key and a confirm | about 1 min |
 
 That's about 14 minutes a shift: around 10 minutes of typing at 40 words a minute, plus about 4 minutes of opening and closing apps.
@@ -179,7 +190,9 @@ Since security comes first here, this is everything the tool saves and where. It
 | Login codes, usernames and settings | settings.ini in the operator's Documents\\Watchlog folder | The operator | Until changed. There are no passwords in it. If someone types one in, the tool moves it into Credential Manager the next time it starts |
 | Shift journal (time, template and text of each entry, never logins) | The operator's Documents\\Shift Journal folder, which syncs to their own OneDrive | The operator | 30 days, then deleted automatically. It can be set anywhere from 7 days to a year, set to keep only times and template names, or turned off |
 | Quick notes | Quick Notes.md in the operator's Documents | The operator | Until they delete them |
-| Alert Grid click spots | That PC only | That Windows user | Screen positions only. Until the PC is taught again |
+| Alert Grid and iTrak click spots | That PC only | That Windows user | Screen positions only. Until the PC is taught again |
+| Daily backups of templates, settings and click spots | That PC only (the user's AppData) | That Windows user | Never passwords. The last 14 days |
+| Break time used this shift | That PC only | That Windows user | Minutes only. Starts over each shift |
 | Window layout | That PC only | That Windows user | Program names, window positions and sizes only. Until saved again |
 | Time saved counts | That PC only | That Windows user | Numbers only, never log text |
 | The last value of a few boxes, like the bay and the last facial rec alert number logged | That PC only | That Windows user | Until the next one replaces it |
@@ -194,6 +207,7 @@ A few more things worth knowing:
 - It doesn't record what you type. It only watches for its own codes.
 - It only types a password when that login's code is typed, when the operator says yes to "Log in?" or to the start of shift sign-in, or when SDS comes back to its login screen after an SDS login the operator did. That last one can be turned off in Settings. Every time, it checks right before typing that the program in front is one that login is locked to. A login that isn't locked to a program is never typed automatically.
 - In Alert Grid it only clicks and presses Ctrl+A, Enter or Esc. It never types into the Acknowledge box.
+- In iTrak it only clicks New daily log, the Location, Topic, Reference and Synopsis boxes and End Time's Now button, and types or pastes the entry into them. It never clicks Save.
 - It only looks at the clipboard when a form opens with a box that takes a copy, and for `;face` it notices copies made in Edge. Nothing it sees there is saved to a file.
 - It doesn't change iTrak or any other system. It types or clicks what the operator would have, and the operator still saves the entry.
 - The copy it makes for sharing never includes anyone's settings, passwords, journal or notes.
@@ -218,7 +232,7 @@ The exe isn't signed, so Windows may show a SmartScreen warning the first time. 
 | templates.txt | The wording of every template, in plain English. The team copy lives on SharePoint and the supervisors look after it |
 | my-templates.txt | Optional extra codes for one operator, kept separate from the approved wording |
 | settings.ini | That operator's login codes and usernames (no passwords), which program each login is locked to, app shortcuts and start and end of shift lists. Created by the welcome window |
-| LaunchWork.bat | The websites that open at the start of shift |
+| LaunchWork.bat | Opens the iTrak facial recognition and Citrix pages in Edge, for double-clicking. The start of shift opens them itself |
 | QUICK START.txt and README.txt | A one-page setup guide and the full guide |
 
 What IT would need to approve:
@@ -226,13 +240,14 @@ What IT would need to approve:
 - Running Watchlog.exe from the user's own profile and starting it with Windows
 - Storing passwords in Windows Credential Manager and having the tool type them into the programs they're locked to
 - The tool clicking through the Alert Grid acknowledge steps for the operator
+- The tool opening a new iTrak daily log and filling in its boxes, which the operator then reads over and saves
 - Signing back into SDS by itself about an hour after the operator's own SDS login, only when SDS is on its login screen
 - The shift journal keeping a copy of log text for 30 days
 - Who gets edit access to the SharePoint template folder. A new Watchlog.exe put there updates every PC that says yes, so I'd keep it to the supervisors and me
 
 ## Next steps
 
-Version 3.29.0 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.29.1 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.

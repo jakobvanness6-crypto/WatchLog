@@ -1,8 +1,8 @@
 # Watchlog summary
 
-Oct 25, 2026 · Jakob
+Oct 31, 2026 · Jakob
 
-Watchlog is a small Windows program I built that types our standard log entries. You type a short code like `;interior` or `;medical`, fill in the details that change, and the finished entry goes into iTrak. You still read it over and save it yourself, same as now. It also clears the Alert Grid list with one key once you've looked it over, opens and signs into our programs at the start of shift, and signs SDS back in when it logs me out after an hour. A home window with a button for everything makes it easy for new people to find their way around.
+Watchlog is a small Windows program I built that types our standard log entries. You type a short code like `;interior` or `;medical`, fill in the details that change, and the finished entry goes into iTrak. Most codes can also open a new daily log and fill in its Location, Topic and Reference. You still read it over and save it yourself, same as now. It also clears the Alert Grid list with one key once you've looked it over, opens and signs into our programs at the start of shift, signs SDS back in when it logs me out after an hour, and keeps count of the 60 minutes of break. A home window with a button for everything makes it easy for new people to find their way around.
 
 ## Why it's worth trying
 

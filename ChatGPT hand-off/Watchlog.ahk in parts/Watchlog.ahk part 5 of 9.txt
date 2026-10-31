@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 4943-6134 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 5 of 9 (lines 4944-6140 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Types text key by key (what Citrix handles best), a little slower than normal
 EntryType(text) {
     SetKeyDelay 20, 10
@@ -1152,7 +1152,12 @@ StampDateTime(*) {
 ;  Ctrl+Alt+I = show the current window's title and program name
 ; =====================================================================
 LoadApps() {
-    taken := "QOIHPXRLEJKWAMN"
+    ; letters Watchlog's own Ctrl+Alt keys use (Pause, Exit, Reload, and the
+    ; shortcut keys as set in Customize), so an app can't take one (v3.29.1)
+    taken := "PXR"
+    for d in HotkeyDefs
+        if RegExMatch(HotkeyNorm(HotkeyKey(d.id)), "^\^!([a-z])$", &km)
+            taken .= StrUpper(km[1])
     problems := "", named := ""
     Loop 9 {
         sec := "App" A_Index

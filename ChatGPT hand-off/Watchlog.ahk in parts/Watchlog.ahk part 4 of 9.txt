@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 4 of 9 (lines 3751-4942 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 4 of 9 (lines 3752-4943 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; The edit made in the journal window goes through to every count: Shift count,
 ; this shift, Time saved (day, week, month, since the start) and the dashboard.
 ; A log taken out comes off with its own keystrokes; one added by hand goes on
@@ -219,7 +219,7 @@ TeachWait(msg) {
     KeyWait "F8"
     KeyWait "a"
     stop := A_TickCount + 180000
-    ok := false, cancelled := false
+    ok := false, gaveUp := false
     while A_TickCount < stop {
         if GetKeyState("F8", "P")
             || (GetKeyState("a", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P") && GetKeyState("Shift", "P")) {
@@ -227,7 +227,7 @@ TeachWait(msg) {
             break
         }
         if GetKeyState("Esc", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P") {
-            cancelled := true
+            gaveUp := true
             break
         }
         Sleep 30
@@ -236,8 +236,8 @@ TeachWait(msg) {
     KeyWait "F8", "T2"
     KeyWait "a", "T2"
     if !ok {
-        Tip(cancelled ? "Teach Alert Grid cancelled. Nothing saved." : "Teach Alert Grid timed out. Nothing saved.", 3000, true)
-        Activity("Alert Grid teach: " (cancelled ? "cancelled" : "timed out"))
+        Tip(gaveUp ? "Teach Alert Grid cancelled. Nothing saved." : "Teach Alert Grid timed out. Nothing saved.", 3000, true)
+        Activity("Alert Grid teach: " (gaveUp ? "cancelled" : "timed out"))
     } else
         Activity("Alert Grid teach: captured a spot")
     return ok

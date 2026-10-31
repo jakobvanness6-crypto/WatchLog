@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.29.0  -  README
+  WATCHLOG  v3.29.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -50,6 +50,7 @@ CONTENTS
  16. Setting it up on another PC, or for a new operator (the exe)
  17. Troubleshooting
  18. Rules worth keeping
+ 19. Newer features (break tracker, safeguards, code words that fill the daily log, call pad)
 
 
 -----------------------------------------------------------------------
@@ -81,7 +82,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.29.0 (Documents, or the program folder).
+                      v3.23.0 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -130,6 +131,8 @@ couple of seconds. No need to press anything.
                     its login screen.
   Ctrl+Alt+J        Shift journal: how many of each log you've done this
                     shift, with a Copy summary button. See section 10.
+  Ctrl+Alt+Shift+D  Shift dashboard (v3.16.0): this shift, the last 7 and 30 days, and
+                    break time left (v3.29.0). See SHIFT DASHBOARD in section 10.
   Ctrl+Alt+Shift+S  Save where your windows are right now (window layout).
   Ctrl+Alt+W        Put the windows back where you saved them. See the
                     WINDOW LAYOUT notes in section 16.
@@ -235,7 +238,7 @@ couple of seconds. No need to press anything.
                     synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
                     asks which bay and keeps the answer for the shift (v3.20.3).
   Ctrl+Alt+Shift+E  Click End Time Now in the daily log in front (v3.29.0)
-  Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.29.0)
+  Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.28.0)
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
                     run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
                     on each (nothing is clicked for you). The daily log form is its own window
@@ -258,7 +261,7 @@ couple of seconds. No need to press anything.
                     removed in v2.7 and T is now Teams.)
 
   Numpad +          The call pad (v3.12.0): a small pad to jot a phone call into with
-  (or Ctrl+Alt+N)   one hand. See CALL PAD AND AUTOCORRECT below. The + key on the number
+  (or Ctrl+Alt+N)   one hand. See CALL PAD AND AUTOCORRECT in section 19. The + key on the number
                     pad opens it from any program except Watchlog's own windows;
                     Shift+ or Ctrl+ with it still types a +.
                     [CallPad] Key=off in settings.ini gives the + key back.
@@ -395,7 +398,7 @@ were typing.
 
 
 -----------------------------------------------------------------------
- 5. TEMPLATE LIST  (as of v3.0, from templates.txt)
+ 5. TEMPLATE LIST  (as of v3.29, from templates.txt)
 -----------------------------------------------------------------------
 Forms (open a form):
   ;jack         Supervisor jackpot: amount, machine, window #, time paid
@@ -445,6 +448,11 @@ Quick (paste straight away):
   ;man          Garbage sweep (EVS Attendant escorted into Cage Mantrap)
   ;close        Table closing (tray lids, tokes)
   ;destroy      Card destruction
+  ;break        Break (fills the daily log and starts the break time count, v3.29.0)
+
+Code words marked with >> in templates.txt also open (or use) a daily log in iTrak and
+fill Location, Topic and Reference: ;cards ;break ;start ;end ;interior ;exterior ;parking
+;drop ;man ;destroy ;account ;fill ;open ;auto ;jack ;bv ;mfill. See section 19.
 
 If you add or change templates, the cheat sheet (Ctrl+Alt+H) is always
 the up-to-date list. This one is a snapshot.
@@ -725,59 +733,23 @@ and the less-used items sit in sub-menus):
   Windows >                     Save window layout, Put windows back,
                                 Caps Lock guard (ticked = on)
   Template editor               Same as Ctrl+Alt+E (section 12)
+  Customize Watchlog...         Shortcut keys, shift programs, lists,
+                                autocorrect, timing, full-entry logs (v3.21.0)
+  Dark look                     Ticked = dark windows (v3.22.1)
   Settings                      Section 14
   Tutorial                      The guided tour again
   About Watchlog                Version, copyright and the licence
   Advanced >                    Security and status (15), Activity log
                                 (15), Make a copy to share (16), Edit
-                                templates / my templates / settings in
-                                Notepad, Open Watchlog folder, Choose my
-                                own update folder, Pause all shortcuts,
-                                Reload
+                                templates / my templates / settings /
+                                the autocorrect list in Notepad, Open
+                                Watchlog folder, Choose my own update
+                                folder, Back up my settings and templates
+                                now, Restore from a backup..., Go back to
+                                the previous version... (v3.28.0), Pause
+                                all shortcuts, Reload
   Exit Watchlog                 Closes it (start it again from the
                                 Start menu)
-
-DAILY LOG FILLS FOR THE SHORTHAND LOGS  (v3.26.2)
-  ;fill, ;open, ;auto, ;jack, ;bv and ;mfill (and so the call pad shorthand for them) now also
-  open a new daily log in iTrak, or use the one already open, and fill Location, Topic and
-  Reference, like ;cards and ;break. Reference is left empty on purpose where you fill it
-  yourself (fill, jack, bv, mfill). Shift+Enter on the form still pastes just the wording.
-      ;fill   Pit | Table Fill |            ;open, ;auto   Pit | Table Opening/Closing | NA
-      ;jack   Slots | Jackpot |   ;bv   Slots | Emergency Pull |
-      ;mfill  ABM/NRT | ATM/NRT/CTR fill |
-  The Pit and Slots come from the log itself: %pit% in a code word's Location is the pit of
-  the first table (2xx = Pit 2, 3xx = Pit 3) and %slots% the area of the first machine (the
-  letter: C2102 = Charlie Slots). They are looked up in two lists near the top of templates.txt
-  that you can change or extend (a new letter, a new pit) without a new program version:
-      @pit = 2=Pit 2 | 3=Pit 3
-      @slots = A=Alpha Slots | B=Bravo Slots | C=Charlie Slots | D=Delta Slots
-  If it can't tell, that box is left empty and a short message says so.
-
-CHANGING THE ; IN FRONT OF CODE WORDS  (v3.25.0)
-  Settings > General > "Type this in front of code words and logins" (settings.ini
-  [Triggers] Prefix=). Use 1 to 3 symbols, no letters, digits, spaces or colons (for
-  example . or // or \). After you Save, Watchlog reloads and every code word, login
-  shortcut that starts with ; and the time and date stamps (;t ;dd ;dt) are typed with
-  your prefix instead: with . you type .jack, .t, .dd. It is per PC (settings.ini), so
-  each operator picks their own. templates.txt, my-templates.txt and the shared team
-  file keep the ; in them, so they work the same everywhere. The cheat sheet (Ctrl+Alt+H),
-  the template finder and the login list show your prefix. Pick one you don't type in
-  normal writing, because a code word fires the moment it is typed. Messages in the
-  template editor still show the ; from the file.
-
-CODE WORDS THAT FILL THE DAILY LOG  (v3.24.0)
-  A code word can fill a whole iTrak daily log instead of pasting text. In templates.txt
-  (or my-templates.txt) put  >> Location | Topic | Reference  at the end of its line:
-      ;cards (Card change) = Card change on {Table: @tables}. >> Pit 2 | Card Change | NA
-  Type ;cards and answer the boxes. Watchlog then fills the daily log that is open in
-  iTrak (the one in front if several), or clicks New daily log and opens one if none is
-  open, and fills Location, Topic, Reference and the Synopsis (the wording before >>).
-  {Boxes} work in Location, Topic and Reference too. End Time and Save are left to you,
-  or add  | end  last to click End Time's Now. It works from any window, uses the same
-  taught spots as Ctrl+Alt+F, stops if iTrak loses the front, and counts in Time saved.
-  To paste just the wording where you are instead, press Shift+Enter on the form (or hold
-  Shift when a code word with no boxes fires). A line with >> but fewer than three parts
-  after it is reported in the problems list.
 
 CUSTOMIZE WATCHLOG  (v3.21.0: tray menu > Customize Watchlog, or the Customize button on the home window)
   Screens for the things that used to mean editing a file. Each opens in its own
@@ -876,153 +848,6 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
-SDS SIGN-IN FIX  (v3.29.0)
-  The hourly SDS sign-in could stop with "no saved login is locked to SDS" when something else
-  took the keyboard a moment after SDS came to the front. It now brings SDS back and tries
-  again, then uses the login whose Only in names SDS (or the one last typed into SDS), even
-  without a ; in front. If it still can't, the Activity log lists your logins and the program
-  each is locked to (no passwords).
-
-SAFEGUARDS  (v3.27.0)
-  Things Watchlog now refuses or warns about, instead of failing quietly:
-  - A login with no program set (no Window= / Only in) is never typed into Notepad,
-    Outlook, Teams, Word, Excel, OneNote, Slack, WhatsApp, Discord, Watchlog's own windows
-    or the iTrak Daily Log Entry window. It says so on screen. Set Only in for a login to
-    lock it to its program. A refused login of any kind (wrong window in front) now also
-    shows a message, not just an Activity log line.
-  - A form's log is pasted only if the window you started it in comes back to the front
-    (it waits up to 2 seconds). If not, nothing is pasted, it beeps, and the log stays on the
-    clipboard: click where it goes and press Ctrl+V.
-  - Alert Grid clearing stops if a pop-up takes the front before the first click or the
-    right-click (it gets one second to bring Alert Grid back).
-  - At start-up Watchlog compares the Windows display scale with the one the iTrak and Alert
-    Grid clicks were taught at, and warns if it changed. Alert Grid clicks taught before
-    v3.27.0 have no scale saved: teach once (Ctrl+Alt+Shift+A) to get the warning.
-  - A form closed with Esc keeps what you typed for 10 minutes: opening the same log again
-    puts it back (Esc again, without changing anything, throws it away). Kept in memory only.
-  - An unexpected error now shows a short plain box ("That didn't finish, but Watchlog is
-    still running") with the line number, instead of AutoHotkey's error window.
-
-BREAK TIME TRACKER  (v3.29.0)
-  You get 60 minutes of break a shift, split however you like. Watchlog keeps count:
-  - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The
-    break ends when you Save & Close that Daily Log Entry window. Nothing else to press.
-  - Break time left shows on the home window, the shift dashboard ("This shift" tab) and when
-    you hover over the tray icon, e.g. "Break: 42 min left (18 of 60 used)" or
-    "On break 12 min, 30 min left".
-  - Ctrl+Alt+Shift+E clicks End Time's Now button in the daily log in front (or the break
-    log). It uses the spot taught with Ctrl+Alt+Shift+F.
-  - The count starts over at Start of shift (Ctrl+Alt+L), or 14 hours after the first break.
-  - settings.ini [Break] Minutes=60 sets the allowance. If you close a break log by mistake,
-    only the first one counts.
-  Built, NOT run (the sandbox can't run AutoHotkey).
-
-MORE SAFEGUARDS  (v3.28.0)
-  - Repeat the last log: Ctrl+Alt+Shift+R opens a new daily log in iTrak and fills it in with
-    the same boxes as the last full-entry log (code word, call pad shorthand or Ctrl+Alt+F).
-    Change the key in Customize > Shortcut keys.
-  - Backups: the first start of each day Watchlog copies your templates.txt, my-templates.txt,
-    settings.ini, autocorrect list and the taught click files (no passwords: Windows keeps
-    those) to %LOCALAPPDATA%\Watchlog\Backups\<date>. The last 14 are kept. Tray > Advanced >
-    Back up my settings and templates now makes one by hand.
-  - Tray > Advanced > Restore from a backup... puts a backup back (what you have now is
-    backed up first) and reloads.
-  - Tray > Advanced > Go back to the previous version... puts back the copy Watchlog kept
-    when it last updated and restarts on it. That newer version isn't offered again until
-    you choose "Offer the skipped update again" (same menu).
-  - Alert Grid (v3.27.3): the check that Alert Grid is in front now retries for 2 seconds, and
-    the "no more alerts" click waits at least 250 ms for its box.
-  Built, NOT run (the sandbox can't run AutoHotkey).
-
-SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
-  Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and
-  the log is made. If the line has everything it goes in with no form; if something is
-  missing the form opens with what it found already filled in.
-      fill 205 5.5            table fill BJ205 $5,500  (5.5 and 5 mean thousands, 5k = $5,000,
-                              500 = $500; two fills: fill 205 5.5 303 10)
-      open 201 202 203        tables opened, on one line (a number is enough: 201 = UT201)
-      201 auto                tables auto-closed (auto can come first or last: 201 202 auto)
-      jack c2102 11421.11 w3 cash 2130      jackpot: machine, amount, window, time paid (military
-                              time, optional; cash is the default wording)
-      bv c2102 4471 full      emergency BV pull (full or def, for defective)
-      mfill n3 190800 bvs     machine fill (v3.26.3), one fill per line for several; the older
-                              n3 190800 bvs and c2102 11421.11 win 3 cash, with no code word,
-                              now also make the log when you press Ctrl+Enter
-      account 123456          account under review: fills the iTrak daily log (Guest
-                              Services | Account under review | M6 (417))
-  Any other code word first (cards ry301, aml 123 b1410) opens that log's form with the
-  pad filled in as before. The older way still works: jot, Ctrl+Enter, then type the
-  trigger. Careful: a call that starts with one of your code words as its first word will
-  open that log's form when you press Ctrl+Enter.
-
-CALL PAD AND AUTOCORRECT  (Numpad +, v3.12.0; shorthand v3.13.0)
-Most of what goes into a log arrives on a phone call. The call pad is a
-small window to jot it into while you talk, so it replaces the paper
-notepad. It opens with the cursor in the box (one key, no mouse), stamps
-the time of your first key, and keeps the text if you press Esc.
-
-  Esc               Hides the pad. The text stays until New call.
-  Ctrl+Enter        Make a log (v3.13.0): copies the call to the clipboard,
-                    hides the pad and takes you back to the window you were
-                    in. Then type any log's trigger (like ;jack): its boxes
-                    are already filled in from the saved call, marked
-                    "(from your call pad)". When that log is inserted the
-                    call moves to Earlier calls and the next Numpad + opens
-                    a fresh, empty pad (one call is one log).
-                    (Cancelling the form keeps the call on the pad.)
-                    What it picks up:
-                      machine   B1410, NRT2, ATM3 (a letter and 3 to 5 digits)
-                      table     any table in the @tables list, like UT201
-                      amount    $4,000 or 4k  (not in ;player, which has Buy-in)
-                      alert #   an 8-digit number (;aml)
-                    A box is only filled when the pad holds exactly one of
-                    that kind. Two different machines leaves the box empty.
-                    Lists you pick from are only set to an item that exists.
-
-SHORTHAND ON THE PAD  (v3.13.0), one per line:
-  n3 190800 bvs         machine fill: NRT3 $190,800 (BVs)   (n1-n4 or nrt1-4)
-  a1 100000             ATM1 $100,000                        (a1-a5 or atm1-5)
-  n1 5000 bvs/divert    NRT1 $5,000 (BVs/Divert)   (any text with "div" in it)
-  n2 90k                NRT2 $90,000        (k = thousand)
-    Type ;mfill: the first fill is in the boxes and the form adds the
-    others by itself (Add another), so the log has one line per machine.
-    The new Note box on ;mfill is the text in brackets after the amount.
-    Words after the amount other than bvs or divert go in the brackets as
-    typed. Typing bvs straight into the Note box works the same (v3.14.0). (templates.txt wording Oct 25, 2026 (3) has the Note box: copy
-    the new templates.txt into Documents\Watchlog, or the team folder.)
-  c2102 11421.11 win 3 cash
-                    a jackpot: type ;jack and the machine (C2102), the
-                    amount ($11,421.11, cents kept) and the window (#3) are
-                    filled in. The wording already says "paid all cash".
-                    Time paid is not filled in (jot-time shorthand is not built).
-  Copy all          Copies the pad text. Paste into window puts it where you
-                    were typing.
-  New call          Puts this call under "Earlier calls this shift" (the
-                    last 8) and starts a fresh pad.
-
-Time saved (v3.13.1): the keys you type on the pad for a call (and the + key and
-Ctrl+Enter) count as typed when that call's log is inserted. The boxes the
-pad filled are not counted a second time, so the saving is the log's length
-minus what you actually typed on the pad.
-
-The pad text and the earlier calls are kept on this PC only
-(%LOCALAPPDATA%\Watchlog\call pad.txt and call pad history.txt), never in
-settings.ini, the shared folder or the activity log. They are wiped at end
-of shift (Ctrl+Alt+Shift+L) and are ignored after 14 hours.
-
-Casino autocorrect fixes slang and acronyms as you type in the call pad and
-in the log form boxes (typed boxes and boxes with a list, v3.14.0), when you
-finish the word with a space, Enter or punctuation (tito becomes TITO,
-handpay becomes hand pay, titos becomes TITOs). Ctrl+Z puts the old
-word back. The built-in list comes from the SOP glossary acronyms: ABM AGCO AJM
-APC CCOM CVT CFE CPU XVU CTR EPROM GMS GBHC IOC OLG PTM PMGR ROMSIG TITO MEAL RAM
-WAN GM, plus handpay, cashbox, softcount, mainbank and shortpay.
-Tray menu > Advanced > Edit the autocorrect list saves the list as
-autocorrect.txt in the Watchlog folder and opens it in Notepad. That file is
-then the whole list: add lines like  wrong = right, or put # in front of one
-to switch it off. A saved change is used within a second (v3.14.1).
-[CallPad] Autocorrect=no turns it off. It does not run in other programs.
-
 THE TEMPLATE EDITOR  (Ctrl+Alt+E, v3.10.0)
   The easy way. At the top, pick the file: the team's templates (or
   templates.txt) or your own my-templates.txt.
@@ -1240,13 +1065,60 @@ Save it and it reloads itself.
 
 [App1] ... [App9]   Ctrl+Alt + Key switches to the app or opens it
   Name=    shown on the cheat sheet
-  Key=     one letter. Taken: Q O I H P X R L E J (plus S and C if
-           you keep SDS and CMP). Key=none turns an app off.
+  Key=     one letter not used by Watchlog's own Ctrl+Alt keys. With the
+           standard keys these are taken: A D E F H I J K L M N O P Q R W X
+           (plus S and C if you keep SDS and CMP). A key changed in
+           Customize > Shortcut keys frees its old letter. Key=none turns
+           an app off.
   Path=    the program or .bat that opens it (* = any version), or a
            link like msteams: for Microsoft Store apps
   Built in: T Teams, U Outlook, Y Spotify, G Edge. To give one a
   different letter, add an [AppN] with the same Name and a new Key.
   Window=  how to find its window (Ctrl+Alt+I shows a window's info)
+
+[AlertGrid]
+  Pause=           ms between clicks (default 40)
+  SelectWait=      longest wait in ms for Ctrl+A to select the list (default 120)
+  CapsLockClears=  no = plain Caps Lock doesn't clear alerts (default yes)
+
+[ITrak]
+  Window=          how to find iTrak (default: iTrak ahk_exe wfica32.exe)
+  EntryWindow=     how to find a daily log (default: Daily Log Entry ahk_exe wfica32.exe)
+  Pause=           ms after each click in the daily log (default 300)
+  EntryWait=       ms to wait for a new daily log to open (default 8000)
+  EntrySettle=     ms to let a new daily log finish drawing (default 600)
+  RefuseIfResized= yes = don't click if iTrak is a different size than when
+                   taught (default no)
+
+[SDS]
+  ResignMinutes=   minutes after an SDS login before it signs back in
+                   (default 62, 0 = off)
+
+[Break]
+  Minutes=         break time allowed per shift (default 60). See BREAK TIME
+                   TRACKER in section 19.
+
+[Triggers]
+  Prefix=          what goes in front of code words on this PC (default ;)
+
+[CallPad]
+  Key=             the key that opens the call pad (default NumpadAdd, off = none)
+  Autocorrect=     no = no casino autocorrect on the pad (default yes)
+
+[Reminder]
+  Beep=            yes = the login reminder beeps (default no)
+
+[Layout]
+  AfterStart=      no = Ctrl+Alt+L doesn't put the windows back (default yes)
+
+[Look]
+  Dark=            yes = dark windows (default no; also tray > Dark look)
+
+[Updates]
+  Folder=          your own update folder (blank = the team templates folder)
+
+[Hotkeys]
+  id=key           shortcut keys changed in Customize > Shortcut keys
 
 [LastUsed]
   From before v3.3. The last bay and soft count step are now kept on
@@ -1468,7 +1340,7 @@ Something else broke
 -----------------------------------------------------------------------
  18. RULES WORTH KEEPING
 -----------------------------------------------------------------------
-  - Start every trigger with ; .
+  - Start every trigger with ; (or the prefix set on this PC: Settings > General).
   - Never make a login trigger the same as your real username, or it
     would type your password inside an email address. The script warns
     you at startup about any login trigger with no ; and no window lock.
@@ -1477,3 +1349,196 @@ Something else broke
   - Never put passwords in templates.txt, settings.ini or a note.
   - Before sharing the tool with the team, get the surveillance
     manager's and IT's OK.
+
+
+-----------------------------------------------------------------------
+ 19. NEWER FEATURES  (v3.12 to v3.29, newest first)
+-----------------------------------------------------------------------
+BREAK TIME TRACKER  (v3.29.0)
+  You get 60 minutes of break a shift, split however you like. Watchlog keeps count:
+  - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The
+    break ends when you Save & Close that Daily Log Entry window. Nothing else to press.
+  - Break time left shows on the home window, the shift dashboard ("This shift" tab) and when
+    you hover over the tray icon, e.g. "Break: 42 min left (18 of 60 used)" or
+    "On break 12 min, 30 min left".
+  - Ctrl+Alt+Shift+E clicks End Time's Now button in the daily log in front (or the break
+    log). It uses the spot taught with Ctrl+Alt+Shift+F.
+  - The count starts over at Start of shift (Ctrl+Alt+L), or 14 hours after the first break.
+  - settings.ini [Break] Minutes=60 sets the allowance. If you close a break log by mistake,
+    only the first one counts.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+MORE SAFEGUARDS  (v3.28.0)
+  - Repeat the last log: Ctrl+Alt+Shift+R opens a new daily log in iTrak and fills it in with
+    the same boxes as the last full-entry log (code word, call pad shorthand or Ctrl+Alt+F).
+    Change the key in Customize > Shortcut keys.
+  - Backups: the first start of each day Watchlog copies your templates.txt, my-templates.txt,
+    settings.ini, autocorrect list and the taught click files (no passwords: Windows keeps
+    those) to %LOCALAPPDATA%\Watchlog\Backups\<date>. The last 14 are kept. Tray > Advanced >
+    Back up my settings and templates now makes one by hand.
+  - Tray > Advanced > Restore from a backup... puts a backup back (what you have now is
+    backed up first) and reloads.
+  - Tray > Advanced > Go back to the previous version... puts back the copy Watchlog kept
+    when it last updated and restarts on it. That newer version isn't offered again until
+    you choose "Offer the skipped update again" (same menu).
+  - Alert Grid (v3.27.3): the check that Alert Grid is in front now retries for 2 seconds, and
+    the "no more alerts" click waits at least 250 ms for its box.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+SDS SIGN-IN FIX  (v3.27.1)
+  The hourly SDS sign-in could stop with "no saved login is locked to SDS" when something else
+  took the keyboard a moment after SDS came to the front. It now brings SDS back and tries
+  again, then uses the login whose Only in names SDS (or the one last typed into SDS), even
+  without a ; in front. If it still can't, the Activity log lists your logins and the program
+  each is locked to (no passwords).
+
+SAFEGUARDS  (v3.27.0)
+  Things Watchlog now refuses or warns about, instead of failing quietly:
+  - A login with no program set (no Window= / Only in) is never typed into Notepad,
+    Outlook, Teams, Word, Excel, OneNote, Slack, WhatsApp, Discord, Watchlog's own windows
+    or the iTrak Daily Log Entry window. It says so on screen. Set Only in for a login to
+    lock it to its program. A refused login of any kind (wrong window in front) now also
+    shows a message, not just an Activity log line.
+  - A form's log is pasted only if the window you started it in comes back to the front
+    (it waits up to 2 seconds). If not, nothing is pasted, it beeps, and the log stays on the
+    clipboard: click where it goes and press Ctrl+V.
+  - Alert Grid clearing stops if a pop-up takes the front before the first click or the
+    right-click (it gets one second to bring Alert Grid back).
+  - At start-up Watchlog compares the Windows display scale with the one the iTrak and Alert
+    Grid clicks were taught at, and warns if it changed. Alert Grid clicks taught before
+    v3.27.0 have no scale saved: teach once (Ctrl+Alt+Shift+A) to get the warning.
+  - A form closed with Esc keeps what you typed for 10 minutes: opening the same log again
+    puts it back (Esc again, without changing anything, throws it away). Kept in memory only.
+  - An unexpected error now shows a short plain box ("That didn't finish, but Watchlog is
+    still running") with the line number, instead of AutoHotkey's error window.
+
+CALL PAD AND AUTOCORRECT  (Numpad +, v3.12.0; shorthand v3.13.0)
+Most of what goes into a log arrives on a phone call. The call pad is a
+small window to jot it into while you talk, so it replaces the paper
+notepad. It opens with the cursor in the box (one key, no mouse), stamps
+the time of your first key, and keeps the text if you press Esc.
+
+  Esc               Hides the pad. The text stays until New call.
+  Ctrl+Enter        Make a log (v3.13.0): copies the call to the clipboard,
+                    hides the pad and takes you back to the window you were
+                    in. Then type any log's trigger (like ;jack): its boxes
+                    are already filled in from the saved call, marked
+                    "(from your call pad)". When that log is inserted the
+                    call moves to Earlier calls and the next Numpad + opens
+                    a fresh, empty pad (one call is one log).
+                    (Cancelling the form keeps the call on the pad.)
+                    What it picks up:
+                      machine   B1410, NRT2, ATM3 (a letter and 3 to 5 digits)
+                      table     any table in the @tables list, like UT201
+                      amount    $4,000 or 4k  (not in ;player, which has Buy-in)
+                      alert #   an 8-digit number (;aml)
+                    A box is only filled when the pad holds exactly one of
+                    that kind. Two different machines leaves the box empty.
+                    Lists you pick from are only set to an item that exists.
+
+SHORTHAND ON THE PAD  (v3.13.0), one per line:
+  n3 190800 bvs         machine fill: NRT3 $190,800 (BVs)   (n1-n4 or nrt1-4)
+  a1 100000             ATM1 $100,000                        (a1-a5 or atm1-5)
+  n1 5000 bvs/divert    NRT1 $5,000 (BVs/Divert)   (any text with "div" in it)
+  n2 90k                NRT2 $90,000        (k = thousand)
+    Type ;mfill: the first fill is in the boxes and the form adds the
+    others by itself (Add another), so the log has one line per machine.
+    The new Note box on ;mfill is the text in brackets after the amount.
+    Words after the amount other than bvs or divert go in the brackets as
+    typed. Typing bvs straight into the Note box works the same (v3.14.0). (templates.txt wording Oct 25, 2026 (3) has the Note box: copy
+    the new templates.txt into Documents\Watchlog, or the team folder.)
+  c2102 11421.11 win 3 cash
+                    a jackpot: type ;jack and the machine (C2102), the
+                    amount ($11,421.11, cents kept) and the window (#3) are
+                    filled in. The wording already says "paid all cash".
+                    Time paid is not filled in (jot-time shorthand is not built).
+  Copy all          Copies the pad text. Paste into window puts it where you
+                    were typing.
+  New call          Puts this call under "Earlier calls this shift" (the
+                    last 8) and starts a fresh pad.
+
+Time saved (v3.13.1): the keys you type on the pad for a call (and the + key and
+Ctrl+Enter) count as typed when that call's log is inserted. The boxes the
+pad filled are not counted a second time, so the saving is the log's length
+minus what you actually typed on the pad.
+
+The pad text and the earlier calls are kept on this PC only
+(%LOCALAPPDATA%\Watchlog\call pad.txt and call pad history.txt), never in
+settings.ini, the shared folder or the activity log. They are wiped at end
+of shift (Ctrl+Alt+Shift+L) and are ignored after 14 hours.
+
+Casino autocorrect fixes slang and acronyms as you type in the call pad and
+in the log form boxes (typed boxes and boxes with a list, v3.14.0), when you
+finish the word with a space, Enter or punctuation (tito becomes TITO,
+handpay becomes hand pay, titos becomes TITOs). Ctrl+Z puts the old
+word back. The built-in list comes from the SOP glossary acronyms: ABM AGCO AJM
+APC CCOM CVT CFE CPU XVU CTR EPROM GMS GBHC IOC OLG PTM PMGR ROMSIG TITO MEAL RAM
+WAN GM, plus handpay, cashbox, softcount, mainbank and shortpay.
+Tray menu > Advanced > Edit the autocorrect list saves the list as
+autocorrect.txt in the Watchlog folder and opens it in Notepad. That file is
+then the whole list: add lines like  wrong = right, or put # in front of one
+to switch it off. A saved change is used within a second (v3.14.1).
+[CallPad] Autocorrect=no turns it off. It does not run in other programs.
+
+SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
+  Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and
+  the log is made. If the line has everything it goes in with no form; if something is
+  missing the form opens with what it found already filled in.
+      fill 205 5.5            table fill BJ205 $5,500  (5.5 and 5 mean thousands, 5k = $5,000,
+                              500 = $500; two fills: fill 205 5.5 303 10)
+      open 201 202 203        tables opened, on one line (a number is enough: 201 = UT201)
+      201 auto                tables auto-closed (auto can come first or last: 201 202 auto)
+      jack c2102 11421.11 w3 cash 2130      jackpot: machine, amount, window, time paid (military
+                              time, optional; cash is the default wording)
+      bv c2102 4471 full      emergency BV pull (full or def, for defective)
+      mfill n3 190800 bvs     machine fill (v3.26.3), one fill per line for several; the older
+                              n3 190800 bvs and c2102 11421.11 win 3 cash, with no code word,
+                              now also make the log when you press Ctrl+Enter
+      account 123456          account under review: fills the iTrak daily log (Guest
+                              Services | Account under review | M6 (417))
+  Any other code word first (cards ry301, aml 123 b1410) opens that log's form with the
+  pad filled in as before. The older way still works: jot, Ctrl+Enter, then type the
+  trigger. Careful: a call that starts with one of your code words as its first word will
+  open that log's form when you press Ctrl+Enter.
+
+DAILY LOG FILLS FOR THE SHORTHAND LOGS  (v3.26.2)
+  ;fill, ;open, ;auto, ;jack, ;bv and ;mfill (and so the call pad shorthand for them) now also
+  open a new daily log in iTrak, or use the one already open, and fill Location, Topic and
+  Reference, like ;cards and ;break. Reference is left empty on purpose where you fill it
+  yourself (fill, jack, bv, mfill). Shift+Enter on the form still pastes just the wording.
+      ;fill   Pit | Table Fill |            ;open, ;auto   Pit | Table Opening/Closing | NA
+      ;jack   Slots | Jackpot |   ;bv   Slots | Emergency Pull |
+      ;mfill  ABM/NRT | ATM/NRT/CTR fill |
+  The Pit and Slots come from the log itself: %pit% in a code word's Location is the pit of
+  the first table (2xx = Pit 2, 3xx = Pit 3) and %slots% the area of the first machine (the
+  letter: C2102 = Charlie Slots). They are looked up in two lists near the top of templates.txt
+  that you can change or extend (a new letter, a new pit) without a new program version:
+      @pit = 2=Pit 2 | 3=Pit 3
+      @slots = A=Alpha Slots | B=Bravo Slots | C=Charlie Slots | D=Delta Slots
+  If it can't tell, that box is left empty and a short message says so.
+
+CHANGING THE ; IN FRONT OF CODE WORDS  (v3.25.0)
+  Settings > General > "Type this in front of code words and logins" (settings.ini
+  [Triggers] Prefix=). Use 1 to 3 symbols, no letters, digits, spaces or colons (for
+  example . or // or \). After you Save, Watchlog reloads and every code word, login
+  shortcut that starts with ; and the time and date stamps (;t ;dd ;dt) are typed with
+  your prefix instead: with . you type .jack, .t, .dd. It is per PC (settings.ini), so
+  each operator picks their own. templates.txt, my-templates.txt and the shared team
+  file keep the ; in them, so they work the same everywhere. The cheat sheet (Ctrl+Alt+H),
+  the template finder and the login list show your prefix. Pick one you don't type in
+  normal writing, because a code word fires the moment it is typed. Messages in the
+  template editor still show the ; from the file.
+
+CODE WORDS THAT FILL THE DAILY LOG  (v3.24.0)
+  A code word can fill a whole iTrak daily log instead of pasting text. In templates.txt
+  (or my-templates.txt) put  >> Location | Topic | Reference  at the end of its line:
+      ;cards (Card change) = Card change on {Table: @tables}. >> Pit 2 | Card Change | NA
+  Type ;cards and answer the boxes. Watchlog then fills the daily log that is open in
+  iTrak (the one in front if several), or clicks New daily log and opens one if none is
+  open, and fills Location, Topic, Reference and the Synopsis (the wording before >>).
+  {Boxes} work in Location, Topic and Reference too. End Time and Save are left to you,
+  or add  | end  last to click End Time's Now. It works from any window, uses the same
+  taught spots as Ctrl+Alt+F, stops if iTrak loses the front, and counts in Time saved.
+  To paste just the wording where you are instead, press Shift+Enter on the form (or hold
+  Shift when a code word with no boxes fires). A line with >> but fewer than three parts
+  after it is reported in the problems list.

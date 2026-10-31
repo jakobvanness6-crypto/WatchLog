@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 1 of 9 (lines 1-1133 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 1 of 9 (lines 1-1134 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ; Speed: AutoHotkey pauses 100 ms after every window switch by default,
@@ -9,7 +9,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.21.0   (called Log Templates before v3.0.1)
+;  WATCHLOG   (version: see VERSION below; called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -33,7 +33,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.29.0"
+VERSION := "3.29.1"
 VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -747,7 +747,7 @@ SdsLoginScreen() {
     return 0
 }
 
-; The login for the SDS window (v3.27.3). Tries the usual match (a login locked to
+; The login for the SDS window (v3.27.1). Tries the usual match (a login locked to
 ; the program in front); if something else grabbed the keyboard in the meantime it
 ; brings SDS back and tries again, then falls back to the login whose Only in
 ; names SDS, or the one that was last typed into SDS.
@@ -1100,6 +1100,7 @@ Window=ahk_exe CMPDesktop.exe
 ;  yet), the last good copy saved on this PC is used and it says so.
 ; =====================================================================
 LoadTemplates() {
+    global Entries
     problems := ""
     ; Every trigger fires the moment it's typed, so no trigger may be the start
     ; of another one (;count would fire before you finish typing ;counttables)

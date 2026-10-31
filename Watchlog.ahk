@@ -8,7 +8,7 @@ ListLines False
 KeyHistory 0
 
 ; =====================================================================
-;  WATCHLOG  v3.21.0   (called Log Templates before v3.0.1)
+;  WATCHLOG   (version: see VERSION below; called Log Templates before v3.0.1)
 ;  Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
 ;  Used only with the copyright holder's permission. No copying,
 ;  sharing, changing or redistributing it, in whole or in part, without
@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.29.0"
+VERSION := "3.29.1"
 VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -746,7 +746,7 @@ SdsLoginScreen() {
     return 0
 }
 
-; The login for the SDS window (v3.27.3). Tries the usual match (a login locked to
+; The login for the SDS window (v3.27.1). Tries the usual match (a login locked to
 ; the program in front); if something else grabbed the keyboard in the meantime it
 ; brings SDS back and tries again, then falls back to the login whose Only in
 ; names SDS, or the one that was last typed into SDS.
@@ -1099,6 +1099,7 @@ Window=ahk_exe CMPDesktop.exe
 ;  yet), the last good copy saved on this PC is used and it says so.
 ; =====================================================================
 LoadTemplates() {
+    global Entries
     problems := ""
     ; Every trigger fires the moment it's typed, so no trigger may be the start
     ; of another one (;count would fire before you finish typing ;counttables)
@@ -2920,12 +2921,12 @@ PadShortcut(text) {
     code := StrLower(words[1])
     rest := []
     known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1, "mfill", 1)
-    padText := text
+    srcText := text
     if known.Has(code) {
         loop words.Length - 1
             rest.Push(words[A_Index + 1])
         if code = "mfill"
-            padText := RegExReplace(text, "i)^\s*mfill\s*", "")
+            srcText := RegExReplace(text, "i)^\s*mfill\s*", "")
     } else if words.Length > 1 && StrLower(words[words.Length]) = "auto" {
         code := "auto"
         loop words.Length - 1
@@ -3015,7 +3016,7 @@ PadShortcut(text) {
         hints["expect"] := 3
         hints["go"] := machine != "" && asset != "" && reason != ""
     } else if code = "mfill" {
-        fills := PadParse(padText).fills
+        fills := PadParse(srcText).fills
         if fills.Length
             hints["fills"] := fills, hints["go"] := true
     } else if code = "account" {
@@ -3968,7 +3969,7 @@ TeachWait(msg) {
     KeyWait "F8"
     KeyWait "a"
     stop := A_TickCount + 180000
-    ok := false, cancelled := false
+    ok := false, gaveUp := false
     while A_TickCount < stop {
         if GetKeyState("F8", "P")
             || (GetKeyState("a", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P") && GetKeyState("Shift", "P")) {
@@ -3976,7 +3977,7 @@ TeachWait(msg) {
             break
         }
         if GetKeyState("Esc", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P") {
-            cancelled := true
+            gaveUp := true
             break
         }
         Sleep 30
@@ -3985,8 +3986,8 @@ TeachWait(msg) {
     KeyWait "F8", "T2"
     KeyWait "a", "T2"
     if !ok {
-        Tip(cancelled ? "Teach Alert Grid cancelled. Nothing saved." : "Teach Alert Grid timed out. Nothing saved.", 3000, true)
-        Activity("Alert Grid teach: " (cancelled ? "cancelled" : "timed out"))
+        Tip(gaveUp ? "Teach Alert Grid cancelled. Nothing saved." : "Teach Alert Grid timed out. Nothing saved.", 3000, true)
+        Activity("Alert Grid teach: " (gaveUp ? "cancelled" : "timed out"))
     } else
         Activity("Alert Grid teach: captured a spot")
     return ok
@@ -6093,7 +6094,12 @@ StampDateTime(*) {
 ;  Ctrl+Alt+I = show the current window's title and program name
 ; =====================================================================
 LoadApps() {
-    taken := "QOIHPXRLEJKWAMN"
+    ; letters Watchlog's own Ctrl+Alt keys use (Pause, Exit, Reload, and the
+    ; shortcut keys as set in Customize), so an app can't take one (v3.29.1)
+    taken := "PXR"
+    for d in HotkeyDefs
+        if RegExMatch(HotkeyNorm(HotkeyKey(d.id)), "^\^!([a-z])$", &km)
+            taken .= StrUpper(km[1])
     problems := "", named := ""
     Loop 9 {
         sec := "App" A_Index

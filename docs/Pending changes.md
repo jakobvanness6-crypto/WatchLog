@@ -3,11 +3,62 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.29.0 (Oct 31, 2026): break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.29.1 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
-### Plan: failure safeguards (Oct 30, NOT built, waiting on Jakob's list of failures he has actually hit, and "build it")
+### Idea: "Info From" department search (Jakob's coworker, Oct 30, NOT built, waiting on Jakob's OK and "build it")
+- Update Oct 31 (Jakob): he selects the person and clicks Select himself. The Look For box matches the START of what is typed: `dealer` finds dealers but `dealers` doesn't; `marketing` only lowercase; `F&B` for Food and Beverage; `security` and `audit` either case. So the list needs, for each department, the exact SEARCH TEXT (not just the department name below). Search text he has confirmed: dealer, security, audit, F&B, marketing. Still to get: search text for HR, Surveillance, Property, Tables (or is that "dealer"?), Slots, Cage, OPS, and FOH/BOH (or does F&B cover both?).
+- Default department per code word (proposed Oct 31, waiting on his OK): fill/open/auto dealer, jack security, bv security, mfill audit, account marketing; a department word typed in a call pad shorthand line overrides it. He said he can't say how he'd write it, so pull it from the log type.
+In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
+- How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
+- Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
+- A hotkey can also do it on its own, at any time, for any open log.
+- Confirmed by Jakob (Oct 30, with screenshot): the Info From button is inside the Daily Log Entry window. Click it, a list drops down (Personnel, Subject, Contact, Company, Remove Selected, Remove All), click Personnel, click into a search bar, type, Enter runs the search. Department searches work. Watchlog would do those clicks and typing, then stop so you double-click the name.
+- Teach spots (like the full-entry logs): Info From button, Personnel, and the search bar. Subject, Contact and Company could use the same idea later.
+- Screenshots from Jakob (Oct 30): clicking Personnel opens its own "Personnel" window with a "Look For:" box at the top, Find Now / Clear, a results grid (Last Name, First Name, Middle Name, Gender, Property, Department, Position, Personnel ID) and Select / Cancel at the bottom. So the spots are: Info From button, Personnel (in the dropdown), and the Look For box in the new window (measured from that window, like the entry window). He is still sending the department names (his list so far shows Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH), which look like the department names; to confirm).
+- Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
+- Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
+
+### Idea: autocorrect everywhere, including Citrix/iTrak (NOT built)
+Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Shorthand lines (step 1) shipped in v3.26.x, so this is next whenever Jakob wants it.
+
+
+
+- **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Those six were added later (templates.txt only, see the end of this file).
+- **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
+
+
+- Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
+- Shorthand for other logs: see the original plan under "Done in v3.26.0".
+- Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
+- Optional quick insert when every form box is already filled (off by default).
+- Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.29.1 (Oct 31)
+- Code and docs review: LoadTemplates declares `global Entries`; an app key can no longer take Ctrl+Alt+D or F (or a letter moved to in Customize); README history tags fixed (past bumps had rewritten them), README section 19 Newer features, settings.ini reference completed; Overview, IT Summary and Summary describe the iTrak daily log filling, break tracker and backups. tools/bump-version.py and build/release.sh added.
+
+## Done in v3.29.0 (Oct 31)
+- Break time tracker: ;break (or the Break full-entry log) starts the count, Save & Close on that daily log ends it; minutes left on the home window, dashboard and tray icon; 60 min a shift ([Break] Minutes=), reset at Start of shift. No reminders (Jakob). Ctrl+Alt+Shift+E clicks End Time Now in the daily log in front.
+
+## Done in v3.28.0 (Oct 30)
+- Failure safeguards, second batch (items 6, 8, 9 of the plan, and 7 as backups): Ctrl+Alt+Shift+R repeats the last full-entry log; daily backups of templates, settings, autocorrect and taught clicks (14 kept) with tray Restore; tray Go back to the previous version (the newer one isn't offered again until allowed). Jakob tested all of it: works.
+- NOT built from item 7: automatically falling back to the backup when templates.txt loads empty or much shorter than last time (Restore does it by hand).
+
+## Done in v3.27.3 (Oct 30)
+- Alert Grid step 5 (no more alerts) failed sometimes: the v3.27.0 front check gave up after 1 s while the box was closing. It now retries for 2 s and the no-more click waits at least 250 ms.
+
+## Done in v3.27.2 (Oct 30)
+- Fix: v3.27.0 and v3.27.1 wouldn't load ("This Func cannot be assigned a value: joined").
+
+## Done in v3.27.1 (Oct 30)
+- Fix: the hourly SDS sign-in stopped with "no saved login is locked to SDS". It now brings SDS back and retries, then falls back to the login whose Only in names SDS, and logs the logins' triggers and windows if it still can't.
+
+## Done in v3.27.0 (Oct 30)
+- Failure safeguards, first batch (items 1 to 5 and 10 of the plan below): passwords never typed into Notepad, mail, chat, Office, Watchlog's windows or the daily log when a login has no program set; refused logins show a message; form logs aren't pasted into the wrong window (they stay on the clipboard); Alert Grid stops if a pop-up takes the front; display scale warning at start-up; a form closed with Esc comes back for 10 minutes; plain error box.
+- The rest of the plan was built in v3.28.0. The original plan, for reference:
+
+#### Plan: failure safeguards (Oct 30, all built by v3.28.0)
 
 From a read-through of Watchlog.ahk v3.23.0. Already safe today: login locked to a window is re-checked just before typing; full-entry logs (Ctrl+Alt+F) re-check iTrak is in front before every click; the call pad saves itself so a crash can't lose a call; a team templates file that won't load falls back to the last good copy; self-update tests the new file first and keeps the old one; OneDrive conflict copies of settings.ini show in the Security window; errors go in the activity log.
 
@@ -28,7 +79,24 @@ Not proposed: an auto-restart helper if Watchlog closes (needs a second program 
 
 Questions for Jakob: which of these has actually happened to you? Anything else that has gone wrong on shift? Build all ten, or only some?
 
-### Plan: shorthand line to finished log (Oct 30, step 1 of 2, NOT built, waiting on Jakob's examples and "build it")
+
+## Done in v3.26.3 (Oct 30)
+- Fix: `mfill n3 190800 bvs` (and the old `n3 190800 bvs` with no code word, and `c2102 11421.11 win 3 cash` for a jackpot) pressed with Ctrl+Enter on the call pad now make the log directly instead of opening an empty form.
+
+## Done in v3.26.2 (Oct 30)
+- ;fill ;open ;auto ;jack ;bv ;mfill also fill the iTrak daily log (Location, Topic, Reference as Jakob gave them; Reference left empty for him on fill, jack, bv and mfill). Pit comes from the table (@pit list), Alpha/Bravo/Charlie Slots from the machine letter (@slots list), both editable in templates.txt: groundwork for more automation. Open: is D = Delta Slots? exact iTrak topic names; Auto-close Reference assumed NA.
+
+## Done in v3.26.1 (Oct 30)
+- Fix: Alert Grid clearing no longer skips the final clear-acknowledged click (step 5) after the acknowledged-alerts fallback of v3.24.1 (Jakob: it stopped finishing). v3.26.0 was never sent on its own; 3.26.1 includes its shorthand lines.
+
+## Done in v3.26.0 (Oct 30)
+- Shorthand lines on the call pad: first word a code word, then Ctrl+Enter makes the log with no form when the line is complete. `fill 205 5.5`, `open 201 202 203`, `201 auto`, `jack c2102 11421.11 w3 cash 2130`, `bv c2102 4471 full`, `account 123456`. Any other code word first opens its form with the pad filled in.
+- ;account is now a daily-log fill: Guest Services | Account under review | M6 (417), "Account #XXXXXX reviewed, not banned player. Account cleared and Guest Services notified."
+- Built from the plan "shorthand line to finished log" (kept below for reference). Not done: `;found` and `;aml` shorthand (Jakob said leave them). Still open: shorthand for more logs, optional short codes (f for fill) in Customize, typing a shorthand line outside the pad.
+
+<details><summary>Original plan: shorthand line to finished log</summary>
+
+#### Plan: shorthand line to finished log (Oct 30, built in v3.26.x for fill, open, auto, jack, bv, mfill, account)
 
 **The idea.** You write one short line the way you jot it on paper, and Watchlog turns it into the finished log using the template you already have. No form when the line has everything; the form only opens when something is missing, with what it found already filled in.
 
@@ -72,52 +140,7 @@ Questions for Jakob: which of these has actually happened to you? Anything else 
 2. How do you write times (2130, 9:30p, 930)? 24-hour in the log?
 3. Should it also work outside the call pad, for example typing `;fill 205 5k` straight into iTrak and pressing a key? (Harder inside Citrix: see step 2.)
 
-### Idea: "Info From" department search (Jakob's coworker, Oct 30, NOT built)
-In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
-- How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
-- Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
-- A hotkey can also do it on its own, at any time, for any open log.
-- Confirmed by Jakob (Oct 30, with screenshot): the Info From button is inside the Daily Log Entry window. Click it, a list drops down (Personnel, Subject, Contact, Company, Remove Selected, Remove All), click Personnel, click into a search bar, type, Enter runs the search. Department searches work. Watchlog would do those clicks and typing, then stop so you double-click the name.
-- Teach spots (like the full-entry logs): Info From button, Personnel, and the search bar. Subject, Contact and Company could use the same idea later.
-- Screenshots from Jakob (Oct 30): clicking Personnel opens its own "Personnel" window with a "Look For:" box at the top, Find Now / Clear, a results grid (Last Name, First Name, Middle Name, Gender, Property, Department, Position, Personnel ID) and Select / Cancel at the bottom. So the spots are: Info From button, Personnel (in the dropdown), and the Look For box in the new window (measured from that window, like the entry window). He is still sending the department names (his list so far shows Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH), which look like the department names; to confirm).
-- Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
-- Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
-
-### Step 2 (after step 1): autocorrect everywhere, including Citrix/iTrak
-Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Design comes after step 1 ships.
-
-
-
-- **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Waiting on Location, Topic, Reference and End Time click for those three.
-- **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
-
-
-- Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
-- Shorthand for other logs: see the plan at the top (step 1).
-- Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
-- Optional quick insert when every form box is already filled (off by default).
-- Autocorrect list could be shared from the team folder beside templates.txt.
-
-## Done in v3.29.0 (Oct 30)
-- Fix: the hourly SDS sign-in stopped with "no saved login is locked to SDS". It now brings SDS back and retries, then falls back to the login whose Only in names SDS, and logs the logins' triggers and windows if it still can't.
-
-## Done in v3.27.0 (Oct 30)
-- Failure safeguards, first batch (items 1 to 5 and 10 of the plan below): passwords never typed into Notepad, mail, chat, Office, Watchlog's windows or the daily log when a login has no program set; refused logins show a message; form logs aren't pasted into the wrong window (they stay on the clipboard); Alert Grid stops if a pop-up takes the front; display scale warning at start-up; a form closed with Esc comes back for 10 minutes; plain error box.
-- Still in the plan: 6 repeat a recent log, 7 templates.txt backup, 8 settings backups and restore, 9 go back to the previous version.
-
-## Done in v3.26.3 (Oct 30)
-- Fix: `mfill n3 190800 bvs` (and the old `n3 190800 bvs` with no code word, and `c2102 11421.11 win 3 cash` for a jackpot) pressed with Ctrl+Enter on the call pad now make the log directly instead of opening an empty form.
-
-## Done in v3.26.2 (Oct 30)
-- ;fill ;open ;auto ;jack ;bv ;mfill also fill the iTrak daily log (Location, Topic, Reference as Jakob gave them; Reference left empty for him on fill, jack, bv and mfill). Pit comes from the table (@pit list), Alpha/Bravo/Charlie Slots from the machine letter (@slots list), both editable in templates.txt: groundwork for more automation. Open: is D = Delta Slots? exact iTrak topic names; Auto-close Reference assumed NA.
-
-## Done in v3.26.1 (Oct 30)
-- Fix: Alert Grid clearing no longer skips the final clear-acknowledged click (step 5) after the acknowledged-alerts fallback of v3.24.1 (Jakob: it stopped finishing). v3.26.0 was never sent on its own; 3.26.1 includes its shorthand lines.
-
-## Done in v3.26.0 (Oct 30)
-- Shorthand lines on the call pad: first word a code word, then Ctrl+Enter makes the log with no form when the line is complete. `fill 205 5.5`, `open 201 202 203`, `201 auto`, `jack c2102 11421.11 w3 cash 2130`, `bv c2102 4471 full`, `account 123456`. Any other code word first opens its form with the pad filled in.
-- ;account is now a daily-log fill: Guest Services | Account under review | M6 (417), "Account #XXXXXX reviewed, not banned player. Account cleared and Guest Services notified."
-- Not done: `;found` and `;aml` shorthand (Jakob said leave them). Still open: shorthand for more logs, optional short codes (f for fill) in Customize, typing a shorthand line outside the pad.
+</details>
 
 ## Done in v3.25.1 (Oct 30)
 - Fix: v3.25.0 failed to start with Missing quote on line 6258 (a space then ; inside a string is a comment in AutoHotkey). The new prefix text in Settings now escapes it.
@@ -511,8 +534,3 @@ Six full-entry logs, none click End Time Now, Reference NA:
 - +Exterior Officer / +Exterior Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed exterior door check
 - +Parking Officer / +Parking Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed parking lot patrol
 (templates.txt only, no version bump.)
-
-### Department search for Info From (planned Oct 31, NOT built, waiting on Jakob's OK of the defaults and "build it")
-Info From drop-down > Personnel > Look For box (matches the start of the text: dealer works, dealers doesn't; marketing lowercase; F&B; security/audit either case) > Find Now; Jakob picks the person and clicks Select himself.
-Departments so far: dealer, security, audit, F&B, marketing (he named only these five).
-Proposed defaults per code word: fill/open/auto dealer, jack security, bv security, mfill audit, account marketing; a department word in a call pad shorthand line overrides it. Needs a once-per-PC teach of the Info From drop-down and Personnel line.

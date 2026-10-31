@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 6 of 9 (lines 6135-7343 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 9 (lines 6141-7349 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
 IsBallyPath(path) => InStr(path, "SDSUI") || InStr(path, "CMPDesktop") || InStr(path, "AlertGridUI")
 
 ; The saved login that belongs to the program in front: one locked to
