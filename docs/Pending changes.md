@@ -3,31 +3,19 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.30.0 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.31.0 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
-### "Info From" department search: BUILT in v3.30.0 (Oct 31), notes kept for reference
-- Update Oct 31 (Jakob): he selects the person and clicks Select himself. The Look For box matches the START of what is typed: `dealer` finds dealers but `dealers` doesn't; `marketing` only lowercase; `F&B` for Food and Beverage; `security` and `audit` either case. So the list needs, for each department, the exact SEARCH TEXT (not just the department name below). Search text CONFIRMED (Jakob, Oct 31): Audit = audit, Security = security, Marketing = marketing, F&B (FOH and BOH) = F&B, Tables = dealer, HR = HR, Surveillance = surveillance, Property = property, Slots = slots, Cage = cage, OPS = OPS. Type exactly that text (case as given).
-- People attached per code word (Jakob, Oct 31; several people per log, one search each, in this order; he picks each person and clicks Select, then Watchlog opens Info From > Personnel for the next):
-  - fill: cashier, officer
-  - open: dealer
-  - auto: dealer
-  - jack: OPS, slots, cage
-  - bv: slot tech, security
-  - mfill: cashier, officer
-  - account: guest services
-  Search text CONFIRMED (Oct 31): cashier = cage, officer = security, slot tech = slots, guest services = marketing. So: fill cage, security; open dealer; auto dealer; jack OPS, slots, cage; bv slots, security; mfill cage, security; account marketing.
-  A department word typed in a call pad shorthand line could still override. Everything is settled; waiting only on "build it". Needs a once-per-PC teach: Info From drop-down arrow, the Personnel line, and the Look For box in the Personnel window.
-In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
-- How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
-- Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
-- A hotkey can also do it on its own, at any time, for any open log.
-- Confirmed by Jakob (Oct 30, with screenshot): the Info From button is inside the Daily Log Entry window. Click it, a list drops down (Personnel, Subject, Contact, Company, Remove Selected, Remove All), click Personnel, click into a search bar, type, Enter runs the search. Department searches work. Watchlog would do those clicks and typing, then stop so you double-click the name.
-- Teach spots (like the full-entry logs): Info From button, Personnel, and the search bar. Subject, Contact and Company could use the same idea later.
-- Screenshots from Jakob (Oct 30): clicking Personnel opens its own "Personnel" window with a "Look For:" box at the top, Find Now / Clear, a results grid (Last Name, First Name, Middle Name, Gender, Property, Department, Position, Personnel ID) and Select / Cancel at the bottom. So the spots are: Info From button, Personnel (in the dropdown), and the Look For box in the new window (measured from that window, like the entry window). He is still sending the department names (his list so far shows Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH), which look like the department names; to confirm).
-- Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
-- Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
+### Info From: type the name instead of the department: option 1 BUILT in v3.30.2 (Oct 31). Option 2 (name box on the form) DROPPED (Jakob, Oct 31): he types a few letters into Look For and that's enough; option 2 would add privacy worry for no gain.
+- v3.30.1 works on his bay, but a department search (dealer) lists every dealer past and present, so he still scrolls. He'd rather type the name.
+- Option 1 (suggested): Watchlog clicks Info From > Personnel, clicks into Look For and STOPS; he types part of the name and presses Enter. Works for any department.
+- Option 2: an optional name box on the code word form (for example ;open asks Table and Dealer last name); Watchlog types it into Look For; blank = option 1.
+- Option 2 privacy (Jakob worried, Oct 31): proposed safeguards: name box never remembered (no last used), never in journal/activity log/backups, typed not pasted (no clipboard), blank = v3.30.2 behaviour. NO saved name lists or recent-names memory (iTrak's own arrow already shows recent names). Asked: Look For matches start of last name? which code words ask for a name (;open/;auto dealer; ;fill cage+security known at start?). Waiting on answers + "build it".
+- No names stored between logs. Asked: does Look For match the start of the LAST name? Option 1, 2 or both? Waiting on his answer and "build it".
+
+### Info From people search: REMOVED in v3.31.0 (Jakob, Oct 31)
+- Built in v3.30.0, fixed in v3.30.1 (it clicks the Info From button, not the arrow), changed in v3.30.2 (opens the search and stops in Look For). It worked, but Jakob types a few letters into iTrak's own Info From search anyway, so the automation was clutter. Everything was removed: the clicks, tray > iTrak > Teach Info From, `| from ...` on code word lines (ignored if an old templates.txt still has them), settings.ini [ITrak] PersonnelWindow= and InfoFromTypeDept=. Leftover itrak.ini [InfoFrom] numbers are harmless. Name box on the form: dropped too (privacy). Do not rebuild without his word.
 
 ### Idea: paste instead of type in the daily log boxes (Jakob, Oct 31): DROPPED. Jakob tested: iTrak's drop-down boxes don't accept pastes. Keep typing them.
 Synopsis is already pasted; Location, Topic, Reference and the Info From Look For box are typed key by key (EntryType, 20 ms a key). Option to test on one bay: settings.ini [ITrak] PasteFields=reference,lookfor (and maybe location,topic). Risks: Location/Topic are search drop-downs that may not narrow on a paste; every paste goes through the Citrix clipboard (has stuck before). Waiting on Jakob's word.
@@ -48,7 +36,7 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Autocorrect list could be shared from the team folder beside templates.txt.
 
 ## Done in v3.30.0 (Oct 31)
-- Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From arrow, Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.
+- Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From button (v3.30.1; v3.30.0 wrongly taught the arrow), Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.
 
 ## Done in v3.29.2 (Oct 31)
 - ;cards logs the table's pit (%pit%, from @pit) instead of always Pit 2 (templates.txt, wording version Oct 31, 2026).
