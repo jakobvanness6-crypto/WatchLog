@@ -197,3 +197,36 @@ for o, names in assigned_in.items():
         if n in top_assigned and not any(n in glob_decl[a] for a in chain(o)):
             # params are fine
             print(ln, defs[o][0], n, '|', src[ln-1].strip()[:90])
+
+# D: a space or tab then ; INSIDE a quoted string. AutoHotkey treats it as the
+# start of a comment even there, so the line fails to load ("Missing quote").
+# Write `; instead. (This is what broke v3.25.0 and v3.30.0.)
+print("\nD: space/tab + ; inside a string (must be `;):")
+in_cont2 = False
+for i, line in enumerate(src, 1):
+    st = line.strip()
+    if in_cont2:
+        if st.startswith(')'):
+            in_cont2 = False
+        continue
+    if st.startswith(';') or st.startswith('/*'):
+        continue
+    q = None
+    j = 0
+    while j < len(line):
+        c = line[j]
+        if c == '`':
+            j += 2; continue
+        if q:
+            if c == q:
+                q = None
+            elif c == ';' and j > 0 and line[j-1] in ' \t':
+                print(i, '|', st[:110]); break
+        else:
+            if c in '"\'':
+                q = c
+            elif c == ';' and j > 0 and line[j-1] in ' \t':
+                break
+        j += 1
+    if q and st in ('text := "', 'return "') or (q and st.endswith('"') and st.count('"') == 1):
+        in_cont2 = True

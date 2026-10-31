@@ -306,7 +306,7 @@ TeachInfoFromRun() {
         return
     }
     Activity("iTrak: Info From taught (daily log " cw "x" ch ", Personnel " pcw "x" pch ")")
-    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (;fill, ;open, ;auto, ;jack, ;bv, ;mfill, ;account) now search Info From for each department after the log is filled. Keep the daily log and Personnel windows the same size.", "Teach Info From"
+    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (`;fill, `;open, `;auto, `;jack, `;bv, `;mfill, `;account) now search Info From for each department after the log is filled. Keep the daily log and Personnel windows the same size.", "Teach Info From"
 }
 
 ; =====================================================================
