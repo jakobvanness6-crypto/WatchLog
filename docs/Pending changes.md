@@ -29,7 +29,7 @@ In iTrak's Info From section you attach anyone involved. Watchlog should not pic
 - Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
 - Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
 
-### Idea: paste instead of type in the daily log boxes (Jakob, Oct 31, NOT built)
+### Idea: paste instead of type in the daily log boxes (Jakob, Oct 31): DROPPED. Jakob tested: iTrak's drop-down boxes don't accept pastes. Keep typing them.
 Synopsis is already pasted; Location, Topic, Reference and the Info From Look For box are typed key by key (EntryType, 20 ms a key). Option to test on one bay: settings.ini [ITrak] PasteFields=reference,lookfor (and maybe location,topic). Risks: Location/Topic are search drop-downs that may not narrow on a paste; every paste goes through the Citrix clipboard (has stuck before). Waiting on Jakob's word.
 
 ### Idea: autocorrect everywhere, including Citrix/iTrak (NOT built)
