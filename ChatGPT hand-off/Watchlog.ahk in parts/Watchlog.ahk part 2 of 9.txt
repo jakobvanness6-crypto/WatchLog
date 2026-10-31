@@ -1,0 +1,1304 @@
+; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2437 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; Picks the file the templates come from and reads it.
+; Returns {src, file, text, label, note}: src is "team", "team-copy" (the
+; last good copy, because the shared file couldn't be read) or "local".
+ReadTemplateSource() {
+    shared := Cfg["SharedTemplates"]
+    if shared = "" {
+        Tpl.src := "local", Tpl.file := TemplatesFile
+        text := ""
+        try text := FileRead(TemplatesFile, "UTF-8")
+        catch {
+            if FileExist(TemplatesFile)
+                return {src: "local", file: TemplatesFile, text: "", label: "templates.txt"
+                    , note: "Couldn't open templates.txt. If OneDrive isn't running, start it and press Ctrl+Alt+R."}
+        }
+        ; empty, missing or cut short (half-synced): use the newest good backup
+        ; until templates.txt is right again (v3.29.2)
+        n := CountTemplates(text)
+        if TemplatesLookCut(n, "LastCount") && IsObject(bk := NewestTemplatesBackup(n)) {
+            text := bk.text
+            TemplateInfo(text)
+            Tpl.note := "templates.txt " (n ? "has only " n " templates (" TemplatesLastCount("LastCount") " last time)" : "is empty or missing") ", so the backup from " bk.when " is being used. It switches back by itself when templates.txt is right again; tray > Advanced > Restore from a backup puts the backup back for good."
+            Activity("templates.txt looked cut short (" n " templates); using the backup from " bk.when)
+            TrayTip Tpl.note, "Watchlog: templates", "Icon!"
+            return {src: "local", file: TemplatesFile, text: text, label: "templates.txt (backup from " bk.when ")", note: ""}
+        }
+        if n
+            try IniWrite n, LastUsedFile, "Templates", "LastCount"
+        TemplateInfo(text)
+        return {src: "local", file: TemplatesFile, text: text, label: "templates.txt", note: ""}
+    }
+    text := "", why := ""
+    try {
+        text := FileRead(shared, "UTF-8")
+        tn := CountTemplates(text)
+        if !tn
+            why := "has no templates in it", text := ""
+        else if TemplatesLookCut(tn, "TeamCount")
+            why := "has only " tn " templates (" TemplatesLastCount("TeamCount") " last time; it may be half-synced)", text := ""
+        else
+            try IniWrite tn, LastUsedFile, "Templates", "TeamCount"
+    } catch {
+        why := FileExist(shared) ? "couldn't be opened (OneDrive may not be running)" : "isn't there (SharePoint may not have synced to this PC)"
+    }
+    if text != "" {
+        Tpl.src := "team", Tpl.file := shared
+        TemplateInfo(text)
+        SaveTeamCopy(text)
+        return {src: "team", file: shared, text: text, label: "Team templates", note: ""}
+    }
+    ; Couldn't read it: use the last good copy, and try again every minute
+    SetTimer RetryTeamFile, 60000
+    if FileExist(TeamCopyFile) {
+        try {
+            text := FileRead(TeamCopyFile, "UTF-8")
+            Tpl.src := "team-copy", Tpl.file := TeamCopyFile
+            TemplateInfo(text)
+            when := FormatTime(FileGetTime(TeamCopyFile, "M"), "MMM d HH:mm")
+            Tpl.note := "The team templates file " why ", so the copy saved on this PC on " when " is being used."
+            Activity("Team templates file " why "; using the last good copy from " when)
+            TrayTip Tpl.note "`nIt switches back by itself once the file can be read.", "Watchlog: team templates", "Icon!"
+            return {src: "team-copy", file: TeamCopyFile, text: text, label: "Team templates (saved copy)", note: ""}
+        }
+    }
+    ; No copy yet either: fall back to templates.txt in this folder
+    Tpl.src := "local", Tpl.file := TemplatesFile
+    try text := FileRead(TemplatesFile, "UTF-8")
+    TemplateInfo(text)
+    Tpl.note := "The team templates file " why ", and there's no saved copy on this PC yet, so templates.txt in this folder is being used. Its wording may be older."
+    return {src: "local", file: TemplatesFile, text: text, label: "templates.txt"
+        , note: Tpl.note "`n`n   " shared}
+}
+
+; How many templates the file had the last time it loaded properly ("" = not known)
+TemplatesLastCount(key) {
+    try return IniRead(LastUsedFile, "Templates", key, "")
+    return ""
+}
+
+; True when a templates file with n templates looks empty or cut short:
+; none at all, or fewer than half of last time (when that was 10 or more)
+TemplatesLookCut(n, key) {
+    lastN := TemplatesLastCount(key)
+    return !n || (IsInteger(lastN) && lastN >= 10 && n < lastN // 2)
+}
+
+; The newest daily backup of templates.txt with more templates than n, as
+; {text, when}, or "" when there isn't one (backups: see DailyBackup)
+NewestTemplatesBackup(n) {
+    if !DirExist(DataDir "\Backups")
+        return ""
+    names := []
+    loop files DataDir "\Backups\*", "D"
+        names.Push(A_LoopFileName)
+    if !names.Length
+        return ""
+    names := SortNames(names)
+    loop names.Length {
+        folder := names[names.Length - A_Index + 1]
+        f := DataDir "\Backups\" folder "\home - templates.txt"
+        if !FileExist(f)
+            continue
+        try {
+            t := FileRead(f, "UTF-8")
+            c := CountTemplates(t)
+            if c > n && !TemplatesLookCut(c, "LastCount")
+                return {text: t, when: folder}
+        }
+    }
+    return ""
+}
+
+; While the saved copy is in use: reload as soon as the shared file can be read
+RetryTeamFile() {
+    if IsObject(CurForm) || IsObject(SettingsWin) || IsObject(EditorWin)
+        return
+    try {
+        if CountTemplates(FileRead(Cfg["SharedTemplates"], "UTF-8"))
+            ReloadOnce()
+    }
+}
+
+; The wording version (a "# Wording version: ..." line, if the file has one)
+; and the check code: the same code on two PCs means exactly the same wording
+TemplateInfo(text) {
+    Tpl.version := RegExMatch(text, "im)^#\s*Wording version\s*:\s*(.*?)\s*$", &m) ? m[1] : ""
+    Tpl.code := text != "" ? CheckCode(text) : ""
+    ; "# Program version: 3.0.1" = the version everyone should be running
+    Tpl.program := RegExMatch(text, "im)^#\s*Program version\s*:\s*v?(\d+(?:\.\d+)*)", &mp) ? mp[1] : ""
+}
+
+CheckCode(text) {
+    text := StrReplace(text, "`r`n", "`n")
+    n := StrPut(text, "UTF-8") - 1
+    buf := Buffer(n + 1, 0)
+    StrPut(text, buf, "UTF-8")
+    crc := DllCall("ntdll\RtlComputeCrc32", "UInt", 0, "Ptr", buf, "UInt", n, "UInt")
+    return Format("{:04X}-{:04X}", crc >> 16, crc & 0xFFFF)
+}
+
+; Keeps a copy of the team file on this PC, and notes when the wording changed
+SaveTeamCopy(text) {
+    old := ""
+    try old := FileRead(TeamCopyFile, "UTF-8")
+    if old == text
+        return
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        f := FileOpen(TeamCopyFile, "w", "UTF-8")
+        f.Write(text)
+        f.Close()
+    }
+    if old = "" {
+        Activity("Team templates first read on this PC: " Cfg["SharedTemplates"])
+        return
+    }
+    Activity("Team templates changed: check code " CheckCode(old) " -> " Tpl.code (Tpl.version != "" ? ", wording version " Tpl.version : ""))
+    TrayTip "The team's templates were updated" (Tpl.version != "" ? " (wording version " Tpl.version ")" : "") ".", "Watchlog", "Iconi"
+}
+
+; How many template lines a file has (for checking a file before using it)
+CountTemplates(text) {
+    n := 0
+    Loop Parse text, "`n", "`r" {
+        line := Trim(A_LoopField)
+        if line != "" && !InStr("#@+", SubStr(line, 1, 1)) && InStr(line, "=")
+            n += 1
+    }
+    return n
+}
+
+; One line about where the templates came from, for the status window,
+; the version box and the activity log
+TemplateSummary() {
+    switch Tpl.src {
+        case "team": s := "team file " Tpl.file
+        case "team-copy": s := "the saved copy of the team file (the shared one couldn't be read)"
+        default: s := "templates.txt in " HomeDir
+    }
+    s .= " (" Tpl.count " templates" (Tpl.version != "" ? ", wording version " Tpl.version : "") (Tpl.code != "" ? ", check code " Tpl.code : "") ")"
+    if Tpl.mine
+        s .= " + " Tpl.mine " of your own in my-templates.txt"
+    return s
+}
+
+; Shared lists, written once and used by many blanks:
+;   @tables = UT201 | FB202 | UT203     then  {Table: @tables}
+ReadLists(content, label, personal, &problems) {
+    Loop Parse content, "`n", "`r" {
+        line := Trim(A_LoopField)
+        if SubStr(line, 1, 1) != "@"
+            continue
+        eq := InStr(line, "=")
+        lname := Trim(SubStr(line, 2, eq ? eq - 2 : StrLen(line)))
+        if !eq || !RegExMatch(lname, "^[\w-]+$") {
+            problems .= label " line " A_Index ": a list needs a one-word name and an = sign, like  @tables = UT201 | FB202`n"
+            continue
+        }
+        if personal && Lists.Has(lname) {
+            problems .= label " line " A_Index ": the team file already has a list called @" lname ", so the team one is used. Give yours another name.`n"
+            continue
+        }
+        items := []
+        for it in StrSplit(SubStr(line, eq + 1), "|")
+            if Trim(it) != ""
+                items.Push(Trim(it))
+        Lists[lname] := items
+    }
+}
+
+; Full-entry daily logs (v3.20.0): lines starting with +
+;   +Break = Location | Topic | Reference | Synopsis [| end]
+; Ctrl+Alt+F lists them; Enter on one opens a new daily log in iTrak and fills
+; Location, Topic, Reference and the Synopsis, with no questions. The word
+; end on the end clicks End Time's Now button too (not taught yet: ignored).
+ReadEntries(content, label, &problems, src := "main") {
+    Loop Parse content, "`n", "`r" {
+        line := Trim(A_LoopField)
+        if SubStr(line, 1, 1) != "+"
+            continue
+        eq := InStr(line, "=")
+        name := Trim(SubStr(line, 2, eq ? eq - 2 : StrLen(line)))
+        parts := eq ? StrSplit(SubStr(line, eq + 1), "|") : []
+        if !eq || name = "" || parts.Length < 4 {
+            problems .= label " line " A_Index ": a full-entry log looks like  +Break = Location | Topic | Reference | Synopsis`n"
+            continue
+        }
+        dupe := false
+        for e in Entries
+            if StrLower(e.name) = StrLower(name)
+                dupe := true
+        if dupe {
+            problems .= label " line " A_Index ": there are two full-entry logs called " name ", so this one was skipped.`n"
+            continue
+        }
+        Entries.Push({name: name, loc: Trim(parts[1]), topic: Trim(parts[2]), ref: Trim(parts[3]), syn: Trim(parts[4])
+            , end: parts.Length >= 5 && StrLower(Trim(parts[5])) = "end", src: src})
+    }
+}
+
+; Turns each template line into a trigger. Returns how many were added.
+AddTemplates(content, src, label, trigs, &problems) {
+    added := 0
+    Loop Parse content, "`n", "`r" {
+        line := Trim(A_LoopField)
+        if line = "" || SubStr(line, 1, 1) = "#" || SubStr(line, 1, 1) = "@" || SubStr(line, 1, 1) = "+"
+            continue
+        eq := InStr(line, "=")
+        if !eq {
+            problems .= label " line " A_Index ": missing the = sign`n"
+            continue
+        }
+        left := Trim(SubStr(line, 1, eq - 1))
+        text := Trim(SubStr(line, eq + 1))
+        name := ""
+        trig := left
+        if RegExMatch(left, "^(\S+)\s*\((.*)\)$", &m) {
+            trig := m[1]
+            name := Trim(m[2])
+        }
+        if trig = "" || InStr(trig, " ") {
+            problems .= label " line " A_Index ": the trigger can't have spaces in it`n"
+            continue
+        }
+        if RegExMatch(trig, "i)^(;t|;dd|;dt)") {
+            problems .= label " line " A_Index ": " trig " starts like a time/date stamp, so it would never fire`n"
+            continue
+        }
+        clash := ""
+        for other in trigs {
+            if InStr(other, trig) = 1 || InStr(trig, other) = 1
+                clash := other
+        }
+        if clash == trig {
+            if trigs[clash] = "login"
+                problems .= label " line " A_Index ": " trig " is also a login shortcut, so this template was skipped. Give it a different trigger.`n"
+            else if src = "mine" && trigs[clash] != "mine"
+                problems .= label " line " A_Index ": " trig " is already a team template, so yours was skipped. Give yours a different trigger.`n"
+            else
+                problems .= label " line " A_Index ": " trig " is in the file twice, so this line was skipped. Remove or rename one of them.`n"
+            continue
+        }
+        if clash != "" {
+            problems .= label " line " A_Index ": " trig " and " clash " start the same way, so the shorter one would fire before you finish typing the longer one. Rename one of them.`n"
+            continue
+        }
+        trigs[trig] := src
+        lineNo := A_Index, pos := 1
+        while p := RegExMatch(text, "[:|]\s*@([\w-]+)\s*(?=[|}])", &m, pos) {
+            if !Lists.Has(m[1])
+                problems .= label " line " lineNo ": " trig " uses @" m[1] ", but there's no line starting with @" m[1] " =`n"
+            pos := p + m.Len
+        }
+        text := StrReplace(text, "\n", "`n")
+        ; {repeat} anywhere in a form: an "Add another" button, so several
+        ; (machines, say) go into one log, one per line
+        repeat := RegExMatch(text, "i)\{repeat\}") > 0
+        text := RegExReplace(text, "i)\s*\{repeat\}")
+        ; "wording >> Location | Topic | Reference": the code word fills a whole
+        ; iTrak daily log (v3.24.0). The wording becomes the Synopsis.
+        fill := InStr(text, " >> ") > 0
+        if fill {
+            tail := SplitTop(SubStr(text, InStr(text, " >> ", , -1) + 4))
+            if tail.Length < 3 {
+                problems .= label " line " lineNo ": " trig " has >> but needs three parts after it:  >> Location | Topic | Reference`n"
+                fill := false
+                text := SubStr(text, 1, InStr(text, " >> ", , -1) - 1)
+            }
+        }
+        isForm := RegExMatch(text, "\{[^{}]+\}") > 0
+        HotIf NotInSettings
+        Hotstring(":*C:" TrigKey(trig), MakeTemplateHandler(text, name != "" ? name : trig, repeat, trig, fill))
+        HotIf
+        TemplateList.Push({trig: trig, name: name, text: text, form: isForm, repeat: repeat, fill: fill, src: src})
+        added += 1
+    }
+    return added
+}
+
+MakeTemplateHandler(text, title, repeat := false, trig := "", fill := false) {
+    return (*) => RunTemplate(text, title, repeat, trig, fill)
+}
+
+; Splits on | outside {boxes}
+SplitTop(s) {
+    parts := [], cur := "", depth := 0
+    for ch in StrSplit(s) {
+        if ch = "{"
+            depth++
+        else if ch = "}" && depth
+            depth--
+        if ch = "|" && !depth {
+            parts.Push(cur), cur := ""
+        } else
+            cur .= ch
+    }
+    parts.Push(cur)
+    return parts
+}
+
+; A finished "wording >> Location | Topic | Reference [| end]" (v3.24.0):
+; fills an iTrak daily log, opening one if none is open. Returns false (so the
+; wording is pasted where you are instead) when Shift is held.
+TemplateFill(out, title) {
+    if GetKeyState("Shift", "P")
+        return false
+    i := InStr(out, " >> ", , -1)
+    if !i
+        return false
+    parts := StrSplit(SubStr(out, i + 4), "|")
+    if parts.Length < 3
+        return false
+    ; several lines (Add another): each ends with its own  >> ..., the last one is used
+    syn := Trim(RegExReplace(out, " >> [^\r\n]*", ""))
+    ; after the three boxes: "end" (click End Time Now) and/or "from a, b"
+    ; (the Info From people to search for, by department, v3.30.0)
+    isEnd := false, from := []
+    loop parts.Length - 3 {
+        extra := Trim(parts[A_Index + 3])
+        if StrLower(extra) = "end"
+            isEnd := true
+        else if RegExMatch(extra, "i)^from\s+(.+)$", &fm)
+            for d in StrSplit(fm[1], ",")
+                if Trim(d) != ""
+                    from.Push(Trim(d))
+    }
+    RunEntry({name: title, loc: FillDerive(Trim(parts[1]), syn), topic: FillDerive(Trim(parts[2]), syn)
+        , ref: FillDerive(Trim(parts[3]), syn), syn: syn
+        , end: isEnd, from: from, src: "code"}, true)
+    return true
+}
+
+; %pit% and %slots% in the Location, Topic or Reference of a code word (v3.26.2):
+; %pit% = the pit of the first table in the log (UT201 -> 2), looked up in the
+; list @pit = 2=Pit 2 | 3=Pit 3; %slots% = the slots area of the first machine
+; (C2102 -> C), looked up in @slots = A=Alpha Slots | B=Bravo Slots ... Both lists
+; live in templates.txt, so they can be changed or added to without the program.
+FillDerive(s, syn) {
+    if InStr(s, "%pit%") {
+        v := ""
+        if Lists.Has("tables") {
+            for it in Lists["tables"] {
+                if RegExMatch(syn, "i)(?<![A-Za-z0-9])" it "(?![A-Za-z0-9])") && RegExMatch(it, "\d", &d) {
+                    v := ListMapGet("pit", d[0])
+                    break
+                }
+            }
+        }
+        if v = ""
+            Tip("Couldn't tell which pit: Location left empty.", 3000, true)
+        s := StrReplace(s, "%pit%", v)
+    }
+    if InStr(s, "%slots%") {
+        v := ""
+        if RegExMatch(syn, "(?<![A-Za-z0-9])([A-Za-z])\d{3,5}(?!\d)", &m)
+            v := ListMapGet("slots", m[1])
+        if v = ""
+            Tip("Couldn't tell which slots area: Location left empty.", 3000, true)
+        s := StrReplace(s, "%slots%", v)
+    }
+    return s
+}
+
+; In a list like  @slots = A=Alpha Slots | B=Bravo Slots , the text after key=
+ListMapGet(name, key) {
+    if !Lists.Has(name)
+        return ""
+    for it in Lists[name] {
+        p := InStr(it, "=")
+        if p && StrUpper(Trim(SubStr(it, 1, p - 1))) = StrUpper(key)
+            return Trim(SubStr(it, p + 1))
+    }
+    return ""
+}
+
+; Just the wording of a finished code word line (the part before >>), for pasting
+FillWording(out) {
+    ; Shift is still down: let go first, or the paste becomes Ctrl+Shift+V
+    held := A_TickCount + 400
+    while A_TickCount < held && GetKeyState("Shift", "P")
+        Sleep 10
+    return Trim(RegExReplace(out, " >> [^\r\n]*", ""))
+}
+
+; trig = the shortcut typed, for the time saved tracker
+RunTemplate(text, title, repeat := false, trig := "", fill := false) {
+    ; Swallow a Space or Enter typed out of habit right after the trigger
+    global JustFired := A_TickCount
+    ; A trigger typed into the template finder: close it and run the
+    ; template in the window you were typing in
+    if PickerActive()
+        ClosePicker(true)
+    fields := ParseFields(text)
+    if fields.Length = 0 {
+        out := FixArticles(text)
+        if fill && TemplateFill(out, title)
+            return
+        if fill
+            out := FillWording(out)
+        Paste(out)
+        saved := StrLen(out) - StrLen(trig)
+        Journal(title, out, saved)
+        CountSaved("log", saved, title)
+        return
+    }
+    ; "saved" boxes with a value from this shift aren't asked (v3.20.2)
+    fixed := Map(), shown := []
+    for f in fields {
+        if f.HasOwnProp("savedVal")
+            fixed[f.key] := f.savedVal
+        else
+            shown.Push(f)
+    }
+    if !fixed.Count {
+        FormPaste(title, fields, vals => FillTemplate(text, fields, vals), repeat, StrLen(trig), fill)
+        return
+    }
+    merge(vals) {
+        out := [], j := 0
+        for f in fields
+            out.Push(fixed.Has(f.key) ? fixed[f.key] : vals[++j])
+        return out
+    }
+    if !shown.Length {
+        out := FillTemplate(text, fields, merge([]))
+        if fill && TemplateFill(out, title)
+            return
+        if fill
+            out := FillWording(out)
+        Paste(out)
+        saved := StrLen(out) - StrLen(trig)
+        Journal(title, out, saved)
+        CountSaved("log", saved, title)
+        return
+    }
+    FormPaste(title, shown, vals => FillTemplate(text, fields, merge(vals)), repeat, StrLen(trig), fill)
+}
+
+; ---- Facial rec copies (v3.6.0) ---------------------------------------
+; The facial rec page won't copy the alert # and the match % together, so
+; the last copy of each is kept in memory only (never written to disk,
+; forgotten after 2 minutes or once used). Only an 8-digit number or a
+; percentage is kept, and only when copied in Edge, so Citrix's clipboard
+; is never touched.
+NoteCopy(type) {
+    global CopyMemory
+    if type != 1 || !WinActive("ahk_exe msedge.exe")
+        return
+    text := ""
+    try text := Trim(A_Clipboard)
+    if RegExMatch(text, "^\d{8}$")
+        CopyMemory["alert"] := {text: text, at: A_TickCount}
+    else if RegExMatch(text, "^\d{1,3}(\.\d+)?\s*%$")
+        CopyMemory["match"] := {text: RegExReplace(text, "\s*%$"), at: A_TickCount}
+}
+
+RecentCopy(kind) {
+    if CopyMemory.Has(kind) && A_TickCount - CopyMemory[kind].at < 120000
+        return CopyMemory[kind].text
+    return ""
+}
+
+ForgetCopy(kind) {
+    if CopyMemory.Has(kind)
+        CopyMemory.Delete(kind)
+}
+
+; A plain number (4 to 8 digits) from a copy. A longer copy, like a whole
+; iTrak line, works if it has exactly one such number in it.
+NumberFromCopy(text) {
+    text := Trim(text)
+    if RegExMatch(text, "^\d{4,8}$")
+        return text
+    if StrLen(text) > 500
+        return ""
+    pos := 1, found := ""
+    while p := RegExMatch(text, "(?<!\d)\d{4,8}(?!\d)", &m, pos) {
+        if found != ""
+            return ""
+        found := m[0], pos := p + m.Len
+    }
+    return found
+}
+
+; Which list item (a job title) appears in the copied text; the longest
+; match wins ("Security Supervisor" over "Supervisor"). 0 = none.
+TitleFromCopy(items, text) {
+    if StrLen(text) > 2000
+        return 0
+    best := 0, bestLen := 0
+    for i, it in items {
+        if StrLen(it) > bestLen && RegExMatch(text, "i)(?<![\w])" RegExReplace(it, "[\\.*?+\[\](){}|^$]", "\$0") "(?![\w])") {
+            best := i, bestLen := StrLen(it)
+        }
+    }
+    return best
+}
+
+; Finds every {blank} in the text and turns it into a form box (once per name)
+ParseFields(text) {
+    fields := [], seen := Map()
+    ; Last-used values for "last" and "next" boxes, read once for the whole
+    ; form. They're kept on this PC (not in settings.ini, which OneDrive
+    ; syncs); before v3.3 they were in settings.ini, so that's the fallback.
+    last := Map()
+    last.CaseSense := false
+    if InStr(text, "last") || InStr(text, "next") || InStr(text, "alertcopy") || InStr(text, "saved") {
+        section := ""
+        try section := IniRead(LastUsedFile, "LastUsed")
+        if section = ""
+            try section := IniRead(SettingsFile, "LastUsed")
+        for line in StrSplit(section, "`n", "`r") {
+            if eq := InStr(line, "=")
+                last[SubStr(line, 1, eq - 1)] := SubStr(line, eq + 1)
+        }
+    }
+    pos := 1
+    while p := RegExMatch(text, "\{([^{}]+)\}", &m, pos) {
+        f := ParseField(m[1], last)
+        if !seen.Has(f.key) {
+            seen[f.key] := true
+            fields.Push(f)
+        }
+        pos := p + m.Len
+    }
+    return fields
+}
+
+IsTimeStamp(v) => RegExMatch(v, "^\d{14}$")
+
+ParseField(spec, last := Map()) {
+    c := InStr(spec, ":")
+    key := Trim(c ? SubStr(spec, 1, c - 1) : spec)
+    f := {key: key, label: key, ph: "XX"}
+    if !c
+        return f
+    items := [], pick := false, hint := ""
+    for opt in StrSplit(SubStr(spec, c + 1), "|") {
+        opt := Trim(opt)
+        low := StrLower(opt)
+        if opt = "" {
+            continue
+        } else if low = "now" {
+            f.kind := "time", f.def := FormatTime(, "HH:mm"), f.ph := "XX:XX"
+        } else if RegExMatch(low, "^now\s*\+\s*(\d+)$", &n) {
+            f.kind := "time", f.def := FormatTime(DateAdd(A_Now, Integer(n[1]), "Minutes"), "HH:mm"), f.ph := "XX:XX"
+        } else if low = "time" {
+            f.kind := "time", f.ph := "XX:XX", hint := "  (e.g. 2130)"
+        } else if low = "thousands" {
+            ; with money: 3.3 means 3,300 (a decimal point = thousands)
+            f.thousands := true, hint := "  (e.g. 3.3 = 3,300)"
+        } else if low = "money" {
+            f.kind := "money", f.ph := "XX,XXX", hint := "  (e.g. 10000)"
+        } else if low = "percent" {
+            f.kind := "percent", f.ph := "XX%", hint := "  (e.g. 67)"
+        } else if low = "clip" {
+            f.def := NumberFromCopy(CopiedText())
+            hint := "  (copy it first to auto-fill)"
+        } else if low = "alertcopy" {
+            ; facial rec alert #: the 8-digit number copied in the last two
+            ; minutes, and the last one logged on this PC (alerts count up)
+            f.remember := true, f.alertCopy := true
+            lastA := last.Has(key) ? last[key] : ""
+            copied := RecentCopy("alert")
+            if copied != "" {
+                f.def := copied
+                if lastA != "" && copied = lastA
+                    hint := "  (SAME as the last one logged: " lastA ")"
+                else if lastA != "" && copied < lastA
+                    hint := "  (LOWER than the last one logged: " lastA ")"
+                else
+                    hint := "  (copied)"
+            } else {
+                hint := lastA != "" ? "  (last logged: " lastA "; copy the new one first)" : "  (copy it first to auto-fill)"
+            }
+        } else if low = "matchcopy" {
+            ; facial rec match %: the percentage copied in the last two minutes
+            f.kind := "percent", f.ph := "XX%", f.matchCopy := true
+            copied := RecentCopy("match")
+            f.def := copied
+            hint := copied != "" ? "  (copied)" : "  (copy it first to auto-fill, e.g. 65)"
+        } else if low = "fromcopy" {
+            f.fromCopy := true
+
+        } else if low = "last" {
+            f.remember := true
+            f.def := last.Has(key) ? last[key] : ""
+        } else if low = "saved" {
+            ; like last, but when a value was entered in the last 14 hours
+            ; (the bay at the start of shift) it is used without asking (v3.20.2)
+            f.remember := true
+            f.def := last.Has(key) ? last[key] : ""
+            if f.def != "" && last.Has(key ".at") && IsTimeStamp(last[key ".at"]) && DateDiff(A_Now, last[key ".at"], "Hours") < 14
+                f.savedVal := f.def
+        } else if low = "next" {
+            f.remember := true, f.nextStep := true
+        } else if low = "pick" {
+            pick := true
+        } else if low = "several" {
+            f.several := true           ; Add another adds to this box, on the same line (v3.19.3)
+        } else if low = "caps" {
+            f.caps := true
+        } else if low = "tidy" {
+            f.tidy := true              ; bvs -> BVs, bvs divert -> BVs/Divert
+        } else if low = "upper" {
+            f.upper := true             ; all capitals: rn -> RN
+        } else if SubStr(opt, 1, 1) = "@" && Lists.Has(SubStr(opt, 2)) {
+            for it in Lists[SubStr(opt, 2)]
+                items.Push(it)
+        } else if RegExMatch(opt, "i)^if\s+(.+?)\s*=\s*(.*)$", &cm) {
+            ; "if ATM=100000": fill this box with 100000 while another
+            ; box in the form starts with ATM
+            if !f.HasOwnProp("conds")
+                f.conds := []
+            f.conds.Push({when: cm[1], val: cm[2]})
+        } else if SubStr(low, 1, 6) = "blank=" {
+            f.ph := SubStr(opt, 7)
+        } else if SubStr(low, 1, 7) = "prefix=" {
+            f.prefix := SubStr(opt, 8)
+        } else if SubStr(low, 1, 7) = "suffix=" {
+            f.suffix := SubStr(opt, 8)       ; added after what you type, only if you type something
+        } else if SubStr(low, 1, 13) = "numberprefix=" {
+            ; added only in front of a number: 12345 -> #12345, RN stays RN
+            f.numPrefix := SubStr(opt, 14)
+        } else {
+            items.Push(opt)
+        }
+    }
+    if items.Length {
+        f.items := items
+        if pick
+            f.kind := "list"
+        else
+            hint := "  (pick or type)"
+        ; "fromcopy": open the list on the job title found in what was copied
+        if f.HasOwnProp("fromCopy") {
+            at := TitleFromCopy(items, CopiedText())
+            if at {
+                f.choose := at
+                hint := "  (from the copied text)"
+            }
+        }
+        ; "next" opens the list on the item after the one used last time
+        if f.HasOwnProp("nextStep") {
+            lastVal := last.Has(key) ? last[key] : ""
+            f.choose := 1
+            for i, it in items {
+                if it = lastVal
+                    f.choose := Mod(i, items.Length) + 1
+            }
+        }
+    }
+    f.label := key hint
+    return f
+}
+
+FillTemplate(text, fields, vals) {
+    byKey := Map()
+    for i, f in fields
+        byKey[f.key] := vals[i]
+    out := "", pos := 1
+    while p := RegExMatch(text, "\{([^{}]+)\}", &m, pos) {
+        c := InStr(m[1], ":")
+        key := Trim(c ? SubStr(m[1], 1, c - 1) : m[1])
+        out .= SubStr(text, pos, p - pos)
+        if byKey[key] = "" && SubStr(out, -1) = " "      ; empty box: don't leave a double space
+            out := SubStr(out, 1, -1)
+        out .= byKey[key]
+        pos := p + m.Len
+    }
+    out .= SubStr(text, pos)
+    return FixArticles(out)
+}
+
+; ["BJ205", "BJ206", "RO204"] -> "BJ205, BJ206 and RO204"
+JoinList(items) {
+    out := ""
+    for i, it in items
+        out .= (i = 1 ? "" : i = items.Length ? " and " : ", ") it
+    return out
+}
+
+; Empties a form box (a pick-only list ends with nothing picked)
+ClearBox(c) {
+    if c.Type = "DDL"
+        c.Choose(0)
+    else
+        c.Text := ""
+}
+
+; "a/an employee" -> "an employee", "a/an guest" -> "a guest"
+FixArticles(s) {
+    pos := 1
+    while p := RegExMatch(s, "a/an (\S)", &m, pos) {
+        art := InStr("aeiouAEIOU", m[1]) ? "an" : "a"
+        s := SubStr(s, 1, p - 1) . art . SubStr(s, p + 4)
+        pos := p + StrLen(art)
+    }
+    return s
+}
+
+
+; =====================================================================
+;  HELPERS
+; =====================================================================
+
+; A short note by the mouse (or mid-screen) that clears itself after ms.
+; ms = 0 leaves it up until Tip("") clears it. A new note restarts the
+; clock, so a quick second note isn't wiped early by the first one's timer.
+Tip(msg, ms := 2000, center := false) {
+    if msg = "" {
+        ToolTip()
+        return
+    }
+    if center {
+        CoordMode "ToolTip", "Screen"
+        ToolTip msg, A_ScreenWidth // 2 - StrLen(msg) * 3, A_ScreenHeight // 2
+    } else {
+        ToolTip msg
+    }
+    SetTimer ClearTip, ms ? -ms : 0
+}
+ClearTip() => ToolTip()
+
+; Puts the keyboard back in the window you were typing in, with a short
+; pause so a paste lands there (Citrix needs a moment longer)
+ReturnTo(hwnd) {
+    try WinActivate "ahk_id " hwnd
+    ok := WinWaitActive("ahk_id " hwnd, , 2)
+    Sleep WinActive("ahk_exe wfica32.exe") ? 400 : 50
+    return ok != 0
+}
+
+; The log couldn't be pasted (the window it was started in isn't in front):
+; it stays on the clipboard instead of going into whatever has the keyboard
+KeepOnClip(text) {
+    global LeftOnClip
+    A_Clipboard := StrReplace(StrReplace(text, "`r`n", "`n"), "`n", "`r`n")
+    LeftOnClip := text
+    SoundBeep 750, 120
+    Tip("The window you were in isn't in front, so nothing was pasted.`nThe log is on the clipboard: click where it goes and press Ctrl+V.", 7000, true)
+    Activity("Form log not pasted: the window it was started in wasn't in front (the log is on the clipboard)")
+}
+
+; What you copied, for the clip and fromcopy boxes. A log Watchlog itself
+; left on the clipboard doesn't count: the next form would otherwise pick a
+; number or a job title out of the last log (v3.14.2).
+CopiedText() {
+    text := ""
+    try text := A_Clipboard
+    if LeftOnClip != "" && Trim(StrReplace(text, "`r`n", "`n")) == Trim(StrReplace(LeftOnClip, "`r`n", "`n"))
+        return ""
+    return text
+}
+
+; Fast paste: backs up your clipboard, pastes the text, then restores it
+; keep = true leaves the text on the clipboard afterwards (used by forms, so
+; if the paste doesn't land you can still press Ctrl+V yourself).
+Paste(text, keep := false) {
+    global LeftOnClip
+    ; Windows apps want a CR+LF pair for a new line - a bare LF gets ignored
+    text := StrReplace(StrReplace(text, "`r`n", "`n"), "`n", "`r`n")
+    ; Pasting into Citrix (iTrak): the log stays on the clipboard and the old
+    ; clipboard isn't saved or put back. Reading a clipboard that came from
+    ; iTrak (like a copied employee number) makes Citrix fetch it back from
+    ; the session, and swapping it again right after a paste can leave
+    ; Citrix's clipboard stuck, so nothing pastes into iTrak at all.
+    citrix := WinActive("ahk_exe wfica32.exe")
+    if citrix
+        keep := true
+    saved := keep ? "" : ClipboardAll()
+    ; Set it in one go (no emptying first), so Citrix sees a single change
+    A_Clipboard := text
+    if keep
+        LeftOnClip := text
+    ; Citrix copies the clipboard across to the session on its own
+    ; schedule: give it a moment before pasting
+    if citrix
+        Sleep 300
+    SendInput "^v"
+    if keep
+        return
+    Sleep 150
+    A_Clipboard := saved
+}
+
+; Fill-in form: shows boxes, then pastes the finished log where you were typing.
+; Tab / Shift+Tab between boxes, Enter to insert, Esc to cancel.
+; Any box left blank keeps its placeholder so you can fill it in later.
+SetForm(v) {
+    global CurForm := v
+}
+
+FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
+    global Cancelled
+    target := WinExist("A")
+    g := WGui("+AlwaysOnTop +ToolWindow", title)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    ctrls := [], starts := [], labs := []
+    for f in fields {
+        labs.Push(g.AddText(A_Index > 1 ? "y+10" : "", f.label))
+        kind := f.HasOwnProp("kind") ? f.kind : ""
+        n := f.HasOwnProp("choose") ? f.choose : 1
+        ; Lists open showing up to 12 choices at once
+        rows := f.HasOwnProp("items") ? " r" Min(f.items.Length, 12) : ""
+        if kind = "list"
+            c := g.AddDropDownList("w420 Choose" n rows, f.items)
+        else if f.HasOwnProp("items")
+            c := g.AddComboBox("w420 Choose" n rows, f.items)
+        else
+            c := g.AddEdit("w420", f.HasOwnProp("def") ? f.def : "")
+        ctrls.Push(c)
+        starts.Push({text: c.Text, choose: n})
+    }
+    ; "several" boxes (v3.19.3): Add another adds to this box's list on the
+    ; same line ("BJ205, BJ206 and RO204 Opened.") instead of a new line.
+    ; They start empty, so a box left empty at the end is skipped.
+    multi := Map()
+    for i, f in fields {
+        if !f.HasOwnProp("several")
+            continue
+        multi[i] := []
+        ClearBox(ctrls[i])
+        starts[i].text := "", starts[i].choose := 0
+    }
+    if multi.Count
+        repeat := true
+    ; Boxes the call pad can fill (machine, table, amount, alert #)
+    hints := PadHints()
+    padUsed := 0, padRows := [], padMarks := Map()
+    if hints.Count {
+        res := PadFill(fields, ctrls, labs, hints, padMarks)
+        padUsed := res.n, padRows := res.rows
+    }
+    ; the same form closed with Esc in the last 10 minutes: what was typed comes back (v3.27.0)
+    restored := ""
+    if !padUsed && IsObject(Cancelled) && Cancelled.title = title && A_TickCount - Cancelled.at < 600000 && Cancelled.vals.Length = ctrls.Length {
+        restored := ""
+        for i, c in ctrls {
+            t := Cancelled.vals[i]
+            if fields[i].HasOwnProp("items") && fields[i].HasOwnProp("kind") && fields[i].kind = "list" {
+                for j, it in fields[i].items
+                    if it = t
+                        c.Choose(j)
+            } else
+                c.Text := t
+            restored .= t Chr(1)
+        }
+        Cancelled := ""
+        g.Title := title "  (what you typed before is back)"
+    }
+    LoadAutocorrect()
+    for c in ctrls
+        if c.Type = "Edit" || c.Type = "ComboBox"
+            c.OnEvent("Change", AutoFixEdit)
+    done := []          ; finished entries so far, when "Add another" is used
+    typed := 0          ; keystrokes typed into the form, for the time saved tracker
+    autoVals := Map()   ; boxes filled in by an "if" option, and with what
+    ; How the log will come out, updated as you type
+    g.SetFont("s9")
+    g.AddText("y+14 c707070", "How it will look:")
+    preview := g.AddEdit("w420 r5 ReadOnly -TabStop VScroll BackgroundF1F5F5")
+    lastPreview := ""
+    g.SetFont("s10")
+    prevLen := Map()
+    for i, c in ctrls {
+        if fields[i].HasOwnProp("items") && !(fields[i].HasOwnProp("kind") && fields[i].kind = "list")
+            c.OnEvent("Change", Complete.Bind(i))
+        c.OnEvent("Change", Changed)
+    }
+    Changed()
+    if fill
+        g.AddText("xm y+8 w420 c666666", "Enter fills the iTrak daily log. Shift+Enter pastes just the wording here.")
+    ; Buttons along the bottom-right; Insert is the one Enter presses
+    if repeat
+        g.AddButton("xm+132 y+12 w180", "Add another (Ctrl+Enter)").OnEvent("Click", AddAnother)
+    else
+        g.AddButton("xm+212 y+12 w100", "Cancel").OnEvent("Click", Cancel)
+    g.AddButton("x+8 yp w100 Default", "Insert").OnEvent("Click", Submit)
+    g.OnEvent("Escape", Cancel)
+    g.OnEvent("Close", Cancel)
+    SetForm({hwnd: g.Hwnd, ctrls: ctrls, submit: Submit, more: repeat ? AddAnother : ""})
+    g.Show()
+    WinActivate "ahk_id " g.Hwnd
+    WinWaitActive "ahk_id " g.Hwnd, , 1
+    ; Start on the first box you'd actually fill in: an empty one or a list
+    ; to pick from (skips boxes already filled with a time or copied number)
+    first := ctrls[1]
+    for i, c in ctrls {
+        if c.Text = "" || fields[i].HasOwnProp("items") {
+            first := c
+            break
+        }
+    }
+    first.Focus()
+    ; Several machine fills jotted on the pad: one set of boxes for each
+    if padRows.Length {
+        for i, row in padRows {
+            PadSetRow(fields, ctrls, labs, row, padMarks)
+            if i < padRows.Length
+                AddAnother()
+        }
+        padUsed := padRows.Length
+        Changed()
+    }
+    ; a shorthand line that had everything: make the log without waiting for Enter (v3.26.0)
+    if padUsed && hints.Has("go") && hints["go"] && (!hints.Has("expect") || padUsed >= hints["expect"])
+        Submit()
+
+    Cancel(*) {
+        global Cancelled
+        ; kept for 10 minutes so reopening the same log puts it back; not when it
+        ; is only what was put back last time (a second Esc clears it)
+        if !Untouched() {
+            vals := [], snapTxt := ""
+            for c in ctrls {
+                vals.Push(c.Text)
+                snapTxt .= c.Text Chr(1)
+            }
+            if snapTxt != restored
+                Cancelled := {title: title, vals: vals, at: A_TickCount}
+        }
+        SetForm("")
+        g.Destroy()
+    }
+
+    Changed(*) {
+        AutoFill()
+        ShowPreview()
+    }
+
+    ; "if" options: fill a box when another box starts with the given text,
+    ; unless you've typed something of your own in it
+    AutoFill() {
+        for i, f in fields {
+            if !f.HasOwnProp("conds")
+                continue
+            want := ""
+            for cond in f.conds {
+                for j, c2 in ctrls {
+                    if j != i && InStr(Trim(c2.Text), cond.when) = 1 {
+                        want := cond.val
+                        break
+                    }
+                }
+                if want != ""
+                    break
+            }
+            c := ctrls[i]
+            had := autoVals.Has(i) ? autoVals[i] : ""
+            if c.Text = "" || c.Text = had {
+                if c.Text != want
+                    c.Value := want
+                autoVals[i] := want
+            }
+        }
+    }
+
+    ; Pick-or-type lists: typing the start of an item fills in the rest
+    ; (selected, so the next key replaces it and Backspace removes it).
+    ; Only when text was added, so deleting never fights you.
+    Complete(i, *) {
+        c := ctrls[i]
+        txt := c.Text
+        was := prevLen.Has(i) ? prevLen[i] : 0
+        prevLen[i] := StrLen(txt)
+        if StrLen(txt) <= was || txt = ""
+            return
+        for it in fields[i].items {
+            if StrLen(it) > StrLen(txt) && SubStr(it, 1, StrLen(txt)) = txt {
+                prevLen[i] := StrLen(it)
+                c.Text := it
+                ; CB_SETEDITSEL: select the part that was filled in
+                SendMessage(0x142, 0, StrLen(txt) | (StrLen(it) << 16), c.Hwnd)
+                return
+            }
+        }
+    }
+
+    ShowPreview() {
+        out := ""
+        if multi.Count {
+            out := build(Joined(Collect(false)))
+        } else {
+            for entry in done
+                out .= entry "`r`n"
+            out .= build(Collect(false))
+        }
+        out := StrReplace(StrReplace(out, "`r`n", "`n"), "`n", "`r`n")
+        ; Only redraw when it changed (saves flicker while typing)
+        if out != lastPreview
+            preview.Value := lastPreview := out
+    }
+
+    ; The boxes as they'll go into the log (placeholders, time/money fixes, caps)
+    ; save = false for the preview: nothing is remembered for next time
+    Collect(save := true) {
+        vals := []
+        for i, c in ctrls {
+            f := fields[i]
+            kind := f.HasOwnProp("kind") ? f.kind : ""
+            v := Trim(c.Text)
+            ; Just a number typed in a list box: the list item ending in it
+            ; (202 -> FB202 when FB202 is in the list)
+            if RegExMatch(v, "^\d+$") && f.HasOwnProp("items") {
+                hits := []
+                for it in f.items
+                    if RegExMatch(it, "^\D*" v "$")
+                        hits.Push(it)
+                if hits.Length = 1
+                    v := hits[1]
+            }
+            if v = "" {
+                v := f.ph
+            } else {
+                if kind = "time"
+                    v := FixTime(v)
+                else if kind = "money" {
+                    if f.HasOwnProp("thousands") && RegExMatch(StrReplace(v, "$"), "^\d*\.\d+$")
+                        v := Format("{:d}", Round(StrReplace(v, "$") * 1000))
+                    v := FixMoney(v)
+                }
+                else if kind = "percent"
+                    v := RTrim(v, "%") "%"
+                ; caps: capitals in machine numbers (b1410 -> B1410). Only words
+                ; with a digit in them change, so "nrt2 and nrt4" -> "NRT2 and NRT4"
+                if f.HasOwnProp("caps") {
+                    ; in a machine or NRT box, a lone n or a before a single
+                    ; digit: n3 -> NRT3, a1 -> ATM1 (not in Location boxes)
+                    if RegExMatch(f.key, "i)machine|nrt|atm") {
+                        v := RegExReplace(v, "i)(?<![A-Za-z0-9])n(?=\d(?!\d))", "NRT")
+                        v := RegExReplace(v, "i)(?<![A-Za-z0-9])a(?=\d(?!\d))", "ATM")
+                    }
+                    v := RegExReplace(v, "(\w*\d\w*)", "$U1")
+                }
+                if f.HasOwnProp("tidy")
+                    v := PadNote(v)
+                if f.HasOwnProp("prefix")
+                    v := f.prefix v
+                if f.HasOwnProp("suffix")
+                    v := v f.suffix
+                if f.HasOwnProp("upper")
+                    v := StrUpper(v)
+                if f.HasOwnProp("numPrefix") && RegExMatch(v, "^\d")
+                    v := f.numPrefix v
+            }
+            if save && f.HasOwnProp("remember") && v != f.ph {
+                try {
+                    if !DirExist(DataDir)
+                        DirCreate DataDir
+                    IniWrite v, LastUsedFile, "LastUsed", f.key
+                    IniWrite A_Now, LastUsedFile, "LastUsed", f.key ".at"
+                }
+            }
+            if save && f.HasOwnProp("alertCopy")
+                ForgetCopy("alert")
+            if save && f.HasOwnProp("matchCopy")
+                ForgetCopy("match")
+            vals.Push(v)
+        }
+        return vals
+    }
+
+    ; True when nothing was typed: every plain box is empty or as it started
+    ; (lists don't count, since they always have something picked)
+    Untouched() {
+        for i, c in ctrls {
+            if fields[i].HasOwnProp("items")
+                continue
+            if Trim(c.Text) != "" && c.Text != starts[i].text
+                return false
+        }
+        return true
+    }
+
+    ; Roughly what was typed for this set of boxes: what's in each box you
+    ; changed (a pick from a list counts as 1), plus a Tab or Enter per box
+    TypedNow() {
+        n := 0
+        for i, c in ctrls {
+            ; a box the call pad filled costs nothing here: its keys are counted from the pad
+            if padMarks.Has(i)
+                continue
+            v := Trim(c.Text)
+            n += 1
+            ; a box left blank keeps its placeholder (XXXXX), which saves nothing
+            if v = "" {
+                n += StrLen(fields[i].ph)
+                continue
+            }
+            if v = starts[i].text || (autoVals.Has(i) && v = autoVals[i])
+                continue
+            n += fields[i].HasOwnProp("items") && HasVal(fields[i].items, v) ? 1 : StrLen(v)
+        }
+        return n
+    }
+
+    ; The "several" boxes as one list each: what was added so far plus
+    ; what's in the box now ("BJ205, BJ206 and RO204")
+    Joined(vals) {
+        for i, list in multi {
+            all := list.Clone()
+            if Trim(ctrls[i].Text) != "" && !HasVal(all, vals[i])
+                all.Push(vals[i])
+            vals[i] := all.Length ? JoinList(all) : fields[i].ph
+        }
+        return vals
+    }
+
+    AddAnother(*) {
+        if multi.Count {
+            vals := Collect(false)
+            most := 0, box := ""
+            for i, list in multi {
+                if box = ""
+                    box := ctrls[i]
+                v := Trim(ctrls[i].Text)
+                if v != "" {
+                    typed += StrLen(v) + 1
+                    if !HasVal(list, vals[i])
+                        list.Push(vals[i])
+                    ClearBox(ctrls[i])
+                }
+                most := Max(most, list.Length)
+            }
+            Changed()
+            if most
+                g.Title := title "  (" most " added)"
+            box.Focus()
+            return
+        }
+        if Untouched() {
+            first.Focus()
+            return
+        }
+        typed += TypedNow()
+        done.Push(build(Collect()))
+        ; Clear the boxes for the next one
+        for i, c in ctrls {
+            if fields[i].HasOwnProp("items")
+                c.Choose(starts[i].choose)
+            else
+                c.Value := starts[i].text
+        }
+        autoVals.Clear()
+        Changed()
+        g.Title := title "  (" done.Length " added)"
+        first.Focus()
+    }
+
+    Submit(*) {
+        out := ""
+        if multi.Count {
+            ; "several" boxes: one log, the list on one line
+            typed += TypedNow()
+            out := build(Joined(Collect()))
+        } else {
+            ; With "Add another", a last set of boxes left empty is skipped
+            if !(done.Length && Untouched()) {
+                typed += TypedNow()
+                done.Push(build(Collect()))
+            }
+            for entry in done
+                out .= (A_Index > 1 ? "`n" : "") entry
+        }
+        SetForm("")
+        g.Destroy()
+        if fill {
+            if TemplateFill(out, title)
+                return
+            out := FillWording(out)
+        }
+        ; what was typed on the call pad for this call, plus the + key and Ctrl+Enter
+        if padUsed
+            typed += PadKeys + 2
+        saved := StrLen(out) - trigLen - typed
+        CountSaved("log", saved, title)
+        ; Give the window you were typing in a moment to take the keyboard
+        ; back (Citrix needs longer) - otherwise the paste can get lost
+        back := ReturnTo(target)
+        if target && !back {
+            KeepOnClip(out)
+        } else
+            Paste(out, true)
+        Journal(title, out, saved)
+        if padUsed
+            CallPadUsed()
+    }
+}
+
+; Moves to the next (dir = 1) or previous (dir = -1) box in the open form
+FormMove(dir) {
+    ctrls := CurForm.ctrls
+    focused := ControlGetFocus("ahk_id " CurForm.hwnd)
+    idx := 0
+    for i, c in ctrls {
+        if c.Hwnd = focused || DllCall("IsChild", "Ptr", c.Hwnd, "Ptr", focused)
+            idx := i
+    }
+    idx += dir
+    if idx < 1
+        idx := ctrls.Length
+    else if idx > ctrls.Length
+        idx := 1
+    ctrls[idx].Focus()
+}
+
+; Templates fire as soon as the trigger is typed. A Space or Enter pressed
+; out of habit in the next half second is ignored, so it can't add a stray
+; space or submit a form before you've filled it in.
+#HotIf A_TickCount - JustFired < 500
+Space:: return
+Enter:: return
+NumpadEnter:: return
+#HotIf
+
+; Esc closes the login reminder from any window while it's showing
+#HotIf IsObject(ReminderGui)
+Esc:: CloseReminder()
+#HotIf
+
+; Tab / Shift+Tab / Enter only do this while a form is the active window
+#HotIf IsObject(CurForm) && WinActive("ahk_id " CurForm.hwnd)
+Tab:: FormMove(1)
++Tab:: FormMove(-1)
+Enter:: CurForm.submit()
+NumpadEnter:: CurForm.submit()
++Enter:: CurForm.submit()
++NumpadEnter:: CurForm.submit()
+^Enter:: FormMore()
+^NumpadEnter:: FormMore()
+#HotIf
+
+; Ctrl+Enter in a form that has "Add another"
+FormMore() {
+    if IsObject(CurForm.more)
+        CurForm.more()
+}
+
+; 2130 -> 21:30, 930 -> 09:30, 21:30 stays 21:30
+FixTime(s) {
+    s := Trim(s)
+    if RegExMatch(s, "^\d{3,4}$") {
+        if StrLen(s) = 3
+            s := "0" s
+        s := SubStr(s, 1, 2) ":" SubStr(s, 3)
+    }
+    return s
+}
+
+; 10000 -> 10,000
+FixMoney(s) {
+    s := StrReplace(StrReplace(Trim(s), "$"), ",")
+    if RegExMatch(s, "^\d+(\.\d+)?$") {
+        parts := StrSplit(s, ".")
+        s := RegExReplace(parts[1], "\G\d+?(?=(\d{3})+$)", "$0,")
+            . (parts.Length > 1 ? "." parts[2] : "")
+    }
+    return s
+}
+
+

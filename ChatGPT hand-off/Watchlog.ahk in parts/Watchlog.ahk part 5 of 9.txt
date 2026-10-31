@@ -1,0 +1,1237 @@
+; ===== Watchlog.ahk PART 5 of 9 (lines 5015-6250 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; Types text key by key (what Citrix handles best), a little slower than normal
+EntryType(text) {
+    SetKeyDelay 20, 10
+    SendEvent "{Text}" text
+}
+
+TeachEntryFields() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachEntryFieldsRun()
+    catch as err
+        MsgBox "Teach daily log fields stopped: " err.Message, "Teach daily log fields", "Icon!"
+    TeachBusy := false
+}
+
+TeachEntryFieldsRun() {
+    global ITrakFile, EntryFields
+    win := EntryWin()
+    if !win {
+        MsgBox "Open a new daily log in iTrak first, so the empty Daily Log Entry form is showing (its window title starts with Daily Log Entry), then run this again.", "Teach daily log fields", "Icon!"
+        return
+    }
+    if MsgBox("Leave the empty Daily Log Entry form showing.`n`nFor each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching. The fifth spot is End Time's Now button.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
+        return
+    SetTitleMatchMode 2
+    pts := Map()
+    for i, k in EntryFields {
+        if !TeachWait(i " of 5`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+            return
+        win := EntryWin()
+        if !win || !ITrakPoint(win, &x, &y) {
+            MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+            return
+        }
+        pts[k] := [x, y]
+    }
+    if !TeachWait("5 of 5`nHover over End Time's  Now  button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    win := EntryWin()
+    if !win || !ITrakPoint(win, &x, &y) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+        return
+    }
+    pts["EndNow"] := [x, y]
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    try {
+        for k in EntryFields {
+            IniWrite pts[k][1], ITrakFile, "Fields", k "X"
+            IniWrite pts[k][2], ITrakFile, "Fields", k "Y"
+        }
+        IniWrite pts["EndNow"][1], ITrakFile, "Fields", "EndNowX"
+        IniWrite pts["EndNow"][2], ITrakFile, "Fields", "EndNowY"
+        IniWrite cw, ITrakFile, "Fields", "W"
+        IniWrite ch, ITrakFile, "Fields", "H"
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach daily log fields", "Icon!"
+        return
+    }
+    Activity("iTrak: daily log fields taught (window " cw "x" ch ")")
+    MsgBox "Saved. Ctrl+Alt+F now fills in a full-entry log (add them to templates.txt as lines like  +Break = Surveillance | Duty | NA | Break ).`n`nThe form can open anywhere, but keep it the same size.", "Teach daily log fields"
+}
+
+TeachITrak() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachITrakRun()
+    catch as err
+        MsgBox "Teach iTrak stopped: " err.Message, "Teach iTrak", "Icon!"
+    TeachBusy := false
+}
+
+; Where the mouse is now, inside the iTrak window: sets &x &y, false when
+; it isn't over that window
+ITrakPoint(win, &x, &y) {
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &mx, &my
+    WinGetClientPos &cx, &cy, &cw, &ch, "ahk_id " win
+    x := mx - cx, y := my - cy
+    return x >= 0 && y >= 0 && x < cw && y < ch
+}
+
+TeachITrakRun() {
+    global ITrakFile
+    win := ITrakWin()
+    if !win {
+        MsgBox "Open iTrak first (the Daily Log window).", "Teach iTrak", "Icon!"
+        return
+    }
+    two := MsgBox("Does opening a new daily log in iTrak take TWO clicks (a button, then a line in a menu that opens)?`n`nYes = two clicks`nNo = one click", "Teach iTrak", "YesNo Icon?") = "Yes"
+    if MsgBox("This takes about a minute and you do it once on each PC (or once for the whole team, if you share it afterwards).`n`nAt " (two ? "two points" : "one point") " you hover the mouse over the right spot in iTrak and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching.`n`nStart?", "Teach iTrak", "YesNo Icon?") != "Yes"
+        return
+    SetTitleMatchMode 2
+    if !TeachWait("1 of " (two ? 2 : 1) "`nHover over the button that opens a new daily log in iTrak and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)   (Ctrl+Alt+Esc cancels)")
+        return
+    win := ITrakWin()
+    if !win || !ITrakPoint(win, &x1, &y1) {
+        MsgBox "That spot isn't inside the iTrak window. Nothing saved. Try again.", "Teach iTrak", "Icon!"
+        return
+    }
+    x2 := "", y2 := ""
+    if two {
+        if !TeachWait("2 of 2`nNow click that button, and when the menu is open hover over the line that starts the new daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it yet)")
+            return
+        win := ITrakWin()
+        if !win || !ITrakPoint(win, &x2, &y2) {
+            MsgBox "That spot isn't inside the iTrak window. Nothing saved. Try again.", "Teach iTrak", "Icon!"
+            return
+        }
+    }
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    try {
+        try FileDelete ITrakFile
+        IniWrite x1, ITrakFile, "Clicks", "X1"
+        IniWrite y1, ITrakFile, "Clicks", "Y1"
+        if two {
+            IniWrite x2, ITrakFile, "Clicks", "X2"
+            IniWrite y2, ITrakFile, "Clicks", "Y2"
+        }
+        IniWrite two ? 2 : 1, ITrakFile, "Clicks", "Clicks"
+        IniWrite cw, ITrakFile, "Clicks", "W"
+        IniWrite ch, ITrakFile, "Clicks", "H"
+        IniWrite A_ScreenDPI, ITrakFile, "Clicks", "DPI"
+    } catch {
+        MsgBox "Couldn't save the click to " ITrakFile, "Teach iTrak", "Icon!"
+        return
+    }
+    Activity("iTrak: new daily log taught (" x1 "," y1 (two ? "  then " x2 "," y2 : "") "  window " cw "x" ch ")")
+    MsgBox "Saved. Now click " (two ? "that line" : "the button") " yourself to finish.`n`nFrom now on Ctrl+Alt+D opens a new daily log, wherever iTrak is. To share it with the team's other PCs: tray > iTrak > Share my setup with the team.", "Teach iTrak"
+}
+
+; Puts this PC's taught iTrak click in itrak.ini in the team folder, under
+; this PC's screen scaling, so PCs that haven't been taught use it.
+; Numbers only. A PC's own teach always wins over the team copy.
+ShareITrakSetup() {
+    global ITrakFile
+    f := ITrakTeamFile()
+    if f = "" {
+        MsgBox "There's no team folder set up (the team templates file in Settings), so there's nowhere to share it.", "Share iTrak setup", "Icon!"
+        return
+    }
+    if ITrakTaught() != "here" {
+        MsgBox "iTrak isn't taught on this PC, so there's nothing of this PC's to share. Teach it first (Ctrl+Alt+Shift+I).", "Share iTrak setup", "Icon!"
+        return
+    }
+    c := ITrakLoad()
+    if !c
+        return
+    scale := Round(A_ScreenDPI / 96 * 100)
+    if MsgBox("Share this PC's iTrak click with the team?`n`nIt goes in " f " for screens at " scale "% scaling. PCs that haven't been taught use it; a PC that has been taught keeps its own.`n`nOnly click positions are saved (numbers).", "Share iTrak setup", "YesNo Icon?") != "Yes"
+        return
+    sec := ITrakTeamSection()
+    try {
+        for k in ["X1", "Y1", "X2", "Y2", "W", "H", "Clicks"] {
+            if c[k] != ""
+                IniWrite c[k], f, sec, k
+            else
+                try IniDelete f, sec, k
+        }
+    } catch as e {
+        MsgBox "Couldn't write to the team folder:`n" e.Message "`n`nIf OneDrive is syncing, try again in a moment.", "Share iTrak setup", "Icon!"
+        return
+    }
+    Activity("iTrak: shared this PC's click with the team (" scale "% scaling)")
+    MsgBox "Shared. PCs that haven't been taught now use this click (once OneDrive has synced the team folder).`n`nThe iTrak window should be about the same size on those PCs (maximised is best).", "Share iTrak setup"
+}
+
+; =====================================================================
+;  INFO FROM PEOPLE SEARCH (v3.30.0)
+;  A code word line in templates.txt can end with  | from cage, security :
+;  once the daily log is filled, Watchlog opens Info From > Personnel, types
+;  each department into Look For and presses Enter, then waits while you
+;  pick the person and click Select (or Cancel to skip), and goes on to the
+;  next one. Taught once per PC (tray > iTrak > Teach Info From): the Info
+;  From arrow and the Personnel line (from the daily log window) and the
+;  Look For box (from the Personnel window). Kept in itrak.ini [InfoFrom].
+; =====================================================================
+PersonnelWin() {
+    SetTitleMatchMode 2
+    return WinExist(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")))
+}
+
+; The taught spots as a Map, or "" when not taught
+InfoFromLoad() {
+    c := Map()
+    for k in ["ArrowX", "ArrowY", "PersonnelX", "PersonnelY", "W", "H", "LookX", "LookY", "PW", "PH"] {
+        v := ""
+        try v := Trim(IniRead(ITrakFile, "InfoFrom", k, ""))
+        if !IsInteger(v)
+            return ""
+        c[k] := Integer(v)
+    }
+    return c
+}
+
+InfoFromRun(win, depts, name) {
+    c := InfoFromLoad()
+    if !c {
+        Tip("Info From isn't taught on this PC yet: tray > iTrak > Teach Info From.", 4000, true)
+        return
+    }
+    CoordMode "Mouse", "Screen"
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    for i, d in depts {
+        if !WinExist("ahk_id " win) {
+            Activity("Info From (" name "): stopped, the daily log was closed")
+            return
+        }
+        WinActivate "ahk_id " win
+        if !WinWaitActive("ahk_id " win, , 2) {
+            Tip("Couldn't bring the daily log to the front. Info From stopped.", 3000, true)
+            return
+        }
+        if !ITrakSpot(win, c["ArrowX"], c["ArrowY"], c["W"], c["H"], &x, &y) {
+            Tip("The Info From arrow is outside the daily log window. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): arrow spot outside the window")
+            return
+        }
+        Click x, y
+        Sleep pause
+        ITrakSpot(win, c["PersonnelX"], c["PersonnelY"], c["W"], c["H"], &x, &y)
+        Click x, y
+        SetTitleMatchMode 2
+        pw := WinWait(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")), , 6)
+        if !pw {
+            Tip("The Personnel window didn't open. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): the Personnel window didn't open for " d)
+            return
+        }
+        WinActivate "ahk_id " pw
+        WinWaitActive "ahk_id " pw, , 2
+        Sleep 250
+        if !ITrakSpot(pw, c["LookX"], c["LookY"], c["PW"], c["PH"], &x, &y) {
+            Tip("The Look For box is outside the Personnel window. Info From stopped.", 3500, true)
+            return
+        }
+        Click x, y
+        Sleep 150
+        EntryType d
+        Sleep 80
+        SendInput "{Enter}"
+        Tip(i " of " depts.Length ": pick the " d " person and click Select  (Cancel skips)", 0, true)
+        ; wait while the person is picked (3 minutes at most)
+        if !WinWaitClose("ahk_id " pw, , 180) {
+            Tip("")
+            Activity("Info From (" name "): stopped, the Personnel window stayed open 3 minutes")
+            return
+        }
+        Tip("")
+        Sleep 500
+    }
+    Activity("Info From (" name "): searched " depts.Length " department(s)")
+}
+
+TeachInfoFrom() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachInfoFromRun()
+    catch as err
+        MsgBox "Teach Info From stopped: " err.Message, "Teach Info From", "Icon!"
+    TeachBusy := false
+}
+
+TeachInfoFromRun() {
+    win := EntryWin()
+    if !win {
+        MsgBox "Open a daily log in iTrak first (the Daily Log Entry window), then run this again.", "Teach Info From", "Icon!"
+        return
+    }
+    if MsgBox("Three spots, once per PC. For each one hover the mouse and press F8 (or Ctrl+Alt+Shift+A; Ctrl+Alt+Esc cancels).`n`n"
+        . "1. The arrow at the right end of the Info From box (don't click it yet).`n"
+        . "2. Click that arrow yourself so the list opens, then hover over Personnel.`n"
+        . "3. Click Personnel yourself so the Personnel window opens, then hover over the Look For box.`n`n"
+        . "Afterwards press Cancel in the Personnel window. Start?", "Teach Info From", "YesNo Icon?") != "Yes"
+        return
+    if !TeachWait("1 of 3`nHover over the Info From arrow and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    if !WinExist("ahk_id " win) || !ITrakPoint(win, &ax, &ay) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach Info From", "Icon!"
+        return
+    }
+    if !TeachWait("2 of 3`nClick the Info From arrow, then hover over Personnel and press F8   (Ctrl+Alt+Esc cancels)")
+        return
+    ITrakPoint(win, &px, &py)          ; the list can hang outside the window: that's fine
+    if !TeachWait("3 of 3`nClick Personnel, then hover over the Look For box and press F8   (Ctrl+Alt+Esc cancels)")
+        return
+    pw := PersonnelWin()
+    if !pw || !ITrakPoint(pw, &lx, &ly) {
+        MsgBox "That spot isn't inside the Personnel window (or it isn't open). Nothing saved. Try again.", "Teach Info From", "Icon!"
+        return
+    }
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    WinGetClientPos , , &pcw, &pch, "ahk_id " pw
+    try {
+        for k, v in Map("ArrowX", ax, "ArrowY", ay, "PersonnelX", px, "PersonnelY", py, "W", cw, "H", ch
+                , "LookX", lx, "LookY", ly, "PW", pcw, "PH", pch)
+            IniWrite v, ITrakFile, "InfoFrom", k
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach Info From", "Icon!"
+        return
+    }
+    Activity("iTrak: Info From taught (daily log " cw "x" ch ", Personnel " pcw "x" pch ")")
+    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (`;fill, `;open, `;auto, `;jack, `;bv, `;mfill, `;account) now search Info From for each department after the log is filled. Keep the daily log and Personnel windows the same size.", "Teach Info From"
+}
+
+; =====================================================================
+;  BREAK TIME TRACKER (v3.29.0)
+;  The ;break daily log (any full-entry log named Break) starts the clock;
+;  the break ends when that Daily Log Entry window closes (Save & Close).
+;  The minutes add up for the shift against [Break] Minutes= in
+;  settings.ini (default 60). Kept in last used.ini [Break] so a reload
+;  doesn't lose it; cleared by Start of shift or after 14 hours.
+; =====================================================================
+IsBreakLog(e) => RegExMatch(e.name, "i)^break\b")
+
+BreakAllowed() {
+    m := IniRead(SettingsFile, "Break", "Minutes", "60")
+    return IsNumber(m) && m > 0 ? m * 60 : 3600
+}
+
+; Seconds of break used this shift (the open one counted up to now)
+BreakUsedSecs() {
+    BreakCheckStale()
+    used := 0, openAt := ""
+    try used := Integer(IniRead(LastUsedFile, "Break", "Used", "0"))
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt != ""
+        used += DateDiff(A_Now, openAt, "Seconds")
+    return used
+}
+
+BreakLeftSecs() => BreakAllowed() - BreakUsedSecs()
+
+; "Break left: 42 min (18 of 60 used)" or "On break 12 min, 30 min left"
+BreakText() {
+    left := BreakLeftSecs()
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    mins := (left >= 0 ? left : -left) // 60
+    tail := left >= 0 ? mins " min left" : "over by " mins " min"
+    if openAt != ""
+        return "On break " DateDiff(A_Now, openAt, "Seconds") // 60 " min, " tail
+    return "Break: " tail " (" BreakUsedSecs() // 60 " of " BreakAllowed() // 60 " used)"
+}
+
+; Clears a tally from an earlier shift (14 hours after the first break)
+BreakCheckStale() {
+    since := ""
+    try since := IniRead(LastUsedFile, "Break", "Since", "")
+    if since != "" && DateDiff(A_Now, since, "Hours") >= 14
+        BreakReset()
+}
+
+BreakReset() {
+    try IniDelete LastUsedFile, "Break"
+    SetTimer BreakWatch, 0
+    SetIconTip()
+}
+
+BreakBegin(win) {
+    BreakCheckStale()
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        if IniRead(LastUsedFile, "Break", "Since", "") = ""
+            IniWrite A_Now, LastUsedFile, "Break", "Since"
+        ; a break log already open is ended first (it can't be counted twice)
+        if IniRead(LastUsedFile, "Break", "OpenSince", "") != ""
+            BreakEnd()
+        IniWrite A_Now, LastUsedFile, "Break", "OpenSince"
+        IniWrite win, LastUsedFile, "Break", "Win"
+    }
+    Activity("Break started (" BreakText() ")")
+    SetTimer BreakWatch, 2000
+    SetIconTip()
+}
+
+; After a reload: keep watching a break log that is still open
+BreakResume() {
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt != ""
+        SetTimer BreakWatch, 2000
+    SetIconTip()
+}
+
+BreakWatch() {
+    win := 0, openAt := ""
+    try win := Integer(IniRead(LastUsedFile, "Break", "Win", "0"))
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt = "" {
+        SetTimer BreakWatch, 0
+        return
+    }
+    if !win || !WinExist("ahk_id " win)
+        BreakEnd()
+    else
+        SetIconTip()
+}
+
+BreakEnd() {
+    openAt := "", used := 0
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt = ""
+        return
+    secs := DateDiff(A_Now, openAt, "Seconds")
+    try used := Integer(IniRead(LastUsedFile, "Break", "Used", "0"))
+    try {
+        IniWrite used + secs, LastUsedFile, "Break", "Used"
+        IniDelete LastUsedFile, "Break", "OpenSince"
+        IniDelete LastUsedFile, "Break", "Win"
+    }
+    SetTimer BreakWatch, 0
+    Activity("Break ended after " secs // 60 " min (" BreakText() ")")
+    Tip("Break " secs // 60 " min. " BreakText(), 4000)
+    SetIconTip()
+}
+
+; The tray icon's hover text: version, and break time once a break was taken
+SetIconTip() {
+    iconTxt := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
+    since := ""
+    try since := IniRead(LastUsedFile, "Break", "Since", "")
+    if since != ""
+        iconTxt .= "`n" BreakText()
+    A_IconTip := iconTxt
+}
+
+; Clicks End Time's Now button in the Daily Log Entry in front (or the
+; break log, or the only one open)
+EntryEndNow() {
+    f := EntryLoad()
+    if !f || !f.Has("EndNowX") {
+        Tip("End Time's Now button isn't taught yet: press " HK("entryteach") " to teach it.", 4000, true)
+        return
+    }
+    ents := EntryWins()
+    win := 0
+    if ents.Has(WinExist("A"))
+        win := WinExist("A")
+    else {
+        bw := 0
+        try bw := Integer(IniRead(LastUsedFile, "Break", "Win", "0"))
+        if bw && ents.Has(bw)
+            win := bw
+        else if ents.Count = 1
+            for h in ents
+                win := h
+    }
+    if !win {
+        Tip("Click the daily log first, then press " HK("endnow") " again.", 3000, true)
+        return
+    }
+    WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 2)
+        return
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), Integer(f["W"]), Integer(f["H"]), &x, &y) && AlertOnScreen(x, y) {
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        MouseMove ox, oy, 0
+        Activity("End Time Now clicked by " HK("endnow"))
+    } else
+        Tip("The End Time Now spot is outside the daily log window.", 3000, true)
+}
+
+; =====================================================================
+;  SAFEGUARDS: repeat the last log, backups, going back (v3.28.0)
+; =====================================================================
+; Does the last full-entry log again (a new daily log with the same boxes)
+RepeatLastLog() {
+    if !IsObject(LastRun) {
+        Tip("No log to repeat yet: make one with a code word, the call pad or " HK("entrypick") " first.", 3500, true)
+        return
+    }
+    ne := {}
+    for k, v in LastRun.e.OwnProps()
+        ne.%k% := v
+    ne.syn := LastRun.syn
+    Activity("Repeat last log: " ne.name)
+    RunEntry(ne)
+}
+
+; The files a backup holds: the ones in the Watchlog folder and the numbers
+; taught on this PC (no passwords: those live in Windows' Credential Manager)
+BackupSources() {
+    list := []
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt"]
+        if FileExist(HomeDir "\" n)
+            list.Push([HomeDir "\" n, "home - " n])
+    if DirExist(DataDir)
+        loop files DataDir "\*.ini"
+            list.Push([A_LoopFileFullPath, "data - " A_LoopFileName])
+    return list
+}
+
+; Copies them into DataDir\Backups\<folder>. Returns the number copied.
+BackupInto(folder) {
+    n := 0
+    try {
+        DirCreate DataDir "\Backups\" folder
+        for it in BackupSources() {
+            try {
+                FileCopy it[1], DataDir "\Backups\" folder "\" it[2], true
+                n += 1
+            }
+        }
+    }
+    return n
+}
+
+; Once a day (the first start of the day): keeps the last 14 backup folders
+DailyBackup() {
+    today := FormatTime(, "yyyy-MM-dd")
+    if DirExist(DataDir "\Backups\" today)
+        return
+    n := BackupInto(today)
+    Activity("Backup of " n " settings and template files made (" today ")")
+    names := []
+    loop files DataDir "\Backups\*", "D"
+        names.Push(A_LoopFileName)
+    if names.Length > 14 {
+        names := SortNames(names)
+        loop names.Length - 14
+            try DirDelete DataDir "\Backups\" names[A_Index], true
+    }
+}
+
+; Names in order, oldest first (the folder names start with the date)
+SortNames(names) {
+    txt := ""
+    for nm in names
+        txt .= nm "`n"
+    return StrSplit(Sort(RTrim(txt, "`n")), "`n")
+}
+
+BackupNow() {
+    n := BackupInto(FormatTime(, "yyyy-MM-dd HHmmss") " (made by hand)")
+    Activity("Backup made by hand: " n " files")
+    MsgBox "Backed up " n " files (your templates, settings, autocorrect list and the taught clicks).`n`nPasswords are not in it: Windows keeps those.", "Watchlog backup", "Iconi"
+}
+
+ShowRestore() {
+    names := []
+    if DirExist(DataDir "\Backups")
+        loop files DataDir "\Backups\*", "D"
+            names.Push(A_LoopFileName)
+    if !names.Length {
+        MsgBox "There are no backups yet. One is made the first time Watchlog starts each day.", "Watchlog restore", "Iconi"
+        return
+    }
+    names := SortNames(names)
+    g := Gui("+AlwaysOnTop", "Restore from a backup")
+    g.SetFont("s10")
+    g.AddText("w420", "Pick a backup. Your templates, settings, autocorrect list and taught clicks go back to how they were then. What you have now is backed up first, so this can be undone.")
+    lb := g.AddListBox("w420 r10")
+    shown := []
+    loop names.Length {
+        nm := names[names.Length - A_Index + 1]
+        shown.Push(nm)
+        lb.Add([nm])
+    }
+    lb.Choose(1)
+    g.AddButton("w120 Default", "Restore").OnEvent("Click", Go)
+    g.AddButton("x+10 w120", "Cancel").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+    Go(*) {
+        if !lb.Value
+            return
+        pick := shown[lb.Value]
+        g.Destroy()
+        if MsgBox("Restore the backup " pick "?`n`nWatchlog reloads afterwards.", "Watchlog restore", "YesNo Icon? Default2") != "Yes"
+            return
+        BackupInto(FormatTime(, "yyyy-MM-dd HHmmss") " (before restore)")
+        n := 0
+        loop files DataDir "\Backups\" pick "\*" {
+            if SubStr(A_LoopFileName, 1, 7) = "home - "
+                dest := HomeDir "\" SubStr(A_LoopFileName, 8)
+            else if SubStr(A_LoopFileName, 1, 7) = "data - "
+                dest := DataDir "\" SubStr(A_LoopFileName, 8)
+            else
+                continue
+            try {
+                FileCopy A_LoopFileFullPath, dest, true
+                n += 1
+            }
+        }
+        Activity("Restored " n " files from the backup " pick)
+        MsgBox "Restored " n " files. Watchlog reloads now.", "Watchlog restore", "Iconi T4"
+        Reload
+    }
+}
+
+; The newer version that was skipped when going back (not offered again)
+SkippedVersion() {
+    try return IniRead(LastUsedFile, "Updates", "Skip", "")
+    return ""
+}
+
+ClearSkippedVersion() {
+    try IniDelete LastUsedFile, "Updates", "Skip"
+    BuildTrayMenu()
+    Tip("The newer version will be offered again.", 2500, true)
+}
+
+; Puts back the copy Watchlog kept when it last updated
+GoBackVersion() {
+    ext := A_IsCompiled ? "exe" : "ahk"
+    best := "", bestV := ""
+    loop files DataDir "\Watchlog v* (backup)." ext {
+        if RegExMatch(A_LoopFileName, "^Watchlog v([\d.]+) \(backup\)", &m) && VerCompare(m[1], VERSION) < 0
+            && (bestV = "" || VerCompare(m[1], bestV) > 0)
+            best := A_LoopFileFullPath, bestV := m[1]
+    }
+    if best = "" {
+        MsgBox "There is no earlier version kept on this PC. Watchlog keeps the old one each time it updates.", "Watchlog", "Iconi"
+        return
+    }
+    if MsgBox("Go back from v" VERSION " to v" bestV "?`n`nWatchlog restarts on the older version, and v" VERSION " won't be offered again until you choose 'Offer the skipped update again' (tray > Advanced).", "Watchlog", "YesNo Icon? Default2") != "Yes"
+        return
+    keep := DataDir "\Watchlog v" VERSION " (backup)." ext
+    try {
+        try IniWrite VERSION, LastUsedFile, "Updates", "Skip"
+        if A_IsCompiled {
+            try FileDelete keep
+            FileMove A_ScriptFullPath, keep, 1
+            try FileCopy best, A_ScriptFullPath, 1
+            catch as err {
+                try FileMove keep, A_ScriptFullPath, 1
+                throw err
+            }
+        } else {
+            FileCopy A_ScriptFullPath, keep, true
+            FileCopy best, A_ScriptFullPath, true
+        }
+    } catch as err {
+        try IniDelete LastUsedFile, "Updates", "Skip"
+        Activity("Going back to v" bestV " failed: " err.Message)
+        MsgBox "Couldn't go back: " err.Message, "Watchlog", "Icon!"
+        return
+    }
+    Activity("Went back from v" VERSION " to v" bestV)
+    if A_IsCompiled {
+        Run '"' A_ScriptFullPath '"'
+        ExitApp
+    }
+    Reload
+}
+
+; =====================================================================
+;  UPDATES FROM THE TEAM FOLDER
+;  Whoever looks after the tool puts the new Watchlog.ahk (and
+;  Watchlog.ico) in the same SharePoint folder as the team templates.
+;  When that copy is a newer version, each PC asks to update: it checks
+;  the new file loads, keeps the old one as a backup in
+;  %LOCALAPPDATA%\Watchlog, copies the new one over this one and reloads.
+;  It only ever updates from that one folder.
+; =====================================================================
+; Watchlog.ahk next to the team templates file, or "" when there's no team
+; file (or this copy is the one in the team folder)
+TeamProgramFile() {
+    dir := Cfg["UpdateFolder"]
+    if dir = "" {
+        if Cfg["SharedTemplates"] = ""
+            return ""
+        SplitPath Cfg["SharedTemplates"], , &dir
+    }
+    f := dir (A_IsCompiled ? "\Watchlog.exe" : "\Watchlog.ahk")
+    return StrLower(f) = StrLower(A_ScriptFullPath) ? "" : f
+}
+
+; The version of the team folder's Watchlog.ahk, or "" if there isn't one
+TeamProgramVersion() => ProgramVersionOf(TeamProgramFile())
+
+; The version of a Watchlog.exe or Watchlog.ahk ("" if there isn't one)
+ProgramVersionOf(f) {
+    if f = "" || !FileExist(f)
+        return ""
+    if A_IsCompiled {
+        try return RegExMatch(FileGetVersion(f), "^\d+\.\d+\.\d+", &v) ? v[0] : ""
+        return ""
+    }
+    try text := FileRead(f, "UTF-8")
+    catch
+        return ""
+    return RegExMatch(text, 'm)^VERSION := "([\d.]+)"', &m) ? m[1] : ""
+}
+
+; True when the team folder has a newer Watchlog than this one
+UpdateWaiting() {
+    v := TeamProgramVersion()
+    return v != "" && v != SkippedVersion() && VerCompare(v, VERSION) > 0
+}
+
+CheckForUpdate() {
+    global UpdateOffered
+    if !UpdateWaiting()
+        return false
+    v := TeamProgramVersion()
+    if UpdateOffered = v
+        return false
+    UpdateOffered := v
+    if MsgBox("Watchlog v" v " is in the team folder. This PC has v" VERSION ".`n`n"
+        . "Update now? It takes a few seconds. The old version is kept as a backup.", "Watchlog update", "YesNo Iconi Default1") != "Yes" {
+        Activity("Update to v" v " offered, Later chosen")
+        return true
+    }
+    UpdateFrom(TeamProgramFile(), v)
+    return true
+}
+
+UpdateFrom(f, v) {
+    if A_IsCompiled {
+        UpdateExeFrom(f, v)
+        return
+    }
+    ; Make sure the new file loads before swapping it in
+    tmp := A_Temp "\Watchlog update check.ahk"
+    ok := false
+    try {
+        FileCopy f, tmp, true
+        ok := RunWait('"' A_AhkPath '" /Validate /ErrorStdOut "' tmp '"', , "Hide") = 0
+    }
+    try FileDelete tmp
+    if !ok {
+        Activity("Update to v" v " stopped: the team folder's Watchlog.ahk didn't load")
+        MsgBox "The new Watchlog.ahk in the team folder didn't load, so this PC stays on v" VERSION ".`n`nTell whoever looks after the tool.", "Watchlog update", "Icon!"
+        return
+    }
+    backup := DataDir "\Watchlog v" VERSION " (backup).ahk"
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        FileCopy A_ScriptFullPath, backup, true
+        FileCopy f, A_ScriptFullPath, true
+    } catch as err {
+        try FileCopy backup, A_ScriptFullPath, true
+        Activity("Update to v" v " failed: " err.Message)
+        MsgBox "Couldn't update: " err.Message "`n`nThis PC stays on v" VERSION ".", "Watchlog update", "Icon!"
+        return
+    }
+    SplitPath f, , &dir
+    if FileExist(dir "\Watchlog.ico")
+        try FileCopy dir "\Watchlog.ico", IconFile, true
+    Activity("Updated from v" VERSION " to v" v " from " f " (old copy kept: " backup ")")
+    Reload
+}
+
+
+; =====================================================================
+;  TIME SAVED  (tray > Time saved, or the button in Ctrl+Alt+J)
+;  Every log, login and stamp adds the keystrokes it saved: the length
+;  of what went in minus what you typed (the shortcut, what you put in
+;  the boxes, one Tab or Enter per box). Time is worked out at 40 words
+;  a minute (200 keystrokes). Kept per day in time saved.ini in
+;  %LOCALAPPDATA%\Watchlog: numbers only, never log text or passwords.
+;  A shift starts with the first count after End of shift or after 6
+;  hours with nothing counted.
+; =====================================================================
+CountSaved(kind, keys, name := "") {
+    if IsObject(TutorialWin)
+        return
+    try {
+        day := FormatTime(, "yyyy-MM-dd")
+        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+        if kind != ""
+            d.%kind% += 1
+        d.keys += keys
+        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        if IniRead(SavedFile, "Info", "First", "") = ""
+            IniWrite day, SavedFile, "Info", "First"
+        ; this shift
+        last := IniRead(SavedFile, "Shift", "Last", "")
+        sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
+        if last = "" || IniRead(SavedFile, "Shift", "Ended", 0) || DateDiff(A_Now, last, "Hours") >= 6 {
+            sh := SavedRow("")
+            IniWrite A_Now, SavedFile, "Shift", "Start"
+            IniWrite 0, SavedFile, "Shift", "Ended"
+            try IniDelete SavedFile, "ShiftItems"
+        }
+        if name != "" {
+            ; the shift count: how many times, and keystrokes saved, per item
+            name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
+            it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
+            IniWrite (it.n + 1) "," (it.keys + keys), SavedFile, "ShiftItems", name
+            di := ItemRow(IniRead(SavedFile, "DayItems", day "|" name, ""))
+            IniWrite (di.n + 1) "," (di.keys + keys), SavedFile, "DayItems", day "|" name
+        }
+        if kind != ""
+            sh.%kind% += 1
+        sh.keys += keys
+        IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+        IniWrite A_Now, SavedFile, "Shift", "Last"
+    }
+}
+
+; "times,keystrokes" -> an object
+ItemRow(str) {
+    p := StrSplit(str, ",")
+    num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
+    return {n: num(1), keys: num(2)}
+}
+
+; "logs,logins,stamps,keystrokes" -> an object
+SavedRow(str) {
+    p := StrSplit(str, ",")
+    num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
+    return {log: num(1), login: num(2), stamp: num(3), keys: num(4)}
+}
+
+; This shift's counts (all zero when the last shift has ended)
+SavedShift() {
+    try {
+        last := IniRead(SavedFile, "Shift", "Last", "")
+        if last != "" && !IniRead(SavedFile, "Shift", "Ended", 0) && DateDiff(A_Now, last, "Hours") < 6
+            return SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
+    }
+    return SavedRow("")
+}
+
+; Adds up the days from `from` (yyyy-MM-dd, "" = since the start) to today
+SavedSince(from) {
+    t := SavedRow(""), t.days := 0
+    try section := IniRead(SavedFile, "Days")
+    catch
+        return t
+    for line in StrSplit(section, "`n", "`r") {
+        if !(eq := InStr(line, "="))
+            continue
+        if from != "" && StrCompare(SubStr(line, 1, eq - 1), from) < 0
+            continue
+        d := SavedRow(SubStr(line, eq + 1))
+        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.days += 1
+    }
+    return t
+}
+
+; Keystrokes -> "about 12 minutes" / "about 3.5 hours", at 200 a minute
+SavedTime(keys) {
+    mins := keys / 200
+    if mins < 1
+        return "under a minute"
+    if mins < 60
+        return "about " Round(mins) " minute" (Round(mins) = 1 ? "" : "s")
+    return "about " Round(mins / 60, 1) " hours"
+}
+
+Commas(n) => RegExReplace(Format("{:d}", n), "\G\d+?(?=(\d{3})+$)", "$0,")
+
+HasVal(arr, v) {
+    for it in arr
+        if it = v
+            return true
+    return false
+}
+
+; =====================================================================
+;  SHIFT COUNT  (tray > Shift count, or the button in Time saved)
+;  Counts exactly what got done this shift, item by item: each template
+;  by name, each login, each time stamp, each Alert Grid clear, each
+;  app switch. Numbers only (never the log text), kept in time saved.ini.
+;  It starts by itself with the first thing you do and starts again after
+;  End of shift (or 6 hours of nothing); "Start a new count" restarts it.
+; =====================================================================
+ShowShiftCount() {
+    items := []
+    try section := IniRead(SavedFile, "ShiftItems")
+    catch
+        section := ""
+    for line in StrSplit(section, "`n", "`r") {
+        if !(eq := InStr(line, "="))
+            continue
+        it := ItemRow(SubStr(line, eq + 1))
+        it.name := SubStr(line, 1, eq - 1)
+        items.Push(it)
+    }
+    ; most used first (simple insertion sort, the list is short)
+    Loop items.Length - 1 {
+        i := A_Index + 1
+        cur := items[i], j := i - 1
+        while j >= 1 && items[j].n < cur.n {
+            items[j + 1] := items[j]
+            j -= 1
+        }
+        items[j + 1] := cur
+    }
+    live := items.Length > 0
+    sh := SavedShift()
+    start := last := ""
+    try start := IniRead(SavedFile, "Shift", "Start", "")
+    try last := IniRead(SavedFile, "Shift", "Last", "")
+    total := 0, keysTotal := 0
+    for it in items
+        total += it.n, keysTotal += it.keys
+    span := live && start != "" && last != "" ? "from " FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") : "nothing counted yet"
+    g := WGui("+AlwaysOnTop", "Shift count  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w520", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
+    lv := g.AddListView("w520 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved"])
+    report := "Watchlog shift count on " A_ComputerName " (" span ")`r`n"
+    for it in items {
+        lv.Add(, it.name, it.n, Commas(it.keys))
+        report .= it.name ": " it.n " (" Commas(it.keys) " keystrokes saved)`r`n"
+    }
+    lv.ModifyCol(1, 260), lv.ModifyCol(2, 70), lv.ModifyCol(3, 130)
+    sum := total " things done, " Commas(keysTotal) " keystrokes saved, " SavedTime(keysTotal) " at 40 words a minute"
+    report .= "TOTAL: " sum "`r`n"
+    g.AddText("xm w480", "Total: " sum)
+    g.AddButton("xm y+12 w120", "Start a new count").OnEvent("Click", NewCount)
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w100", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
+    g.AddButton("x+8 yp w80 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := report
+        g.Destroy()
+        Tip("Report copied. Paste it with Ctrl+V.")
+    }
+    NewCount(*) {
+        if MsgBox("Throw away this count and start again from zero?`n`n(The Time saved totals are not touched.)", "Shift count", "YesNo Icon? Default2") != "Yes"
+            return
+        try IniDelete SavedFile, "ShiftItems"
+        try IniWrite 1, SavedFile, "Shift", "Ended"
+        Activity("Shift count restarted by hand")
+        g.Destroy()
+        Tip("Shift count started again from zero")
+    }
+}
+
+ShowTimeSaved() {
+    first := ""
+    try first := IniRead(SavedFile, "Info", "First", "")
+    rows := [["This shift", SavedShift()]
+        , ["Today", SavedSince(FormatTime(, "yyyy-MM-dd"))]
+        , ["Last 7 days", SavedSince(FormatTime(DateAdd(A_Now, -6, "Days"), "yyyy-MM-dd"))]
+        , ["Last 30 days", SavedSince(FormatTime(DateAdd(A_Now, -29, "Days"), "yyyy-MM-dd"))]
+        , ["Since " (first != "" ? FormatTime(StrReplace(first, "-") "000000", "MMM d, yyyy") : "the start"), SavedSince("")]]
+    g := WGui("+AlwaysOnTop", "Time saved  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w560", "Keystrokes Watchlog saved you: what went in, minus what you typed. Time is worked out at 40 words a minute.")
+    lv := g.AddListView("w560 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Keystrokes saved", "Time saved"])
+    report := "Watchlog time saved on " A_ComputerName " (keystrokes saved, at 40 words a minute)`r`n"
+    for r in rows {
+        t := r[2]
+        lv.Add(, r[1], t.log, t.login, t.stamp, Commas(t.keys), SavedTime(t.keys))
+        report .= r[1] ": " t.log " logs, " t.login " logins, " Commas(t.keys) " keystrokes, " SavedTime(t.keys)
+            . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
+    }
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 120), lv.ModifyCol(6, 120)
+    g.AddButton("xm+142 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    g.AddButton("x+8 yp w110", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := report
+        g.Destroy()
+        Tip("Report copied. Paste it with Ctrl+V.")
+    }
+}
+
+
+
+; =====================================================================
+;  SHIFT DASHBOARD  (tray > Shift dashboard, Ctrl+Alt+Shift+D, or the
+;  button in Shift count / Time saved)
+;  Three tabs: this shift (tiles + logs by type), the last 7 days and the
+;  last 30 days. This shift can be copied as text or saved as a one-page
+;  sheet in Shift Reports (next to settings.ini) to print or hand over.
+;  Numbers only: log type names and counts, never log text, employee
+;  numbers, patron names, machine or alert numbers. Kept on this PC in
+;  time saved.ini ([DayItems], one line per day and log type; 400 days).
+;  "Alert clears" counts each Clear all (Ctrl+Alt+A / Caps Lock), not
+;  each alert.
+; =====================================================================
+; (set up by RegisterHotkeys, see HotkeyDefs)
+
+; log / alert / other (logins, stamps and app switches aren't logs)
+ItemKind(name) {
+    if name = "Alert Grid clear"
+        return "alert"
+    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new )")
+        return "other"
+    return "log"
+}
+
+; Drops [DayItems] lines older than 400 days (once, when Watchlog starts)
+TrimDayItems() {
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        cutoff := FormatTime(DateAdd(A_Now, -400, "Days"), "yyyy-MM-dd")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if bar && eq && bar < eq && StrCompare(SubStr(line, 1, bar - 1), cutoff) < 0
+                IniDelete SavedFile, "DayItems", SubStr(line, 1, eq - 1)
+        }
+    }
+}
+
+; This shift's items, most used first: [{name, n, keys}]
+ShiftItemList() {
+    items := []
+    try section := IniRead(SavedFile, "ShiftItems")
+    catch
+        return items
+    for line in StrSplit(section, "`n", "`r") {
+        if !(eq := InStr(line, "="))
+            continue
+        it := ItemRow(SubStr(line, eq + 1))
+        it.name := SubStr(line, 1, eq - 1)
+        items.Push(it)
+    }
+    return SortByCount(items)
+}
+
+; Biggest .n first (insertion sort, the lists are short)
+SortByCount(items) {
+    Loop items.Length - 1 {
+        i := A_Index + 1
+        cur := items[i], j := i - 1
+        while j >= 1 && items[j].n < cur.n {
+            items[j + 1] := items[j]
+            j -= 1
+        }
+        items[j + 1] := cur
+    }
+    return items
+}
+
+; Logs and alert clears from [DayItems] for days from..to (yyyy-MM-dd):
+; {logs, alerts, days: Map(day -> {logs, alerts}), types: sorted [{name, n}]}
+DashRange(from, to) {
+    r := {logs: 0, alerts: 0, days: Map(), types: []}
+    try section := IniRead(SavedFile, "DayItems")
+    catch
+        return r
+    tally := Map()
+    for line in StrSplit(section, "`n", "`r") {
+        bar := InStr(line, "|"), eq := InStr(line, "=")
+        if !bar || !eq || bar > eq
+            continue
+        day := SubStr(line, 1, bar - 1)
+        if StrCompare(day, from) < 0 || StrCompare(day, to) > 0
+            continue
+        name := SubStr(line, bar + 1, eq - bar - 1)
+        kind := ItemKind(name)
+        if kind = "other"
+            continue
+        n := ItemRow(SubStr(line, eq + 1)).n
+        if !r.days.Has(day)
+            r.days[day] := {logs: 0, alerts: 0}
+        if kind = "alert" {
+            r.days[day].alerts += n, r.alerts += n
+        } else {
+            r.days[day].logs += n, r.logs += n
+            tally[name] := (tally.Has(name) ? tally[name] : 0) + n
+        }
+    }
+    for name, n in tally
+        r.types.Push({name: name, n: n})
+    SortByCount(r.types)
+    return r
+}
+
+; Rows for the last `count` days, newest first: [{day, label, logs, alerts, keys}]
+DashDays(count) {
+    rng := DashRange(FormatTime(DateAdd(A_Now, -(count - 1), "Days"), "yyyy-MM-dd"), FormatTime(, "yyyy-MM-dd"))
+    rows := []
+    Loop count {
+        t := DateAdd(A_Now, -(A_Index - 1), "Days")
+        day := FormatTime(t, "yyyy-MM-dd")
+        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+        al := rng.days.Has(day) ? rng.days[day].alerts : 0
+        rows.Push({day: day, label: FormatTime(t, "ddd MMM d"), logs: d.log, alerts: al, keys: d.keys})
+    }
+    return {rows: rows, range: rng}
+}
+
+Bar(n, top, width := 22) => top > 0 && n > 0 ? RegExReplace(Format("{:" Max(1, Ceil(n / top * width)) "}", ""), " ", "█") : ""
+
+HtmlSafe(s) => StrReplace(StrReplace(StrReplace(s, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+
+; What the This shift tab shows: {logs, alerts, keys, span, items(log types)}
+ShiftFacts() {
+    f := {logs: 0, alerts: 0, keys: 0, span: "nothing counted yet", types: []}
+    sh := SavedShift()
+    f.logs := sh.log, f.keys := sh.keys
+    start := last := ""
+    try start := IniRead(SavedFile, "Shift", "Start", "")
+    try last := IniRead(SavedFile, "Shift", "Last", "")
+    for it in ShiftItemList() {
+        kind := ItemKind(it.name)
+        if kind = "alert"
+            f.alerts += it.n
+        else if kind = "log"
+            f.types.Push(it)
+    }
+    if start != "" && last != "" && (f.logs || f.alerts || f.keys) {
+        mins := DateDiff(last, start, "Minutes")
+        f.span := FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") " (" Format("{}h {:02}m", mins // 60, Mod(mins, 60)) ")"
+    }
+    return f
+}
+
+DashSummaryText(f, withTime) {
+    s := "Shift summary, " A_ComputerName ", " FormatTime(, "yyyy-MM-dd") " (" f.span ")`r`n"
+    s .= f.logs " logs, " f.alerts " Alert Grid clears" (withTime ? ", " SavedTime(f.keys) " of typing saved" : "") "`r`n"
+    for it in f.types
+        s .= "  " Format("{:4}", it.n) "  " it.name "`r`n"
+    return s
+}
+
+DashSheetHtml(f, withTime) {
+    top := f.types.Length ? f.types[1].n : 0
+    h := "<!doctype html><html><head><meta charset='utf-8'><title>Shift summary " FormatTime(, "yyyy-MM-dd") "</title><style>"
+        . "body{font-family:Segoe UI,Arial,sans-serif;margin:32px;color:#222;max-width:720px}"
+        . "h1{color:#0E746E;margin:0 0 4px}.sub{color:#666;margin-bottom:20px}"
+        . ".tiles{display:flex;gap:14px;margin-bottom:22px}.tile{flex:1;border:1px solid #cfd8d7;border-radius:8px;padding:12px;text-align:center}"
+        . ".tile b{display:block;font-size:28px;color:#0E746E}.tile span{color:#666;font-size:13px}"
+        . "table{border-collapse:collapse;width:100%}td{padding:5px 8px;border-bottom:1px solid #e3e8e8}"
+        . ".n{width:50px;text-align:right}.bar{background:#0E746E;height:12px;border-radius:3px}"
+        . "</style></head><body><h1>Shift summary</h1><div class='sub'>" HtmlSafe(A_ComputerName) " &middot; "
+        . FormatTime(, "dddd, MMMM d, yyyy") " &middot; " HtmlSafe(f.span) "</div><div class='tiles'>"
+        . "<div class='tile'><b>" f.logs "</b><span>logs</span></div>"
+        . "<div class='tile'><b>" f.alerts "</b><span>Alert Grid clears</span></div>"
+    if withTime
+        h .= "<div class='tile'><b>" StrReplace(StrReplace(SavedTime(f.keys), "about ", ""), "under a minute", "&lt;1 min") "</b><span>typing saved</span></div>"
+    h .= "</div><table>"
+    for it in f.types
+        h .= "<tr><td>" HtmlSafe(it.name) "</td><td class='n'>" it.n "</td><td style='width:45%'><div class='bar' style='width:" Round(it.n / top * 100) "%'></div></td></tr>"
+    return h "</table></body></html>"
+}
+
+ShowDashboard(tab := 1) {
+    global DashWin
+    if IsObject(DashWin)
+        try DashWin.Destroy()
+    f := ShiftFacts()
+    wk := DashDays(7), mo := DashDays(30)
+    prevRng := DashRange(FormatTime(DateAdd(A_Now, -59, "Days"), "yyyy-MM-dd"), FormatTime(DateAdd(A_Now, -30, "Days"), "yyyy-MM-dd"))
+    g := DashWin := WGui("+AlwaysOnTop", "Shift dashboard  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    tb := g.AddTab3("w600 h430", ["This shift", "Week", "Month"])
+
+    tb.UseTab(1)
+    y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
+    g.AddText("xm+12 y" y " w560 BackgroundTrans", BreakText())
+    y += 24
+    g.AddText("xm+12 y" y " w560 BackgroundTrans", "Logs by type (" f.span ")")
+    lv := g.AddListView("xm+12 y+6 w570 r11 -Multi NoSortHdr", ["Log type", "Times", ""])
+    top := f.types.Length ? f.types[1].n : 0
+    for it in f.types
+        lv.Add(, it.name, it.n, Bar(it.n, top))
+    lv.ModifyCol(1, 250), lv.ModifyCol(2, 55), lv.ModifyCol(3, 240)
+
+    for pair in [[2, wk, 7, "Last 7 days"], [3, mo, 30, "Last 30 days"]] {
+        tb.UseTab(pair[1])
+        d := pair[2]
+        logs := alerts := keys := used := best := 0
+        bestDay := ""
+        for r in d.rows {
+            logs += r.logs, alerts += r.alerts, keys += r.keys
+            if r.logs || r.alerts
+                used += 1
+            if r.logs > best
+                best := r.logs, bestDay := r.label
+        }
+        avg := used ? Round(logs / used) : 0
+        y := Tiles(g, [[logs, "logs"], [alerts, "alert clears"], [SavedTime(keys) = "under a minute" ? "<1 min" : StrReplace(SavedTime(keys), "about ", ""), "typing saved"], [used ? avg : "-", "logs per day worked"]])
+        if pair[1] = 3 {
+            prevLogs := 0
+            for day, v in prevRng.days
+                prevLogs += v.logs
+            note := "Busiest day: " (bestDay != "" ? bestDay " (" best " logs)" : "none yet")
+            note .= prevRng.logs || prevLogs ? "     Previous 30 days: " prevLogs " logs (counted by log type)" : ""
+            g.AddText("xm+12 y" y " w570 BackgroundTrans", note)
+        }
+        dl := g.AddListView("xm+12 " (pair[1] = 3 ? "y+6" : "y" y) " w570 r" (pair[1] = 2 ? 7 : 6) " -Multi NoSortHdr", ["Day", "Logs", "Alert clears", "Typing saved", ""])
+        mx := 0
+        for r in d.rows
+            mx := Max(mx, r.logs)
+        for r in d.rows
+            dl.Add(, r.label, r.logs, r.alerts, r.keys ? SavedTime(r.keys) : "", Bar(r.logs, mx, 16))
+        dl.ModifyCol(1, 110), dl.ModifyCol(2, 55), dl.ModifyCol(3, 90), dl.ModifyCol(4, 110), dl.ModifyCol(5, 170)
+        tl := g.AddListView("xm+12 y+8 w570 r" (pair[1] = 2 ? 5 : 4) " -Multi NoSortHdr", ["Top log types (" pair[4] ")", "Times"])
+        for it in d.range.types {
+            if A_Index > 20
+                break
+            tl.Add(, it.name, it.n)
+        }
+        tl.ModifyCol(1, 400), tl.ModifyCol(2, 70)
+    }
+    tb.UseTab()
+    tb.Value := tab
+    timeCB := g.AddCheckbox("xm Checked", "Include time saved in the copy and the sheet")
+    g.AddButton("xm y+8 w130", "Copy summary").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w130", "Save as a sheet").OnEvent("Click", SaveIt)
+    g.AddButton("x+8 yp w120", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := DashSummaryText(f, timeCB.Value)
+        Tip("Shift summary copied. Paste it with Ctrl+V.")
+    }
+    SaveIt(*) {
+        dir := HomeDir "\Shift Reports"
+        file := dir "\Shift summary " FormatTime(, "yyyy-MM-dd HHmm") ".html"
+        try {
+            DirCreate dir
+            FileAppend DashSheetHtml(f, timeCB.Value), file, "UTF-8"
+        } catch as e {
+            MsgBox "Couldn't save the sheet.`n`n" e.Message, "Shift dashboard", "Icon!"
+            return
+        }
+        Activity("Shift dashboard: sheet saved")
+        Run file
+    }
+}
+

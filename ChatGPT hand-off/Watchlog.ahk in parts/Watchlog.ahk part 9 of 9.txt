@@ -1,0 +1,1339 @@
+; ===== Watchlog.ahk PART 9 of 9 (lines 9825-11162 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; The kinds of box, in the order the box form lists them
+BoxKinds() {
+    static kinds := [["plain", "Text you type"]
+        , ["list", "A list of choices"]
+        , ["shared", "A shared list (like @tables)"]
+        , ["next", "Steps: opens on the one after last time"]
+        , ["now", "The time now (can be changed)"]
+        , ["time", "A time you type (2130 becomes 21:30)"]
+        , ["money", "Money (10000 becomes 10,000)"]
+        , ["percent", "A percentage (67 becomes 67%)"]
+        , ["clip", "A copied number (copy it first)"]
+        , ["last", "Remembers what was typed last time"]
+        , ["alertcopy", "Facial rec alert # (copied in Edge)"]
+        , ["matchcopy", "Facial rec match % (copied in Edge)"]]
+    return kinds
+}
+
+; ---- Reading and writing the file ------------------------------------
+; A templates file as lines, plus where its templates, lists and section
+; headings are. Only the lines that change are ever rewritten.
+EdRead(file) {
+    raw := FileRead(file, "RAW")
+    bom := raw.Size >= 3 && NumGet(raw, 0, "UChar") = 0xEF && NumGet(raw, 1, "UChar") = 0xBB && NumGet(raw, 2, "UChar") = 0xBF
+    text := FileRead(file, "UTF-8")
+    doc := {file: file, crlf: InStr(text, "`r`n") > 0, bom: bom, time: FileTimeOf(file)
+        , lines: StrSplit(StrReplace(text, "`r`n", "`n"), "`n")}
+    EdScan(doc)
+    return doc
+}
+
+EdScan(doc) {
+    doc.tpls := [], doc.lists := [], doc.sections := []
+    section := ""
+    for i, raw in doc.lines {
+        line := Trim(raw)
+        if line = ""
+            continue
+        c := SubStr(line, 1, 1)
+        if c = "#" {
+            ; a heading like  # ----- FORMS -----
+            if RegExMatch(line, "^#\s*-{3,}\s*(.+?)\s*-*\s*$", &m) {
+                section := EdSectionName(m[1])
+                doc.sections.Push({name: section, line: i})
+            }
+            continue
+        }
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        if c = "@" {
+            doc.lists.Push({line: i, name: Trim(SubStr(line, 2, eq - 2)), items: EdItems(SubStr(line, eq + 1))})
+            continue
+        }
+        left := Trim(SubStr(line, 1, eq - 1)), body := Trim(SubStr(line, eq + 1))
+        trig := left, name := ""
+        if RegExMatch(left, "^(\S+)\s*\((.*)\)$", &m)
+            trig := m[1], name := Trim(m[2])
+        rep := RegExMatch(body, "i)\{repeat\}") > 0
+        body := RegExReplace(body, "i)\s*\{repeat\}")
+        doc.tpls.Push({line: i, trig: trig, name: name, body: StrReplace(body, "\n", "`n"), repeat: rep, section: section})
+    }
+}
+
+; "START / END OF SHIFT  (asks which bay)" -> "Start / end of shift"
+EdSectionName(s) {
+    s := Trim(RegExReplace(s, "\s*\(.*$"))
+    return StrUpper(SubStr(s, 1, 1)) StrLower(SubStr(s, 2))
+}
+
+EdItems(s) {
+    items := []
+    for it in StrSplit(s, "|")
+        if Trim(it) != ""
+            items.Push(Trim(it))
+    return items
+}
+
+; A template back into its line:  ;trig (Name) = wording {repeat}
+EdLine(t) {
+    body := Trim(StrReplace(StrReplace(t.body, "`r`n", "`n"), "`n", "\n"), " `t")
+    return t.trig (t.name != "" ? " (" t.name ")" : "") " = " body (t.repeat ? " {repeat}" : "")
+}
+
+EdListLine(l) {
+    s := ""
+    for it in l.items
+        s .= (s = "" ? "" : " | ") it
+    return "@" l.name " = " s
+}
+
+; "# Wording version: Oct 25, 2026 (2)" -> today's date, (3) if it's
+; still the same day, otherwise (1)
+EdBumpVersion(doc) {
+    today := FormatTime(, "MMM d, yyyy")
+    for i, line in doc.lines {
+        if !RegExMatch(line, "i)^(#\s*Wording version\s*:\s*)(.*?)\s*$", &m)
+            continue
+        n := RegExMatch(m[2], "^(.*?)\s*\((\d+)\)$", &v) && v[1] = today ? Integer(v[2]) + 1 : 1
+        doc.lines[i] := m[1] today " (" n ")"
+        return today " (" n ")"
+    }
+    return ""
+}
+
+; Writes the file, after keeping a copy of what was there
+EdWrite(doc) {
+    dir := DataDir "\template backups"
+    try {
+        DirCreate dir
+        SplitPath doc.file, , , , &stem
+        FileCopy doc.file, dir "\" stem " " FormatTime(, "yyyy-MM-dd HHmmss") ".txt", 1
+        ; keep the last 20
+        old := []
+        Loop Files dir "\*.txt"
+            old.Push(A_LoopFileTimeModified "|" A_LoopFileFullPath)
+        if old.Length > 20 {
+            sorted := ""
+            for o in old
+                sorted .= o "`n"
+            sorted := Sort(RTrim(sorted, "`n"))
+            for o in StrSplit(sorted, "`n")
+                if A_Index <= old.Length - 20
+                    try FileDelete SubStr(o, InStr(o, "|") + 1)
+        }
+    }
+    text := ""
+    for i, line in doc.lines
+        text .= (i > 1 ? (doc.crlf ? "`r`n" : "`n") : "") line
+    f := FileOpen(doc.file, "w", doc.bom ? "UTF-8" : "UTF-8-RAW")
+    f.Write(text)
+    f.Close()
+    doc.time := FileTimeOf(doc.file)
+}
+
+; ---- Checking a template -----------------------------------------------
+; What's wrong with a template ("" if nothing). others = the shortcuts of
+; the other file (team templates when editing your own, and the other way)
+EdProblems(doc, idx, others) {
+    t := doc.tpls[idx], trig := t.trig, p := ""
+    if trig = "" || trig = ";"
+        p .= "Type a shortcut, like `;jack`n"
+    else if RegExMatch(trig, "[\s=(){}|]")
+        p .= "The shortcut can't have spaces or = ( ) { } | in it.`n"
+    else {
+        if SubStr(trig, 1, 1) != ";"
+            p .= "Start the shortcut with `; so it never fires while you're typing normally.`n"
+        if RegExMatch(trig, "i)^(;t|;dd|;dt)")
+            p .= trig " starts like a time or date stamp (;t `;dd `;dt), so it would never fire.`n"
+        for j, o in doc.tpls {
+            if j = idx || o.trig = ""
+                continue
+            if o.trig == trig
+                p .= trig " is used twice in this file.`n"
+            else if InStr(o.trig, trig) = 1 || InStr(trig, o.trig) = 1
+                p .= trig " and " o.trig " start the same way, so the shorter one fires before you finish typing the longer one.`n"
+        }
+        for o in others.trigs
+            if InStr(o, trig) = 1 || InStr(trig, o) = 1
+                p .= trig (o == trig ? " is" : " and " o " start the same way: " o " is") " already " others.what ".`n"
+        for l in LoginList
+            if InStr(l.trig, trig) = 1 || InStr(trig, l.trig) = 1
+                p .= trig " clashes with the login shortcut " l.trig ".`n"
+    }
+    if RegExMatch(t.name, "[=()]")
+        p .= "The name can't have = ( or ) in it.`n"
+    body := t.body
+    if Trim(body, " `t`r`n") = ""
+        p .= "The wording is empty.`n"
+    depth := 0, bad := false
+    Loop Parse body {
+        if A_LoopField = "{"
+            depth += 1, bad := bad || depth > 1
+        else if A_LoopField = "}"
+            depth -= 1, bad := bad || depth < 0
+    }
+    if bad || depth != 0
+        p .= "A { has no matching } (or the other way round).`n"
+    have := Map()
+    have.CaseSense := false
+    for l in doc.lists
+        have[l.name] := true
+    for k in Lists
+        have[k] := true
+    for tok in EdTokens(body) {
+        if tok.key = ""
+            p .= "A box has no name: " tok.code "`n"
+        for opt in StrSplit(tok.opts, "|")
+            if SubStr(Trim(opt), 1, 1) = "@" && !have.Has(SubStr(Trim(opt), 2))
+                p .= "There's no shared list called " Trim(opt) ".`n"
+    }
+    return RTrim(p, "`n")
+}
+
+; The boxes in some wording: [{pos, len, code, key, opts}] ({repeat} left out)
+EdTokens(body) {
+    toks := [], pos := 1
+    while p := RegExMatch(body, "\{([^{}]*)\}", &m, pos) {
+        spec := m[1], c := InStr(spec, ":")
+        key := Trim(c ? SubStr(spec, 1, c - 1) : spec)
+        if !(StrLower(key) = "repeat" && !c)
+            toks.Push({pos: p, len: m.Len, code: m[0], key: key, opts: c ? SubStr(spec, c + 1) : ""})
+        pos := p + m.Len
+    }
+    return toks
+}
+
+; ---- One box, as the box form shows it -------------------------------
+BoxParse(spec) {
+    c := InStr(spec, ":")
+    b := {name: Trim(c ? SubStr(spec, 1, c - 1) : spec), kind: "plain", mins: 0, thousands: false, pick: false
+        , fromcopy: false, list: "", items: [], caps: false, upper: false, blankMode: 1, blank: ""
+        , prefix: "", suffix: "", numprefix: "", condWhen: "", condVal: "", keep: []}
+    if !c
+        return b
+    kinds := []
+    for opt in StrSplit(SubStr(spec, c + 1), "|") {
+        opt := Trim(opt), low := StrLower(opt)
+        if opt = ""
+            continue
+        if RegExMatch(low, "^(now|time|money|percent|clip|alertcopy|matchcopy|last|next)$")
+            kinds.Push({k: low, opt: opt})
+        else if RegExMatch(low, "^now\s*\+\s*(\d+)$", &n)
+            kinds.Push({k: "now", opt: opt, mins: Integer(n[1])})
+        else if low = "thousands"
+            b.thousands := true
+        else if low = "pick"
+            b.pick := true
+        else if low = "fromcopy"
+            b.fromcopy := true
+        else if low = "caps"
+            b.caps := true
+        else if low = "upper"
+            b.upper := true
+        else if low = "tidy" || low = "several" || low = "saved"
+            b.keep.Push(opt)       ; bvs -> BVs, several (no tick box for them): kept as they are
+        else if SubStr(opt, 1, 1) = "@" && b.list = ""
+            b.list := SubStr(opt, 2)
+        else if b.condWhen = "" && RegExMatch(opt, "i)^if\s+(.+?)\s*=\s*(.*)$", &cm)
+            b.condWhen := cm[1], b.condVal := cm[2]
+        else if SubStr(low, 1, 6) = "blank="
+            b.blank := SubStr(opt, 7), b.blankMode := b.blank = "" ? 2 : 3
+        else if SubStr(low, 1, 7) = "prefix="
+            b.prefix := SubStr(opt, 8)
+        else if SubStr(low, 1, 7) = "suffix="
+            b.suffix := SubStr(opt, 8)
+        else if SubStr(low, 1, 13) = "numberprefix="
+            b.numprefix := SubStr(opt, 14)
+        else if SubStr(opt, 1, 1) = "@" || RegExMatch(low, "^if\s")
+            b.keep.Push(opt)       ; a second list or condition: kept as it is
+        else
+            b.items.Push(opt)
+    }
+    ; The kind is the first kind word; any other one is kept as it is
+    for i, k in kinds {
+        if i = 1 {
+            b.kind := k.k
+            if k.HasOwnProp("mins")
+                b.mins := k.mins
+        } else
+            b.keep.Push(k.opt)
+    }
+    if b.kind = "plain"
+        b.kind := b.list != "" ? "shared" : b.items.Length ? "list" : "plain"
+    return b
+}
+
+BoxListy(kind) => kind = "list" || kind = "shared" || kind = "next"
+
+BoxBuild(b) {
+    o := []
+    switch b.kind {
+        case "now": o.Push(b.mins ? "now+" b.mins : "now")
+        case "plain", "list", "shared":
+        default: o.Push(b.kind)
+    }
+    if b.kind = "money" && b.thousands
+        o.Push("thousands")
+    if BoxListy(b.kind) {
+        if b.pick
+            o.Push("pick")
+        if b.fromcopy
+            o.Push("fromcopy")
+        if b.kind = "shared" && b.list != ""
+            o.Push("@" b.list)
+        for it in b.items
+            o.Push(it)
+    }
+    if b.caps
+        o.Push("caps")
+    if b.upper
+        o.Push("upper")
+    if b.numprefix != ""
+        o.Push("numberprefix=" b.numprefix)
+    if b.prefix != ""
+        o.Push("prefix=" b.prefix)
+    if b.suffix != ""
+        o.Push("suffix=" b.suffix)
+    if b.blankMode = 2
+        o.Push("blank=")
+    else if b.blankMode = 3 && b.blank != ""
+        o.Push("blank=" b.blank)
+    if b.condWhen != ""
+        o.Push("if " b.condWhen "=" b.condVal)
+    for k in b.keep
+        o.Push(k)
+    s := ""
+    for x in o
+        s .= (s = "" ? "" : " | ") x
+    return "{" b.name (s != "" ? ": " s : "") "}"
+}
+
+; What a box is, in words, for the list of boxes
+BoxKindName(b) {
+    for k in BoxKinds()
+        if k[1] = b.kind
+            name := k[2]
+    if b.kind = "now" && b.mins
+        name := "The time now + " b.mins " minutes"
+    if BoxListy(b.kind) && b.pick
+        name .= " (must pick)"
+    return name
+}
+
+BoxDetails(b) {
+    d := []
+    if b.kind = "shared"
+        d.Push("@" b.list)
+    if BoxListy(b.kind) && b.items.Length
+        d.Push(b.items.Length = 1 ? b.items[1] : b.items.Length " choices")
+    if b.thousands && b.kind = "money"
+        d.Push("3.3 = 3,300")
+    if b.caps
+        d.Push("capitals in machine #s")
+    if b.upper
+        d.Push("ALL CAPITALS")
+    if b.prefix != "" || b.suffix != ""
+        d.Push("adds " b.prefix "..." b.suffix)
+    if b.numprefix != ""
+        d.Push(b.numprefix " before a number")
+    if b.blankMode = 2
+        d.Push("empty = nothing")
+    else if b.blankMode = 3
+        d.Push("empty = " b.blank)
+    if b.condWhen != ""
+        d.Push(b.condVal " when a box starts with " b.condWhen)
+    if b.fromcopy && BoxListy(b.kind)
+        d.Push("job title from the copy")
+    s := ""
+    for x in d
+        s .= (s = "" ? "" : ",  ") x
+    return s
+}
+
+; The log as it comes out with the boxes as they open (a list on its first
+; choice, the time now, the rest left as XX). Never reads the clipboard.
+EdPreview(body, doc) {
+    known := Map()
+    known.CaseSense := false
+    for k, v in Lists
+        known[k] := v
+    for l in doc.lists
+        known[l.name] := l.items
+    fields := [], vals := [], seen := Map()
+    for tok in EdTokens(body) {
+        if seen.Has(tok.key)
+            continue
+        seen[tok.key] := true
+        b := BoxParse(SubStr(tok.code, 2, -1))
+        ph := b.blankMode = 2 ? "" : b.blankMode = 3 ? b.blank
+            : b.kind = "now" || b.kind = "time" ? "XX:XX" : b.kind = "money" ? "XX,XXX" : b.kind = "percent" || b.kind = "matchcopy" ? "XX%" : "XX"
+        v := ""
+        if b.kind = "now"
+            v := FormatTime(DateAdd(A_Now, b.mins, "Minutes"), "HH:mm")
+        else if BoxListy(b.kind) {
+            items := b.items
+            if b.kind = "shared" && known.Has(b.list) && known[b.list].Length
+                items := known[b.list]
+            v := items.Length ? items[1] : ""
+        }
+        if v = ""
+            v := ph
+        else {
+            if b.caps
+                v := RegExReplace(v, "(\w*\d\w*)", "$U1")
+            v := b.prefix v b.suffix
+            if b.upper
+                v := StrUpper(v)
+            if b.numprefix != "" && RegExMatch(v, "^\d")
+                v := b.numprefix v
+        }
+        fields.Push({key: tok.key})
+        vals.Push(v)
+    }
+    return FillTemplate(body, fields, vals)
+}
+
+; ---- The editor window ------------------------------------------------
+ShowEditor(startTab := 1) {
+    global EditorWin
+    if IsObject(EditorWin) {
+        try WinActivate "ahk_id " EditorWin.Hwnd
+        return
+    }
+    if IsObject(CurForm) {
+        MsgBox "Finish or close the form that's open first.", "Template editor"
+        return
+    }
+    ClosePicker()
+    ; The two files: the team's (or templates.txt) and your own
+    teamFile := Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile
+    teamName := Cfg["SharedTemplates"] != "" ? "Team templates" : "templates.txt"
+    canTeam := Tpl.src != "team-copy" && FileExist(teamFile)
+    ed := {doc: "", which: canTeam ? 1 : 2, cur: 0, rows: [], dirty: false, saved: false, teamOk: false, curList: 0
+        , loading: false, boxes: [], others: {trigs: [], what: ""}}
+
+    g := WGui("+AlwaysOnTop", "Template editor  -  v" VERSION)
+    EditorWin := g
+    g.BackColor := "FFFFFF"     ; the same white as the tab pages
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("xm y+2", "Editing:")
+    fileDD := g.AddDropDownList("x+8 yp-3 w380", [teamName (Cfg["SharedTemplates"] != "" ? " (everyone's)" : ""), "My own templates (my-templates.txt, just me)"])
+    fileT := g.AddText("x+12 yp+3 w440 c707070", "")
+    tabs := g.AddTab2("xm y+12 w960 h650 Choose" startTab, ["Templates", "Shared lists"])
+
+    ; ---- Templates tab
+    tabs.UseTab(1)
+    search := g.AddEdit("Section w300")
+    SendMessage 0x1501, 1, StrPtr("Search: a shortcut, name or any word"), search    ; grey hint
+    lv := g.AddListView("xs y+6 w300 h470 -Multi NoSortHdr", ["Shortcut", "Name", "Section"])
+    lv.ModifyCol(1, 90), lv.ModifyCol(2, 120), lv.ModifyCol(3, 70)
+    bNew := g.AddButton("xs y+8 w96", "New")
+    bCopy := g.AddButton("x+6 w96", "Copy")
+    bDel := g.AddButton("x+6 w96", "Delete")
+
+    rx := "xs+320"
+    g.AddText(rx " ys+3", "Shortcut:")
+    trigE := g.AddEdit("x+6 yp-3 w130")
+    g.AddText("x+16 yp+3", "Name:")
+    nameE := g.AddEdit("x+6 yp-3 w318")
+    g.AddText(rx " y+12", "Section:")
+    secDD := g.AddDropDownList("x+6 yp-3 w210")
+    repCB := g.AddCheckbox("x+16 yp+4", "Several in one log (an Add another button)")
+    g.AddText(rx " y+14 w600", "Wording. Type the log as it should read; the boxes are the parts in { }.")
+    bodyE := g.AddEdit(rx " y+4 w610 r5 Multi WantReturn")
+    g.AddText(rx " y+10", "Boxes in this log (double-click one to change it):")
+    boxLV := g.AddListView(rx " y+4 w610 r5 -Multi NoSortHdr", ["Box", "What goes in it", "Details"])
+    boxLV.ModifyCol(1, 130), boxLV.ModifyCol(2, 230), boxLV.ModifyCol(3, 230)
+    bAddBox := g.AddButton(rx " y+6 w150", "Add a box...")
+    bEditBox := g.AddButton("x+6 w150", "Change box...")
+    bDelBox := g.AddButton("x+6 w150", "Remove box")
+    g.SetFont("s9 c707070")
+    g.AddText(rx " y+10", "How it will look (lists on their first choice, empty boxes as XX):")
+    g.SetFont("s10 c000000")
+    prevE := g.AddEdit(rx " y+4 w610 r4 ReadOnly -TabStop BackgroundF1F5F5")
+    probT := g.AddText(rx " y+6 w610 r3 cC62828", "")
+
+    ; ---- Shared lists tab
+    tabs.UseTab(2)
+    llv := g.AddListView("Section w300 h470 -Multi NoSortHdr", ["List", "Choices"])
+    llv.ModifyCol(1, 150), llv.ModifyCol(2, 120)
+    bNewList := g.AddButton("xs y+8 w96", "New list")
+    bRenList := g.AddButton("x+6 w96", "Rename")
+    bDelList := g.AddButton("x+6 w96", "Delete")
+    g.AddText("xs+320 ys", "A shared list is used by every box that names it, so changing it here")
+    g.AddText("xs+320 y+0", "changes all of them (like @tables for every table template).")
+    lnameT := g.AddText("xs+320 y+14 w600", "")
+    g.AddText("xs+320 y+8", "Choices, one per line:")
+    litemsE := g.AddEdit("xs+320 y+4 w400 r16 Multi WantReturn")
+    lusedT := g.AddText("xs+320 y+8 w600 r3 c505050", "")
+    tabs.UseTab()
+
+    tabs.GetPos(&tx, &ty, &tw, &th)
+    bSave := g.AddButton("x" tx " y" (ty + th + 10) " w120", "Save")
+    bClose := g.AddButton("x+6 w120", "Close")
+    statT := g.AddText("x+14 yp+5 w680", "")
+
+    fileDD.OnEvent("Change", SwitchFile)
+    search.OnEvent("Change", (*) => Filter())
+    lv.OnEvent("ItemSelect", (ctl, row, sel) => sel ? Load(row) : 0)
+    for c in [trigE, nameE, bodyE]
+        c.OnEvent("Change", Changed)
+    repCB.OnEvent("Click", Changed)
+    secDD.OnEvent("Change", MoveSection)
+    bNew.OnEvent("Click", NewTpl)
+    bCopy.OnEvent("Click", CopyTpl)
+    bDel.OnEvent("Click", DeleteTpl)
+    bAddBox.OnEvent("Click", (*) => BoxDlg(0))
+    bEditBox.OnEvent("Click", (*) => BoxDlg(boxLV.GetNext() ? boxLV.GetNext() : -1))
+    boxLV.OnEvent("DoubleClick", (ctl, row) => row ? BoxDlg(row) : 0)
+    bDelBox.OnEvent("Click", RemoveBox)
+    llv.OnEvent("ItemSelect", (ctl, row, sel) => sel ? LoadList(row) : 0)
+    litemsE.OnEvent("Change", ListChanged)
+    bNewList.OnEvent("Click", NewList)
+    bRenList.OnEvent("Click", RenameList)
+    bDelList.OnEvent("Click", DeleteList)
+    bSave.OnEvent("Click", (*) => Save())
+    bClose.OnEvent("Click", CloseEd)
+    g.OnEvent("Close", CloseEd)
+    g.OnEvent("Escape", CloseEd)
+
+    if !Open(ed.which) {
+        EditorWin := ""
+        g.Destroy()
+        return
+    }
+    fileDD.Value := ed.which
+    if !canTeam
+        fileT.Text := "The team file can't be reached right now, so only your own templates can be changed."
+    g.Show()
+    search.Focus()
+
+    ; -- loading a file
+    Open(which) {
+        file := which = 1 ? teamFile : MyTemplatesFile
+        if which = 1 && !canTeam {
+            g.Opt("+OwnDialogs")
+            MsgBox "The team templates file can't be reached right now (is OneDrive running?), so it can't be changed.", "Template editor", "Icon!"
+            return false
+        }
+        if which = 2 && !FileExist(MyTemplatesFile) && !MakeMineFile()
+            return false
+        try doc := EdRead(file)
+        catch as e {
+            g.Opt("+OwnDialogs")
+            MsgBox "Couldn't open " file ":`n" e.Message, "Template editor", "Icon!"
+            return false
+        }
+        ed.doc := doc, ed.which := which, ed.dirty := false, ed.cur := 0, ed.curList := 0
+        ; the other file's shortcuts, to warn about clashes
+        ed.others := {trigs: [], what: which = 1 ? "one of your own templates (my-templates.txt)" : "a team template"}
+        for t in TemplateList
+            if (which = 1) = (t.src = "mine")
+                ed.others.trigs.Push(t.trig)
+        fileT.Text := file
+        secs := []
+        for s in doc.sections
+            secs.Push(s.name)
+        secDD.Delete()
+        if secs.Length
+            secDD.Add(secs)
+        secDD.Enabled := secs.Length > 0
+        search.Value := ""
+        Filter()
+        FillLists()
+        Status()
+        return true
+    }
+
+    SwitchFile(*) {
+        want := fileDD.Value
+        if want = ed.which
+            return
+        if !AskSave() || !Open(want)
+            fileDD.Value := ed.which
+    }
+
+    ; Unsaved changes: Yes saves, No drops them, Cancel stays. True = go on.
+    AskSave() {
+        if !ed.dirty
+            return true
+        g.Opt("+OwnDialogs")
+        r := MsgBox("Save your changes first?", "Template editor", "YesNoCancel Icon? Default1")
+        if r = "Cancel"
+            return false
+        return r = "No" || Save()
+    }
+
+    ; -- the list on the left
+    Filter(keep := 0) {
+        q := StrLower(Trim(search.Value))
+        ed.rows := []
+        lv.Opt("-Redraw")
+        lv.Delete()
+        for i, t in ed.doc.tpls {
+            if q != "" && !InStr(StrLower(t.trig " " t.name " " t.body " " t.section), q)
+                continue
+            ed.rows.Push(i)
+            lv.Add(, t.trig, t.name, t.section)
+        }
+        lv.Opt("+Redraw")
+        row := 0
+        for r, i in ed.rows
+            if i = keep
+                row := r
+        if !row && ed.rows.Length
+            row := 1
+        if row {
+            lv.Modify(row, "Select Focus Vis")
+            Load(row)
+        } else
+            Load(0)
+    }
+
+    Load(row) {
+        ed.cur := row ? ed.rows[row] : 0
+        on := ed.cur > 0
+        for c in [trigE, nameE, bodyE, repCB, boxLV, bAddBox, bEditBox, bDelBox, bCopy, bDel]
+            c.Enabled := on
+        secDD.Enabled := on && ed.doc.sections.Length
+        if !on {
+            ed.loading := true
+            trigE.Value := "", nameE.Value := "", bodyE.Value := "", repCB.Value := 0
+            ed.loading := false
+            boxLV.Delete(), prevE.Value := "", probT.Text := ""
+            return
+        }
+        t := ed.doc.tpls[ed.cur]
+        ed.loading := true
+        trigE.Value := t.trig
+        nameE.Value := t.name
+        bodyE.Value := StrReplace(t.body, "`n", "`r`n")
+        repCB.Value := t.repeat
+        if ed.doc.sections.Length {
+            for i, s in ed.doc.sections
+                if s.name = t.section
+                    secDD.Choose(i)
+        }
+        ed.loading := false
+        Refresh()
+    }
+
+    ; What's in the boxes now, into the template and its line
+    Changed(*) {
+        if ed.loading || !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        nt := Trim(trigE.Value), nn := Trim(nameE.Value), nb := StrReplace(bodyE.Value, "`r`n", "`n"), nr := repCB.Value
+        if nt == t.trig && nn == t.name && nb == t.body && nr = t.repeat
+            return
+        t.trig := nt, t.name := nn, t.body := nb, t.repeat := nr
+        ed.doc.lines[t.line] := EdLine(t)
+        for r, i in ed.rows
+            if i = ed.cur
+                lv.Modify(r, , t.trig, t.name)
+        Dirty()
+        Refresh()
+    }
+
+    Refresh() {
+        t := ed.doc.tpls[ed.cur]
+        boxLV.Opt("-Redraw")
+        boxLV.Delete()
+        ed.boxes := []
+        seen := Map()
+        for tok in EdTokens(t.body) {
+            if seen.Has(tok.key)
+                continue
+            seen[tok.key] := true
+            b := BoxParse(SubStr(tok.code, 2, -1))
+            ed.boxes.Push(tok)
+            boxLV.Add(, b.name, BoxKindName(b), BoxDetails(b))
+        }
+        boxLV.Opt("+Redraw")
+        try prevE.Value := StrReplace(EdPreview(t.body, ed.doc), "`n", "`r`n")
+            . (t.repeat ? "`r`n(Add another puts more lines like this one in the same log)" : "")
+        catch
+            prevE.Value := "(can't show this yet: check the { } boxes)"
+        probT.Text := EdProblems(ed.doc, ed.cur, ed.others)
+    }
+
+    Dirty() {
+        ed.dirty := true
+        Status()
+    }
+
+    Status(msg := "") {
+        statT.Text := msg != "" ? msg : ed.dirty ? "Changes not saved yet." : ed.doc.tpls.Length " templates, " ed.doc.lists.Length " shared lists. Nothing changed yet."
+        bSave.Enabled := ed.dirty
+    }
+
+    ; -- new, copy, delete, move to another section
+    ; The line number a new template goes in at: the end of its section
+    InsertAt(section) {
+        last := 0, head := 0
+        for t in ed.doc.tpls
+            if t.section = section
+                last := t.line
+        for s in ed.doc.sections
+            if s.name = section
+                head := s.line
+        if last
+            return last + 1
+        if head
+            return head + 1
+        return ed.doc.lines.Length + 1
+    }
+
+    AddLine(at, line) {
+        ed.doc.lines.InsertAt(Min(at, ed.doc.lines.Length + 1), line)
+        EdScan(ed.doc)
+        Dirty()
+        search.Value := ""
+        for i, t in ed.doc.tpls
+            if t.line = at {
+                Filter(i)
+                return
+            }
+        Filter()
+    }
+
+    NewTpl(*) {
+        section := ed.cur ? ed.doc.tpls[ed.cur].section : ed.doc.sections.Length ? ed.doc.sections[ed.doc.sections.Length].name : ""
+        trig := ";new", n := 1
+        while UsedTrig(trig)
+            trig := ";new" (++n)
+        AddLine(InsertAt(section), trig " (New template) = Type the log here.")
+        trigE.Focus()
+        SendMessage 0xB1, 0, -1, trigE
+    }
+
+    CopyTpl(*) {
+        if !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        trig := t.trig "2", n := 2
+        while UsedTrig(trig)
+            trig := t.trig (++n)
+        c := {trig: trig, name: t.name != "" ? t.name " (copy)" : "", body: t.body, repeat: t.repeat}
+        AddLine(t.line + 1, EdLine(c))
+        trigE.Focus()
+        SendMessage 0xB1, 0, -1, trigE
+    }
+
+    UsedTrig(trig) {
+        for t in ed.doc.tpls
+            if t.trig = trig
+                return true
+        return false
+    }
+
+    DeleteTpl(*) {
+        if !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        g.Opt("+OwnDialogs")
+        if MsgBox("Delete " t.trig (t.name != "" ? " (" t.name ")" : "") "?`n`nIt's gone once you Save (a copy of the old file is kept in the backups).", "Template editor", "YesNo Icon? Default2") != "Yes"
+            return
+        ed.doc.lines.RemoveAt(t.line)
+        next := ed.cur
+        EdScan(ed.doc)
+        Dirty()
+        Filter(Min(next, ed.doc.tpls.Length))
+    }
+
+    MoveSection(*) {
+        if ed.loading || !ed.cur || !secDD.Value
+            return
+        t := ed.doc.tpls[ed.cur]
+        want := ed.doc.sections[secDD.Value].name
+        if want = t.section
+            return
+        line := ed.doc.lines[t.line]
+        ed.doc.lines.RemoveAt(t.line)
+        EdScan(ed.doc)
+        at := InsertAt(want)
+        ed.doc.lines.InsertAt(Min(at, ed.doc.lines.Length + 1), line)
+        EdScan(ed.doc)
+        Dirty()
+        for i, x in ed.doc.tpls
+            if x.line = at
+                Filter(i)
+    }
+
+    ; -- boxes
+    ; row 0 = add a new box at the cursor; -1 = the box the cursor is in
+    BoxDlg(row) {
+        if !ed.cur
+            return
+        t := ed.doc.tpls[ed.cur]
+        raw := StrReplace(StrReplace(bodyE.Value, "`r`n", "`n"), "`n", "`r`n")
+        selA := 0, selB := 0
+        DllCall("SendMessage", "Ptr", bodyE.Hwnd, "UInt", 0xB0, "UInt*", &selA, "UInt*", &selB)   ; EM_GETSEL
+        tok := ""
+        if row = -1 {
+            ; the box the cursor is in, if any
+            ; the cursor's place counted without the line breaks' extra character
+            StrReplace(SubStr(raw, 1, selA), "`r`n", , , &breaks)
+            at := selA - breaks
+            for x in EdTokens(StrReplace(raw, "`r`n", "`n"))
+                if at >= x.pos - 1 && at <= x.pos - 1 + x.len
+                    tok := x
+            if !tok {
+                g.Opt("+OwnDialogs")
+                MsgBox "Pick a box in the list first (or click inside one in the wording).", "Template editor"
+                return
+            }
+        } else if row > 0
+            tok := ed.boxes[row]
+        b := tok ? BoxParse(SubStr(tok.code, 2, -1)) : BoxParse("")
+        names := []
+        for l in ed.doc.lists
+            names.Push(l.name)
+        for k in Lists
+            if !HasVal(names, k)
+                names.Push(k)
+        BoxForm(g, b, names, tok ? "" : NamesInUse(t.body), Done)
+
+        Done(code) {
+            body := StrReplace(bodyE.Value, "`r`n", "`n")
+            if tok {
+                nb := BoxParse(SubStr(code, 2, -1))
+                ; the first one is replaced; any other spot with the same box gets the new name
+                body := SubStr(body, 1, tok.pos - 1) code SubStr(body, tok.pos + tok.len)
+                if nb.name !== tok.key {
+                    for x in EdTokens(body)
+                        if x.key == tok.key
+                            body := StrReplace(body, x.code, "{" nb.name SubStr(x.code, 2 + StrLen(x.key)), , , 1)
+                }
+                bodyE.Value := StrReplace(body, "`n", "`r`n")
+                Changed()
+                return
+            }
+            ; a new box goes where the cursor was
+            raw := StrReplace(body, "`n", "`r`n")
+            bodyE.Value := SubStr(raw, 1, selA) code SubStr(raw, selB + 1)
+            Changed()
+            bodyE.Focus()
+            SendMessage 0xB1, selA + StrLen(code), selA + StrLen(code), bodyE
+        }
+    }
+
+    NamesInUse(body) {
+        names := Map()
+        names.CaseSense := false
+        for x in EdTokens(body)
+            names[x.key] := true
+        return names
+    }
+
+    RemoveBox(*) {
+        row := boxLV.GetNext()
+        if !ed.cur || !row
+            return
+        key := ed.boxes[row].key
+        body := StrReplace(bodyE.Value, "`r`n", "`n")
+        for x in EdTokens(body)
+            if x.key == key
+                body := StrReplace(body, x.code, "", , , 1)
+        body := RegExReplace(body, " {2,}", " ")
+        bodyE.Value := StrReplace(body, "`n", "`r`n")
+        Changed()
+    }
+
+    ; -- shared lists
+    FillLists(keep := 0) {
+        llv.Opt("-Redraw")
+        llv.Delete()
+        for l in ed.doc.lists
+            llv.Add(, "@" l.name, l.items.Length)
+        llv.Opt("+Redraw")
+        if ed.doc.lists.Length {
+            row := keep && keep <= ed.doc.lists.Length ? keep : 1
+            llv.Modify(row, "Select Focus Vis")
+            LoadList(row)
+        } else
+            LoadList(0)
+    }
+
+    LoadList(row) {
+        ed.curList := row
+        litemsE.Enabled := row > 0, bRenList.Enabled := row > 0, bDelList.Enabled := row > 0
+        ed.loading := true
+        if !row {
+            lnameT.Text := "No shared lists in this file yet. New list makes one.", litemsE.Value := "", lusedT.Text := ""
+            ed.loading := false
+            return
+        }
+        l := ed.doc.lists[row]
+        s := ""
+        for it in l.items
+            s .= it "`r`n"
+        litemsE.Value := s
+        ed.loading := false
+        lnameT.Text := "@" l.name "   (in a box it's written  {Table: @" l.name "})"
+        used := UsedBy(l.name)
+        lusedT.Text := used != "" ? "Used by: " used : "Not used by any template in this file yet."
+    }
+
+    UsedBy(name) {
+        used := ""
+        for t in ed.doc.tpls
+            if RegExMatch(t.body, "i)[:|]\s*@\Q" name "\E\s*[|}]")
+                used .= (used = "" ? "" : ", ") t.trig
+        return used
+    }
+
+    ListChanged(*) {
+        if ed.loading || !ed.curList
+            return
+        l := ed.doc.lists[ed.curList]
+        items := []
+        for it in StrSplit(StrReplace(litemsE.Value, "`r`n", "`n"), "`n")
+            if Trim(it) != ""
+                items.Push(Trim(StrReplace(StrReplace(StrReplace(it, "|"), "{"), "}")))
+        l.items := items
+        ed.doc.lines[l.line] := EdListLine(l)
+        llv.Modify(ed.curList, , "@" l.name, items.Length)
+        Dirty()
+        if ed.cur
+            Refresh()
+    }
+
+    NewList(*) {
+        g.Opt("+OwnDialogs")
+        ib := InputBox("Name of the new list (one word, like tables or pits):", "New shared list", "w360 h140")
+        if ib.Result != "OK"
+            return
+        name := Trim(ib.Value, " @`t")
+        if !RegExMatch(name, "^[\w-]+$") {
+            MsgBox "A list name is one word: letters, numbers, - or _.", "Template editor", "Icon!"
+            return
+        }
+        for l in ed.doc.lists
+            if l.name = name {
+                MsgBox "There's already a list called @" name ".", "Template editor", "Icon!"
+                return
+            }
+        ; after the last list, or before the first template
+        at := ed.doc.lists.Length ? ed.doc.lists[ed.doc.lists.Length].line + 1
+            : ed.doc.tpls.Length ? ed.doc.tpls[1].line : ed.doc.lines.Length + 1
+        ed.doc.lines.InsertAt(Min(at, ed.doc.lines.Length + 1), "@" name " = ")
+        EdScan(ed.doc)
+        Dirty()
+        for i, l in ed.doc.lists
+            if l.name = name
+                FillLists(i)
+        litemsE.Focus()
+    }
+
+    RenameList(*) {
+        if !ed.curList
+            return
+        l := ed.doc.lists[ed.curList]
+        g.Opt("+OwnDialogs")
+        ib := InputBox("New name for @" l.name " (every template that uses it is changed too):", "Rename list", "w380 h150", l.name)
+        if ib.Result != "OK"
+            return
+        name := Trim(ib.Value, " @`t")
+        if name == l.name
+            return
+        if !RegExMatch(name, "^[\w-]+$") {
+            MsgBox "A list name is one word: letters, numbers, - or _.", "Template editor", "Icon!"
+            return
+        }
+        old := l.name
+        l.name := name
+        ed.doc.lines[l.line] := EdListLine(l)
+        for t in ed.doc.tpls {
+            nb := RegExReplace(t.body, "i)([:|]\s*)@\Q" old "\E(?=\s*[|}])", "$1@" name)
+            if nb != t.body {
+                t.body := nb
+                ed.doc.lines[t.line] := EdLine(t)
+            }
+        }
+        EdScan(ed.doc)
+        Dirty()
+        FillLists(ed.curList)
+        Filter(ed.cur)
+    }
+
+    DeleteList(*) {
+        if !ed.curList
+            return
+        l := ed.doc.lists[ed.curList]
+        g.Opt("+OwnDialogs")
+        if (used := UsedBy(l.name)) != "" {
+            MsgBox "@" l.name " is used by " used ". Change those boxes first, then delete the list.", "Template editor", "Icon!"
+            return
+        }
+        if MsgBox("Delete the list @" l.name "?", "Template editor", "YesNo Icon? Default2") != "Yes"
+            return
+        ed.doc.lines.RemoveAt(l.line)
+        EdScan(ed.doc)
+        Dirty()
+        FillLists(ed.curList)
+        Filter(ed.cur)
+    }
+
+    ; -- saving and closing
+    Save() {
+        g.Opt("+OwnDialogs")
+        probs := ""
+        for i, t in ed.doc.tpls
+            if (p := EdProblems(ed.doc, i, ed.others)) != ""
+                probs .= t.trig ":  " StrReplace(p, "`n", "`n      ") "`n"
+        if probs != "" && MsgBox("These need fixing:`n`n" probs "`nWatchlog skips a template with a problem (and says why) until it's fixed. Save anyway?", "Template editor", "YesNo Icon! Default2") != "Yes"
+            return false
+        if ed.which = 1 && Cfg["SharedTemplates"] != "" && !ed.teamOk {
+            if MsgBox("This is the team's templates file. Saving changes the wording on every bay once OneDrive syncs it.`n`nSave it?", "Template editor", "YesNo Icon? Default1") != "Yes"
+                return false
+            ed.teamOk := true
+        }
+        if FileTimeOf(ed.doc.file) != ed.doc.time
+            && MsgBox("Someone (or OneDrive) changed this file since the editor opened it.`n`nSave over it anyway? (No = keep theirs: close the editor and open it again.)", "Template editor", "YesNo Icon! Default2") != "Yes"
+            return false
+        ver := ed.which = 1 ? EdBumpVersion(ed.doc) : ""
+        try EdWrite(ed.doc)
+        catch as e {
+            MsgBox "Couldn't save " ed.doc.file ":`n" e.Message "`n`nIf OneDrive is syncing, press Save again in a moment.", "Template editor", "Icon!"
+            return false
+        }
+        ed.dirty := false, ed.saved := true
+        Activity("Template editor: saved " ed.doc.file " (" ed.doc.tpls.Length " templates" (ver != "" ? ", wording version " ver : "") ")")
+        Status("Saved" (ver != "" ? " (wording version " ver ")" : "") ". The new wording works as soon as you close the editor.")
+        return true
+    }
+
+    CloseEd(*) {
+        global EditorWin
+        if !AskSave()
+            return true
+        EditorWin := ""
+        g.Destroy()
+        if ed.saved {
+            Tip("Loading the new templates...", 1500, true)
+            Sleep 300
+            ReloadOnce()
+        }
+    }
+}
+
+; The box form: what a box is called, what goes in it, and the extras.
+; done(code) gets the finished box, like {Amount: money | thousands}.
+BoxForm(owner, b, listNames, inUse, done) {
+    d := WGui("+AlwaysOnTop +Owner" owner.Hwnd, b.name = "" ? "Add a box" : "Box: " b.name)
+    d.SetFont("s10", "Segoe UI")
+    d.MarginX := 16, d.MarginY := 12
+    d.AddText("w520", "Name (shown above the box on the form):")
+    nameE := d.AddEdit("w300", b.name)
+    d.AddText("w520 y+12", "What goes in it:")
+    names := [], idx := 1
+    for i, k in BoxKinds() {
+        names.Push(k[2])
+        if k[1] = b.kind
+            idx := i
+    }
+    kindDD := d.AddDropDownList("w360 r12 Choose" idx, names)
+
+    d.SetFont("s10 bold")
+    d.AddText("xm y+14", "Choices")
+    d.SetFont("s10 norm")
+    listT := d.AddText("xm y+6", "Shared list:")
+    choices := listNames.Clone()
+    lidx := 0
+    for i, n in choices
+        if n = b.list
+            lidx := i
+    if !lidx && b.list != ""
+        choices.Push(b.list), lidx := choices.Length
+    listDD := d.AddDropDownList("x+8 yp-3 w200" (lidx ? " Choose" lidx : ""), choices)
+    itemsT := d.AddText("xm y+10 w520", "Choices, one per line:")
+    s := ""
+    for it in b.items
+        s .= it "`r`n"
+    itemsE := d.AddEdit("xm w520 r6 Multi WantReturn", s)
+    pickCB := d.AddCheckbox("xm" (b.pick ? " Checked" : ""), "Must pick one of the choices (no typing your own)")
+    fromCB := d.AddCheckbox("xm" (b.fromcopy ? " Checked" : ""), "Open on the job title found in the copied text")
+    minsT := d.AddText("xm y+8", "Plus this many minutes:")
+    minsE := d.AddEdit("x+8 yp-3 w60 Number", b.mins ? b.mins : "")
+    thouCB := d.AddCheckbox("xm y+8" (b.thousands ? " Checked" : ""), "A decimal point means thousands (3.3 becomes 3,300)")
+
+    d.SetFont("s10 bold")
+    d.AddText("xm y+14", "Extras (optional)")
+    d.SetFont("s10 norm")
+    capsCB := d.AddCheckbox("xm y+6" (b.caps ? " Checked" : ""), "Capitals in machine numbers (b1410 becomes B1410)")
+    upperCB := d.AddCheckbox("xm" (b.upper ? " Checked" : ""), "ALL CAPITALS (rn becomes RN)")
+    d.AddText("xm y+10", "If it's left empty, leave:")
+    blankDD := d.AddDropDownList("x+8 yp-3 w150 Choose" b.blankMode, ["XX", "nothing", "this text:"])
+    blankE := d.AddEdit("x+8 yp w140", b.blank)
+    d.AddText("xm y+10", "When filled in, put in front:")
+    prefixE := d.AddEdit("x+8 yp-3 w70", b.prefix)
+    d.AddText("x+12 yp+3", "and after:")
+    suffixE := d.AddEdit("x+8 yp-3 w70", b.suffix)
+    d.AddText("xm y+10", "Put in front of a number only:")
+    numE := d.AddEdit("x+8 yp-3 w120", b.numprefix)
+    d.AddText("xm y+10", "Fill in")
+    condValE := d.AddEdit("x+8 yp-3 w100", b.condVal)
+    d.AddText("x+8 yp+3", "when another box starts with")
+    condWhenE := d.AddEdit("x+8 yp-3 w80", b.condWhen)
+
+    d.SetFont("s9 c707070")
+    d.AddText("xm y+14", "In the wording it's written:")
+    d.SetFont("s10 c000000", "Consolas")
+    codeE := d.AddEdit("xm w520 r2 ReadOnly -TabStop BackgroundF1F5F5")
+    d.SetFont("s10", "Segoe UI")
+    okB := d.AddButton("xm y+12 w120 Default", "OK")
+    d.AddButton("x+6 w120", "Cancel").OnEvent("Click", Cancel)
+    okB.OnEvent("Click", OK)
+    d.OnEvent("Escape", Cancel)
+    d.OnEvent("Close", Cancel)
+    for c in [nameE, itemsE, minsE, blankE, prefixE, suffixE, numE, condValE, condWhenE]
+        c.OnEvent("Change", Update)
+    for c in [kindDD, listDD, blankDD]
+        c.OnEvent("Change", Update)
+    for c in [pickCB, fromCB, thouCB, capsCB, upperCB]
+        c.OnEvent("Click", Update)
+    owner.Opt("+Disabled")
+    Update()
+    d.Show()
+    nameE.Focus()
+
+    ; Reads the form into the box, greys out what doesn't apply
+    Read() {
+        b.name := Trim(StrReplace(StrReplace(StrReplace(StrReplace(nameE.Value, ":"), "{"), "}"), "|"))
+        b.kind := BoxKinds()[kindDD.Value][1]
+        b.list := listDD.Text
+        b.items := []
+        for it in StrSplit(StrReplace(itemsE.Value, "`r`n", "`n"), "`n")
+            if (it := Trim(Clean(it))) != ""
+                b.items.Push(it)
+        b.pick := pickCB.Value, b.fromcopy := fromCB.Value
+        b.mins := IsInteger(minsE.Value) ? Integer(minsE.Value) : 0
+        b.thousands := thouCB.Value, b.caps := capsCB.Value, b.upper := upperCB.Value
+        b.blankMode := blankDD.Value, b.blank := Clean(blankE.Value)
+        b.prefix := Clean(prefixE.Value), b.suffix := Clean(suffixE.Value), b.numprefix := Clean(numE.Value)
+        b.condVal := Clean(condValE.Value), b.condWhen := Trim(StrReplace(Clean(condWhenE.Value), "="))
+        return b
+    }
+
+    Clean(s) => StrReplace(StrReplace(StrReplace(s, "|"), "{"), "}")
+
+    Update(*) {
+        Read()
+        listy := BoxListy(b.kind)
+        listT.Enabled := listDD.Enabled := b.kind = "shared"
+        itemsT.Enabled := itemsE.Enabled := listy
+        itemsT.Text := b.kind = "shared" ? "Extra choices besides the list (optional), one per line:" : b.kind = "next" ? "Steps, in order, one per line:" : "Choices, one per line:"
+        pickCB.Enabled := fromCB.Enabled := listy
+        minsT.Enabled := minsE.Enabled := b.kind = "now"
+        thouCB.Enabled := b.kind = "money"
+        blankE.Enabled := blankDD.Value = 3
+        codeE.Value := BoxBuild(b)
+    }
+
+    OK(*) {
+        Read()
+        d.Opt("+OwnDialogs")
+        err := ""
+        if b.name = ""
+            err := "Give the box a name, like Machine or Amount."
+        else if StrLower(b.name) = "repeat"
+            err := "repeat is a special word. Pick another name."
+        else if (b.kind = "list" || b.kind = "next") && !b.items.Length
+            err := "Type at least one choice."
+        else if b.kind = "shared" && b.list = ""
+            err := "Pick a shared list (make one on the Shared lists tab first)."
+        if err != "" {
+            MsgBox err, "Box", "Icon!"
+            return
+        }
+        if IsObject(inUse) && inUse.Has(b.name)
+            && MsgBox("This log already has a box called " b.name ". Both spots get the same answer.`n`nUse the same name anyway?", "Box", "YesNo Icon? Default2") != "Yes"
+            return
+        code := BoxBuild(b)
+        Cancel()
+        done(code)
+    }
+
+    Cancel(*) {
+        owner.Opt("-Disabled")
+        d.Destroy()
+        try WinActivate "ahk_id " owner.Hwnd
+    }
+}
+
+; Makes my-templates.txt with its notes at the top (the first time)
+MakeMineFile() {
+    if FileExist(MyTemplatesFile)
+        return true
+    text := "
+    (
+# =====================================================================
+#  MY TEMPLATES - your own extra templates
+#  These go on top of the team's templates, for you only. Same format
+#  as templates.txt (the notes at the top of it explain it all).
+#  If the team file already uses a trigger, yours is skipped, so the
+#  team wording always wins. Save this file and the script reloads.
+#  The template editor (Ctrl+Alt+E) changes this file for you too.
+#
+#  Example (take the # off the start of the line to use it):
+#  ;mynote (My note) = Operator note at {Time: now}: {Note}
+# =====================================================================
+
+    )"
+    try FileAppend text, MyTemplatesFile, "UTF-8"
+    catch as e {
+        MsgBox "Couldn't make my-templates.txt:`n" e.Message, "Watchlog", "Icon!"
+        return false
+    }
+    WatchTimes[MyTemplatesFile] := FileTimeOf(MyTemplatesFile)
+    return true
+}
+
+
+; =====================================================================
+;  LOOK  (v3.22.0)  -  the dark theme with a blue accent
+;  Every window is made with WGui instead of Gui. It works out the colours
+;  from the ones the window asks for (dark text becomes light, white
+;  panels become dark, the old teal becomes the blue accent), so the
+;  windows stay readable either way. Customize > "Dark look" turns it off
+;  ([Look] Dark=no in settings.ini).
+; =====================================================================
+
+LookOn() => Cfg.Has("Dark") && Cfg["Dark"]
+
+; Dark or light for the windows opened from now on
+SetDarkLook(on) {
+    Cfg["Dark"] := on
+    try IniWrite(on ? "yes" : "no", SettingsFile, "Look", "Dark")
+    NoteOwnWrites()
+    Tip("Saved. Windows you open from now on use the " (on ? "dark" : "light") " look.", 2500, true)
+    BuildTrayMenu()
+}
+
+; The panel colour behind the numbers on the home window
+LookCard() => LookOn() ? "262C34" : "E3EEEE"
+
+LookRGB(c) {
+    if !RegExMatch(c, "i)^[0-9A-F]{6}$")
+        return ""
+    v := Integer("0x" c)
+    return [v >> 16, (v >> 8) & 255, v & 255]
+}
+
+LookLum(rgb) => (0.299 * rgb[1] + 0.587 * rgb[2] + 0.114 * rgb[3]) / 255
+
+; A text colour for the dark look
+LookText(c) {
+    if (rgb := LookRGB(c)) = ""
+        return c
+    if !LookOn()                                                                       ; light look: only the old teal changes
+        return rgb[1] + 40 < rgb[2] && rgb[1] + 40 < rgb[3] && Abs(rgb[2] - rgb[3]) < 40 ? "1F6FEB" : c
+    mx := Max(rgb[1], rgb[2], rgb[3]), mn := Min(rgb[1], rgb[2], rgb[3])
+    lum := LookLum(rgb)
+    if mx - mn < 40
+        return lum < 0.3 ? LOOK_FG : lum < 0.7 ? LOOK_MUTED : c
+    if rgb[1] + 40 < rgb[2] && rgb[1] + 40 < rgb[3] && Abs(rgb[2] - rgb[3]) < 40     ; the old teal
+        return LOOK_ACCENT
+    if rgb[3] > rgb[1] + 60 && rgb[3] > rgb[2]                                        ; blues
+        return "7DB8FF"
+    return Format("{:02X}{:02X}{:02X}", rgb[1] + (255 - rgb[1]) * 0.5, rgb[2] + (255 - rgb[2]) * 0.5, rgb[3] + (255 - rgb[3]) * 0.5)
+}
+
+; A window colour for the dark look: the light backgrounds turn dark
+LookBack(c) {
+    if !LookOn() || (rgb := LookRGB(c)) = ""
+        return c
+    return LookLum(rgb) > 0.8 ? LOOK_BG : c
+}
+
+; "s10 norm c606060" -> the same with the colour fixed
+LookFontOpts(o) {
+    out := "", pos := 1
+    while RegExMatch(o, "i)(?<![A-Za-z0-9])c([0-9A-F]{6})(?![A-Za-z0-9])", &m, pos) {
+        out .= SubStr(o, pos, m.Pos - pos) "c" LookText(m[1])
+        pos := m.Pos + m.Len
+    }
+    return out SubStr(o, pos)
+}
+
+LookInit() {
+    static done := false
+    if done || !LookOn()
+        return
+    done := true
+    try {
+        ux := DllCall("GetModuleHandle", "Str", "uxtheme", "Ptr")
+        DllCall(DllCall("GetProcAddress", "Ptr", ux, "Ptr", 135, "Ptr"), "Int", 2)      ; dark controls and menus
+        DllCall(DllCall("GetProcAddress", "Ptr", ux, "Ptr", 136, "Ptr"))
+    }
+}
+
+LookTheme(hwnd, name) {
+    try DllCall("uxtheme\SetWindowTheme", "Ptr", hwnd, "Str", name, "Ptr", 0)
+}
+
+; Dark title bar, then dark controls
+LookWindow(g) {
+    if !LookOn()
+        return
+    try {
+        v := Buffer(4, 0)
+        NumPut("Int", 1, v)
+        DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g.Hwnd, "Int", 20, "Ptr", v, "Int", 4)
+        DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g.Hwnd, "Int", 19, "Ptr", v, "Int", 4)
+    }
+    for hwnd, c in g
+        try LookControl(c)
+}
+
+LookControl(c) {
+    switch c.Type, false {
+        case "Edit", "ListBox", "TreeView":
+            c.Opt("+Background" LOOK_FIELD)
+            LookTheme(c.Hwnd, "DarkMode_Explorer")
+        case "ComboBox", "DDL":
+            c.Opt("+Background" LOOK_FIELD)
+            LookTheme(c.Hwnd, "DarkMode_CFD")
+        case "ListView":
+            bgr := (v) => ((v & 255) << 16) | (v & 0xFF00) | (v >> 16)
+            SendMessage(0x1001, 0, bgr(Integer("0x" LOOK_FIELD)), c)       ; background
+            SendMessage(0x1026, 0, bgr(Integer("0x" LOOK_FIELD)), c)       ; text background
+            SendMessage(0x1024, 0, bgr(Integer("0x" LOOK_FG)), c)          ; text
+            LookTheme(c.Hwnd, "DarkMode_Explorer")
+            if hdr := SendMessage(0x101F, 0, 0, c)
+                LookTheme(hdr, "DarkMode_ItemsView")
+        case "Button", "CheckBox", "Radio", "GroupBox":
+            LookTheme(c.Hwnd, "DarkMode_Explorer")
+    }
+}
+
+class WGui extends Gui {
+    __New(o?, t?, e?) {
+        super.__New(o?, t?, e?)
+        if LookOn() {
+            LookInit()
+            super.BackColor := LOOK_BG
+            super.SetFont("c" LOOK_FG)
+        }
+        SetTimer(LookWindow.Bind(this), -60)           ; once more, for anything added after Show
+    }
+    SetFont(o := "", f := "") {
+        if o = "" && f = "" && LookOn()
+            return super.SetFont("c" LOOK_FG)
+        return super.SetFont(LookFontOpts(o), f)
+    }
+    BackColor {
+        get => super.BackColor
+        set => super.BackColor := LookBack(value)
+    }
+    AddTab2(o := "", p := "") => super.AddTab2(LookOn() ? o " Buttons" : o, p)
+    AddTab3(o := "", p := "") => super.AddTab3(LookOn() ? o " Buttons" : o, p)
+    Show(o?) {
+        LookWindow(this)
+        return super.Show(o?)
+    }
+}

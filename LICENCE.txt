@@ -1,0 +1,22 @@
+=======================================================================
+  WATCHLOG LICENCE
+=======================================================================
+Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+
+Watchlog (the program and its guides) is not free or open software.
+
+1. You may use Watchlog only with the copyright holder's permission.
+
+2. You may not copy, share, sell, change, decompile, take apart or
+   redistribute Watchlog, in whole or in part, or make anything from
+   it, without the copyright holder's written permission.
+
+3. Permission can be withdrawn at any time. When it is, stop using
+   Watchlog and delete your copies.
+
+4. Watchlog is provided "as is", without any warranty. The copyright
+   holder is not liable for any loss or damage from using it. Always
+   check an entry before you save it.
+
+Your own settings, logins and log entries are not part of Watchlog and
+aren't covered by this licence.

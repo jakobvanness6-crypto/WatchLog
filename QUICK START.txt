@@ -1,7 +1,13 @@
 =======================================================================
-  WATCHLOG  v3.17.0  -  QUICK START  (one page)
+  WATCHLOG  v3.30.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
+Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
+Watchlog is used only with the copyright holder's permission. No
+copying, sharing, changing or redistributing it, in whole or in part,
+without written permission. Provided "as is", without warranty. The
+full licence is in LICENCE.txt (and tray menu > About Watchlog).
+
 
 WHAT IT DOES
   Type a short code like ;jack in iTrak and it becomes the full log
@@ -28,8 +34,8 @@ SET IT UP  (about 2 minutes, once per PC)
      there even when the network is slow.
   To see the tutorial again: tray icon > Tutorial.  To remove Watchlog:
   Settings > Apps > Watchlog > Uninstall (your settings are kept).
-  (The script version, Watchlog.ahk in the "Script version" folder,
-  still works if AutoHotkey v2 is installed. IT may prefer it.)
+  (IT can ask Jakob for the readable script version, Watchlog.ahk.
+  It isn't in this folder.)
 
 
 USE IT
@@ -41,9 +47,14 @@ USE IT
                            jackpot or medical) and press Enter.
   Ctrl+Alt+H               Cheat sheet: every code, login and hotkey.
   Tab / Enter / Esc        In a form: next box / insert / cancel.
+  Numpad +                 Call pad: jot a call, Ctrl+Enter makes the log
+                           (shorthand like  fill 205 5.5  makes it directly).
+  Ctrl+Alt+F               Full-entry daily log (Break, Table Drop ...):
+                           opens a new iTrak daily log and fills it in.
+  Caps Lock / Ctrl+Alt+A   Clear all Alert Grid alerts (look them over first).
   Ctrl+Alt+J               This shift's log counts, with Copy summary.
   Ctrl+Alt+L               Start of shift: opens the work apps and
-                           websites.  Ctrl+Alt+Shift+L closes them.
+                           Edge (facial rec, Citrix).  Ctrl+Alt+Shift+L closes them.
   Ctrl+Alt+P               Pause all shortcuts (press again to resume).
 
   Ctrl+Alt+E               Template editor: change the wording, add
@@ -60,6 +71,8 @@ WHAT IT KEEPS  (tray menu > Security and status shows it all, live)
     Journal, deleted after 30 days (Settings can change or turn it off).
   - Activity log: what the tool did and when (on this PC only). Never
     passwords or log text.
+  - Backups: once a day, your templates, settings and taught clicks (no
+    passwords), on this PC, last 14 days. Tray > Advanced > Restore.
   It makes no internet connections and doesn't keep what you type.
 
 
