@@ -1,24 +1,4 @@
-; ===== Watchlog.ahk PART 4 of 9 (lines 3835-5078 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; Adds dn logs and dkeys keystrokes (either can be negative, never below 0)
-; to the item in every tally
-AdjustCount(name, dn, dkeys, day) {
-    name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
-    try {
-        inShift := CountBump("ShiftItems", name, dn, dkeys)
-        CountBump("DayItems", day "|" name, dn, dkeys)
-        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
-        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys)
-        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
-        ; this shift's totals only when this shift's item tally had the log
-        ; (or, for an added log, while the shift is still going)
-        if dn < 0 ? inShift : !IniRead(SavedFile, "Shift", "Ended", 0) {
-            sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
-            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys)
-            IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
-        }
-    }
-}
-
+; ===== Watchlog.ahk PART 4 of 9 (lines 3855-5078 of 11200). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; One "times,keystrokes" line: add dn / dkeys (clamped at 0, deleted at 0 times).
 ; Returns whether the line had anything in it before.
 CountBump(section, key, dn, dkeys) {

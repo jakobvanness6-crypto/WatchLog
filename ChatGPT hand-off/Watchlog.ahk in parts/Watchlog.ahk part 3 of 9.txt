@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 3 of 9 (lines 2458-3834 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 3 of 9 (lines 2458-3854 of 11200). Delete this first line from each part, then join all 9 in order to get the full file. =====
 FileTimeOf(f) {
     try return FileGetTime(f, "M")
     return ""
@@ -1374,5 +1374,25 @@ JournalApplyEdit(oldText, newText, day) {
     for l in came
         AdjustCount(l.name, 1, l.tagged ? l.keys : 0, day)
     return {removed: gone.Length, added: came.Length}
+}
+
+; Adds dn logs and dkeys keystrokes (either can be negative, never below 0)
+; to the item in every tally
+AdjustCount(name, dn, dkeys, day) {
+    name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
+    try {
+        inShift := CountBump("ShiftItems", name, dn, dkeys)
+        CountBump("DayItems", day "|" name, dn, dkeys)
+        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys)
+        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        ; this shift's totals only when this shift's item tally had the log
+        ; (or, for an added log, while the shift is still going)
+        if dn < 0 ? inShift : !IniRead(SavedFile, "Shift", "Ended", 0) {
+            sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
+            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys)
+            IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+        }
+    }
 }
 

@@ -3,9 +3,15 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.30.1 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.30.2 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
+
+### Info From: type the name instead of the department: option 1 BUILT in v3.30.2 (Oct 31). Option 2 (name box on the form) not built.
+- v3.30.1 works on his bay, but a department search (dealer) lists every dealer past and present, so he still scrolls. He'd rather type the name.
+- Option 1 (suggested): Watchlog clicks Info From > Personnel, clicks into Look For and STOPS; he types part of the name and presses Enter. Works for any department.
+- Option 2: an optional name box on the code word form (for example ;open asks Table and Dealer last name); Watchlog types it into Look For; blank = option 1.
+- No names stored between logs. Asked: does Look For match the start of the LAST name? Option 1, 2 or both? Waiting on his answer and "build it".
 
 ### "Info From" department search: BUILT in v3.30.0 (Oct 31), notes kept for reference
 - Update Oct 31 (Jakob): he selects the person and clicks Select himself. The Look For box matches the START of what is typed: `dealer` finds dealers but `dealers` doesn't; `marketing` only lowercase; `F&B` for Food and Beverage; `security` and `audit` either case. So the list needs, for each department, the exact SEARCH TEXT (not just the department name below). Search text CONFIRMED (Jakob, Oct 31): Audit = audit, Security = security, Marketing = marketing, F&B (FOH and BOH) = F&B, Tables = dealer, HR = HR, Surveillance = surveillance, Property = property, Slots = slots, Cage = cage, OPS = OPS. Type exactly that text (case as given).

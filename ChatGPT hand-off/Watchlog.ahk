@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.30.1"
+VERSION := "3.30.2"
 VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -5235,6 +5235,10 @@ InfoFromRun(win, depts, name) {
     }
     CoordMode "Mouse", "Screen"
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    ; v3.30.2: by default you type the name yourself (a department search lists
+    ; everyone who ever worked there). settings.ini [ITrak] InfoFromTypeDept=yes
+    ; brings back typing the department for you.
+    typeDept := IniRead(SettingsFile, "ITrak", "InfoFromTypeDept", "no") = "yes"
     for i, d in depts {
         if !WinExist("ahk_id " win) {
             Activity("Info From (" name "): stopped, the daily log was closed")
@@ -5270,10 +5274,13 @@ InfoFromRun(win, depts, name) {
         }
         Click x, y
         Sleep 150
-        EntryType d
-        Sleep 80
-        SendInput "{Enter}"
-        Tip(i " of " depts.Length ": pick the " d " person and click Select  (Cancel skips)", 0, true)
+        if typeDept {
+            EntryType d
+            Sleep 80
+            SendInput "{Enter}"
+            Tip(i " of " depts.Length ": pick the " d " person and click Select  (Cancel skips)", 0, true)
+        } else
+            Tip(i " of " depts.Length ": type the " d " person's name, Enter, pick them and click Select  (Cancel skips)", 0, true)
         ; wait while the person is picked (3 minutes at most)
         if !WinWaitClose("ahk_id " pw, , 180) {
             Tip("")
@@ -5283,7 +5290,7 @@ InfoFromRun(win, depts, name) {
         Tip("")
         Sleep 500
     }
-    Activity("Info From (" name "): searched " depts.Length " department(s)")
+    Activity("Info From (" name "): opened the Personnel search " depts.Length " time(s)" (typeDept ? " (department typed)" : ""))
 }
 
 TeachInfoFrom() {
@@ -5350,7 +5357,7 @@ TeachInfoFromRun() {
         return
     }
     Activity("iTrak: Info From taught (daily log " cw "x" ch ", Personnel " pcw "x" pch ")")
-    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (`;fill, `;open, `;auto, `;jack, `;bv, `;mfill, `;account) now search Info From for each department after the log is filled. Keep the daily log and Personnel windows the same size.", "Teach Info From"
+    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (`;fill, `;open, `;auto, `;jack, `;bv, `;mfill, `;account) now open the Info From search for each person after the log is filled (you type the name). Keep the daily log and Personnel windows the same size.", "Teach Info From"
 }
 
 ; =====================================================================

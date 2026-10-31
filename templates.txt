@@ -15,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Oct 31, 2026 (2)
-# Program version: 3.30.1
+# Program version: 3.30.2
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -143,11 +143,12 @@
 #  daily log that is open in iTrak, or opens a new one. Press Shift+Enter on the form
 #  (or hold Shift when a no-box code word fires) to paste just the wording instead.
 #  Add  | end  last to click End Time's Now. Example:  the ;cards line below.
-#  Add  | from cage, security  (Look For search text, one per person, in order) to
-#  have Watchlog open Info From > Personnel and search each one after the log is
-#  filled; you pick the person and click Select. Teach it once: tray > iTrak >
-#  Teach Info From. Search text: audit, security, marketing, F&B, dealer, HR,
-#  surveillance, property, slots, cage, OPS.
+#  Add  | from cage, security  (one word per person, in order) to have Watchlog
+#  open Info From > Personnel for each one after the log is filled; you type the
+#  name, pick the person and click Select. Teach it once: tray > iTrak >
+#  Teach Info From. (With settings.ini [ITrak] InfoFromTypeDept=yes the words are
+#  typed into Look For: audit, security, marketing, F&B, dealer, HR,
+#  surveillance, property, slots, cage, OPS.)
 
 +Break = Surveillance | Duty | NA | Break
 +Table Drop = Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690) | Security Officers performed Table Drop

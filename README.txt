@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.30.1  -  README
+  WATCHLOG  v3.30.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1089,6 +1089,8 @@ Save it and it reloads itself.
   EntrySettle=     ms to let a new daily log finish drawing (default 600)
   PersonnelWindow= how to find Info From's Personnel window (default:
                    Personnel ahk_exe wfica32.exe)
+  InfoFromTypeDept= yes = type the department into Look For for you (default no:
+                   you type the name yourself, v3.30.2)
   RefuseIfResized= yes = don't click if iTrak is a different size than when
                    taught (default no)
 
@@ -1357,15 +1359,18 @@ Something else broke
  19. NEWER FEATURES  (v3.12 to v3.30, newest first)
 -----------------------------------------------------------------------
 INFO FROM PEOPLE SEARCH  (v3.30.0)
-  After a code word fills the daily log, Watchlog can attach the people for you, up to
-  the point where you choose who: it clicks the Info From button, Personnel, types the
-  department into Look For and presses Enter. You pick the person and click Select (or
-  Cancel to skip), and it goes on to the next department. A tip shows which one it is on.
+  After a code word fills the daily log, Watchlog opens the people search for you: it
+  clicks the Info From button, then Personnel, then clicks into Look For and stops. You
+  type the person's name, press Enter, pick them and click Select (or Cancel to skip),
+  and it opens the search again for the next person. A tip says who it is on (for
+  example "1 of 2: type the cage person's name").
+  v3.30.2: it no longer types the department (that listed everyone who ever worked
+  there). settings.ini [ITrak] InfoFromTypeDept=yes brings that back.
       ;fill, ;mfill    cage, then security        ;open, ;auto   dealer
       ;jack            OPS, slots, then cage       ;bv            slots, then security
       ;account         marketing
-  Set in templates.txt: end the code word's line with  | from cage, security  (the exact
-  text that works in Look For: audit, security, marketing, F&B, dealer, HR, surveillance,
+  Set in templates.txt: end the code word's line with  | from cage, security  (one word
+  per person, in order; with InfoFromTypeDept=yes it is the exact text typed in Look For: audit, security, marketing, F&B, dealer, HR, surveillance,
   property, slots, cage, OPS). Teach the three spots once per PC: open a daily log, then
   tray > iTrak > Teach Info From (the Info From button itself, NOT the arrow beside the
   box, which only lists recent names; then Personnel in its list; then the Look For box).

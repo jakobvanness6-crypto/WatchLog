@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2457 of 11193). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2457 of 11200). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Picks the file the templates come from and reads it.
 ; Returns {src, file, text, label, note}: src is "team", "team-copy" (the
 ; last good copy, because the shared file couldn't be read) or "local".
