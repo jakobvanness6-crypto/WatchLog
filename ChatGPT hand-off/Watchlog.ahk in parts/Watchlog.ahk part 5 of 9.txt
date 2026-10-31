@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 4944-6140 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 5 of 9 (lines 5001-6197 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Types text key by key (what Citrix handles best), a little slower than normal
 EntryType(text) {
     SetKeyDelay 20, 10

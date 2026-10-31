@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 30, 2026 (5)
-# Program version: 3.29.1
+# Wording version: Oct 31, 2026
+# Program version: 3.29.2
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -163,7 +163,7 @@
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes.
 ;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
 ;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
-;cards (Card change) = Card change on {Table: @tables}. >> Pit 2 | Card Change | NA
+;cards (Card change) = Card change on {Table: @tables}. >> %pit% | Card Change | NA
 ;break (Break) = Break >> Surveillance | Duty | NA
 ;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat} >> %pit% | Table Fill |
 ;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat} >> ABM/NRT | ATM/NRT/CTR fill |

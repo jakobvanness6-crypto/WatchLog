@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.29.1  -  README
+  WATCHLOG  v3.29.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1376,6 +1376,10 @@ MORE SAFEGUARDS  (v3.28.0)
     settings.ini, autocorrect list and the taught click files (no passwords: Windows keeps
     those) to %LOCALAPPDATA%\Watchlog\Backups\<date>. The last 14 are kept. Tray > Advanced >
     Back up my settings and templates now makes one by hand.
+  - templates.txt empty, missing or cut short (half-synced by OneDrive: fewer than half the
+    templates it had last time): Watchlog uses the newest good backup instead and says so,
+    and switches back by itself once templates.txt is right again (v3.29.2). The team file
+    works the same way with its saved copy.
   - Tray > Advanced > Restore from a backup... puts a backup back (what you have now is
     backed up first) and reloads.
   - Tray > Advanced > Go back to the previous version... puts back the copy Watchlog kept
@@ -1506,6 +1510,7 @@ DAILY LOG FILLS FOR THE SHORTHAND LOGS  (v3.26.2)
   open a new daily log in iTrak, or use the one already open, and fill Location, Topic and
   Reference, like ;cards and ;break. Reference is left empty on purpose where you fill it
   yourself (fill, jack, bv, mfill). Shift+Enter on the form still pastes just the wording.
+      ;cards  Pit | Card Change | NA  (the pit comes from the table, v3.29.2)
       ;fill   Pit | Table Fill |            ;open, ;auto   Pit | Table Opening/Closing | NA
       ;jack   Slots | Jackpot |   ;bv   Slots | Emergency Pull |
       ;mfill  ABM/NRT | ATM/NRT/CTR fill |

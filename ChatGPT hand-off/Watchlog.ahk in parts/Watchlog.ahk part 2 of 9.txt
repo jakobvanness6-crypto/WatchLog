@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2388 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2379 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Picks the file the templates come from and reads it.
 ; Returns {src, file, text, label, note}: src is "team", "team-copy" (the
 ; last good copy, because the shared file couldn't be read) or "local".
@@ -13,14 +13,32 @@ ReadTemplateSource() {
                 return {src: "local", file: TemplatesFile, text: "", label: "templates.txt"
                     , note: "Couldn't open templates.txt. If OneDrive isn't running, start it and press Ctrl+Alt+R."}
         }
+        ; empty, missing or cut short (half-synced): use the newest good backup
+        ; until templates.txt is right again (v3.29.2)
+        n := CountTemplates(text)
+        if TemplatesLookCut(n, "LastCount") && IsObject(bk := NewestTemplatesBackup(n)) {
+            text := bk.text
+            TemplateInfo(text)
+            Tpl.note := "templates.txt " (n ? "has only " n " templates (" TemplatesLastCount("LastCount") " last time)" : "is empty or missing") ", so the backup from " bk.when " is being used. It switches back by itself when templates.txt is right again; tray > Advanced > Restore from a backup puts the backup back for good."
+            Activity("templates.txt looked cut short (" n " templates); using the backup from " bk.when)
+            TrayTip Tpl.note, "Watchlog: templates", "Icon!"
+            return {src: "local", file: TemplatesFile, text: text, label: "templates.txt (backup from " bk.when ")", note: ""}
+        }
+        if n
+            try IniWrite n, LastUsedFile, "Templates", "LastCount"
         TemplateInfo(text)
         return {src: "local", file: TemplatesFile, text: text, label: "templates.txt", note: ""}
     }
     text := "", why := ""
     try {
         text := FileRead(shared, "UTF-8")
-        if !CountTemplates(text)
+        tn := CountTemplates(text)
+        if !tn
             why := "has no templates in it", text := ""
+        else if TemplatesLookCut(tn, "TeamCount")
+            why := "has only " tn " templates (" TemplatesLastCount("TeamCount") " last time; it may be half-synced)", text := ""
+        else
+            try IniWrite tn, LastUsedFile, "Templates", "TeamCount"
     } catch {
         why := FileExist(shared) ? "couldn't be opened (OneDrive may not be running)" : "isn't there (SharePoint may not have synced to this PC)"
     }
@@ -51,6 +69,45 @@ ReadTemplateSource() {
     Tpl.note := "The team templates file " why ", and there's no saved copy on this PC yet, so templates.txt in this folder is being used. Its wording may be older."
     return {src: "local", file: TemplatesFile, text: text, label: "templates.txt"
         , note: Tpl.note "`n`n   " shared}
+}
+
+; How many templates the file had the last time it loaded properly ("" = not known)
+TemplatesLastCount(key) {
+    try return IniRead(LastUsedFile, "Templates", key, "")
+    return ""
+}
+
+; True when a templates file with n templates looks empty or cut short:
+; none at all, or fewer than half of last time (when that was 10 or more)
+TemplatesLookCut(n, key) {
+    lastN := TemplatesLastCount(key)
+    return !n || (IsInteger(lastN) && lastN >= 10 && n < lastN // 2)
+}
+
+; The newest daily backup of templates.txt with more templates than n, as
+; {text, when}, or "" when there isn't one (backups: see DailyBackup)
+NewestTemplatesBackup(n) {
+    if !DirExist(DataDir "\Backups")
+        return ""
+    names := []
+    loop files DataDir "\Backups\*", "D"
+        names.Push(A_LoopFileName)
+    if !names.Length
+        return ""
+    names := SortNames(names)
+    loop names.Length {
+        folder := names[names.Length - A_Index + 1]
+        f := DataDir "\Backups\" folder "\home - templates.txt"
+        if !FileExist(f)
+            continue
+        try {
+            t := FileRead(f, "UTF-8")
+            c := CountTemplates(t)
+            if c > n && !TemplatesLookCut(c, "LastCount")
+                return {text: t, when: folder}
+        }
+    }
+    return ""
 }
 
 ; While the saved copy is in use: reload as soon as the shared file can be read
@@ -1186,70 +1243,4 @@ Space:: return
 Enter:: return
 NumpadEnter:: return
 #HotIf
-
-; Esc closes the login reminder from any window while it's showing
-#HotIf IsObject(ReminderGui)
-Esc:: CloseReminder()
-#HotIf
-
-; Tab / Shift+Tab / Enter only do this while a form is the active window
-#HotIf IsObject(CurForm) && WinActive("ahk_id " CurForm.hwnd)
-Tab:: FormMove(1)
-+Tab:: FormMove(-1)
-Enter:: CurForm.submit()
-NumpadEnter:: CurForm.submit()
-+Enter:: CurForm.submit()
-+NumpadEnter:: CurForm.submit()
-^Enter:: FormMore()
-^NumpadEnter:: FormMore()
-#HotIf
-
-; Ctrl+Enter in a form that has "Add another"
-FormMore() {
-    if IsObject(CurForm.more)
-        CurForm.more()
-}
-
-; 2130 -> 21:30, 930 -> 09:30, 21:30 stays 21:30
-FixTime(s) {
-    s := Trim(s)
-    if RegExMatch(s, "^\d{3,4}$") {
-        if StrLen(s) = 3
-            s := "0" s
-        s := SubStr(s, 1, 2) ":" SubStr(s, 3)
-    }
-    return s
-}
-
-; 10000 -> 10,000
-FixMoney(s) {
-    s := StrReplace(StrReplace(Trim(s), "$"), ",")
-    if RegExMatch(s, "^\d+(\.\d+)?$") {
-        parts := StrSplit(s, ".")
-        s := RegExReplace(parts[1], "\G\d+?(?=(\d{3})+$)", "$0,")
-            . (parts.Length > 1 ? "." parts[2] : "")
-    }
-    return s
-}
-
-
-; =====================================================================
-;  AUTO-RELOAD  -  checks every 2 seconds whether templates.txt,
-;  my-templates.txt, settings.ini or the team's shared file was saved,
-;  and reloads if so (so a supervisor's change to the team file reaches
-;  every PC as soon as OneDrive syncs it). Waits while a form or window
-;  is open, and while settings.ini is missing (OneDrive can briefly
-;  remove a file while it syncs - reloading then would start with no
-;  settings). Any other file that goes missing is skipped until it's back.
-; =====================================================================
-StartWatching() {
-    files := [TemplatesFile, MyTemplatesFile, SettingsFile]
-    if Cfg["SharedTemplates"] != ""
-        files.Push(Cfg["SharedTemplates"])
-    if TeamProgramFile() != ""
-        files.Push(TeamProgramFile())
-    for f in files
-        WatchTimes[f] := FileTimeOf(f)
-    SetTimer CheckForEdits, 2000
-}
 

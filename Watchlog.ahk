@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.29.1"
+VERSION := "3.29.2"
 VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -1146,14 +1146,32 @@ ReadTemplateSource() {
                 return {src: "local", file: TemplatesFile, text: "", label: "templates.txt"
                     , note: "Couldn't open templates.txt. If OneDrive isn't running, start it and press Ctrl+Alt+R."}
         }
+        ; empty, missing or cut short (half-synced): use the newest good backup
+        ; until templates.txt is right again (v3.29.2)
+        n := CountTemplates(text)
+        if TemplatesLookCut(n, "LastCount") && IsObject(bk := NewestTemplatesBackup(n)) {
+            text := bk.text
+            TemplateInfo(text)
+            Tpl.note := "templates.txt " (n ? "has only " n " templates (" TemplatesLastCount("LastCount") " last time)" : "is empty or missing") ", so the backup from " bk.when " is being used. It switches back by itself when templates.txt is right again; tray > Advanced > Restore from a backup puts the backup back for good."
+            Activity("templates.txt looked cut short (" n " templates); using the backup from " bk.when)
+            TrayTip Tpl.note, "Watchlog: templates", "Icon!"
+            return {src: "local", file: TemplatesFile, text: text, label: "templates.txt (backup from " bk.when ")", note: ""}
+        }
+        if n
+            try IniWrite n, LastUsedFile, "Templates", "LastCount"
         TemplateInfo(text)
         return {src: "local", file: TemplatesFile, text: text, label: "templates.txt", note: ""}
     }
     text := "", why := ""
     try {
         text := FileRead(shared, "UTF-8")
-        if !CountTemplates(text)
+        tn := CountTemplates(text)
+        if !tn
             why := "has no templates in it", text := ""
+        else if TemplatesLookCut(tn, "TeamCount")
+            why := "has only " tn " templates (" TemplatesLastCount("TeamCount") " last time; it may be half-synced)", text := ""
+        else
+            try IniWrite tn, LastUsedFile, "Templates", "TeamCount"
     } catch {
         why := FileExist(shared) ? "couldn't be opened (OneDrive may not be running)" : "isn't there (SharePoint may not have synced to this PC)"
     }
@@ -1184,6 +1202,45 @@ ReadTemplateSource() {
     Tpl.note := "The team templates file " why ", and there's no saved copy on this PC yet, so templates.txt in this folder is being used. Its wording may be older."
     return {src: "local", file: TemplatesFile, text: text, label: "templates.txt"
         , note: Tpl.note "`n`n   " shared}
+}
+
+; How many templates the file had the last time it loaded properly ("" = not known)
+TemplatesLastCount(key) {
+    try return IniRead(LastUsedFile, "Templates", key, "")
+    return ""
+}
+
+; True when a templates file with n templates looks empty or cut short:
+; none at all, or fewer than half of last time (when that was 10 or more)
+TemplatesLookCut(n, key) {
+    lastN := TemplatesLastCount(key)
+    return !n || (IsInteger(lastN) && lastN >= 10 && n < lastN // 2)
+}
+
+; The newest daily backup of templates.txt with more templates than n, as
+; {text, when}, or "" when there isn't one (backups: see DailyBackup)
+NewestTemplatesBackup(n) {
+    if !DirExist(DataDir "\Backups")
+        return ""
+    names := []
+    loop files DataDir "\Backups\*", "D"
+        names.Push(A_LoopFileName)
+    if !names.Length
+        return ""
+    names := SortNames(names)
+    loop names.Length {
+        folder := names[names.Length - A_Index + 1]
+        f := DataDir "\Backups\" folder "\home - templates.txt"
+        if !FileExist(f)
+            continue
+        try {
+            t := FileRead(f, "UTF-8")
+            c := CountTemplates(t)
+            if c > n && !TemplatesLookCut(c, "LastCount")
+                return {text: t, when: folder}
+        }
+    }
+    return ""
 }
 
 ; While the saved copy is in use: reload as soon as the shared file can be read

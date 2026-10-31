@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.29.1 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.29.2 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
@@ -34,6 +34,10 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.29.2 (Oct 31)
+- ;cards logs the table's pit (%pit%, from @pit) instead of always Pit 2 (templates.txt, wording version Oct 31, 2026).
+- templates.txt that loads empty or with fewer than half the templates of last time (10+) is replaced, in memory, by the newest backup that looks right; the team file falls back to its saved copy the same way. Counts kept in last used.ini [Templates] LastCount / TeamCount.
 
 ## Done in v3.29.1 (Oct 31)
 - Code and docs review: LoadTemplates declares `global Entries`; an app key can no longer take Ctrl+Alt+D or F (or a letter moved to in Customize); README history tags fixed (past bumps had rewritten them), README section 19 Newer features, settings.ini reference completed; Overview, IT Summary and Summary describe the iTrak daily log filling, break tracker and backups. tools/bump-version.py and build/release.sh added.

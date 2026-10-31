@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 9 of 9 (lines 9630-10950 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 9 of 9 (lines 9687-11007 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; ---- Reading and writing the file ------------------------------------
 ; A templates file as lines, plus where its templates, lists and section
 ; headings are. Only the lines that change are ever rewritten.

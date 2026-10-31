@@ -1,4 +1,93 @@
-; ===== Watchlog.ahk PART 8 of 9 (lines 8519-9629 of 10950). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 8 of 9 (lines 8487-9686 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; =====================================================================
+;  TRAY MENU  (v3.10.0)
+;  Click the teal icon by the clock = the Watchlog home window.
+;  Right-click = this menu: everyday things on top, the rest in small
+;  sub-menus (Alert Grid, Windows, Advanced). AutoHotkey's own items
+;  (Window Spy, Edit Script...) are gone; Reload and Pause are under
+;  Advanced.
+; =====================================================================
+BuildTrayMenu() {
+    global WinMenu
+    tm := A_TrayMenu
+    tm.Delete()
+    MenuItem(tm, "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - update needed" : ""), (*) => ShowVersion(), 0xE946)
+    tm.Add()
+    MenuItem(tm, HOME_MENU, (*) => ShowHome(), 0xE80F)
+    MenuItem(tm, "Find a template  (" HK("find") ")", (*) => ShowPicker(), 0xE721)
+    MenuItem(tm, "Cheat sheet  (" HK("cheat") ")", (*) => ShowCheatSheet(), 0xE8FD)
+    MenuItem(tm, "Shift journal  (" HK("journal") ")", (*) => ShowJournal(), 0xE8F1)
+    MenuItem(tm, "Call pad  (Numpad +)", (*) => ShowCallPad(), 0xE717)
+    MenuItem(tm, "Quick notes  (" HK("notes") ")", (*) => ShowNotes(), 0xE70B)
+    MenuItem(tm, "Time saved", (*) => ShowTimeSaved(), 0xE916)
+    MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
+    MenuItem(tm, "Shift dashboard  (" HK("dashboard") ")", (*) => ShowDashboard(), 0xE9D9)
+    tm.Add()
+    MenuItem(tm, "Start of shift  (" HK("start") ")", (*) => StartOfShift(), 0xE768)
+    MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
+
+    ag := Menu()
+    MenuItem(ag, "Clear all alerts  (" HK("alertclear") ")", (*) => ClearAlerts(), 0xE894)
+    MenuItem(ag, "Teach the clicks  (" HK("alertteach") ")", (*) => TeachAlerts(), 0xE7C9)
+    MenuItem(ag, "Share my setup with the team", (*) => ShareAlertSetup(), 0xE72D)
+    MenuItem(tm, "Alert Grid", ag, 0xEA8F)
+
+    itm := Menu()
+    MenuItem(itm, "New daily log  (" HK("itraknew") ")", (*) => ITrakNewLog(), 0xE710)
+    MenuItem(itm, "Teach the click  (" HK("itrakteach") ")", (*) => TeachITrak(), 0xE7C9)
+    MenuItem(itm, "Full-entry log  (" HK("entrypick") ")", (*) => ShowEntryPick(), 0xE8F1)
+    MenuItem(itm, "Teach the daily log fields  (" HK("entryteach") ")", (*) => TeachEntryFields(), 0xE7C9)
+    MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
+    MenuItem(tm, "iTrak", itm, 0xE8F1)
+
+    WinMenu := Menu()
+    MenuItem(WinMenu, "Save window layout  (" HK("savelayout") ")", (*) => SaveLayout(), 0xE74E)
+    MenuItem(WinMenu, "Put windows back  (" HK("restorelayout") ")", (*) => RestoreLayout(), 0xE7C4)
+    WinMenu.Add(CAPS_MENU, (*) => ToggleCapsGuard())
+    if CapsGuard
+        WinMenu.Check(CAPS_MENU)
+    MenuItem(tm, "Windows", WinMenu, 0xE7F4)
+    tm.Add()
+
+    MenuItem(tm, "Template editor  (" HK("editor") ")", (*) => ShowEditor(), 0xE70F)
+    MenuItem(tm, "Customize Watchlog...", (*) => ShowCustomize(), 0xE713)
+    tm.Add("Dark look", (*) => SetDarkLook(!Cfg["Dark"]))
+    if Cfg["Dark"]
+        tm.Check("Dark look")
+    MenuItem(tm, "Settings", (*) => ShowSettings(), 0xE713)
+    MenuItem(tm, "Tutorial", (*) => ShowTutorial(), 0xE7BE)
+    MenuItem(tm, "About Watchlog", (*) => ShowAbout(), 0xE946)
+
+    more := Menu()
+    MenuItem(more, "Security and status", (*) => ShowSecurity(), 0xE72E)
+    MenuItem(more, "Activity log", (*) => OpenActivity(), 0xE81C)
+    MenuItem(more, "Make a copy to share", (*) => MakeShareCopy(), 0xE8C8)
+    more.Add()
+    MenuItem(more, (Cfg["SharedTemplates"] != "" ? "Edit team templates" : "Edit templates") " in Notepad", (*) => EditFile(Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile), 0xE8A5)
+    MenuItem(more, "Edit my templates in Notepad", (*) => EditMine(), 0xE8A5)
+    MenuItem(more, "Edit settings file", (*) => EditFile(SettingsFile), 0xE8A5)
+    MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
+    MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
+    MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
+    more.Add()
+    MenuItem(more, "Back up my settings and templates now", (*) => BackupNow(), 0xE74E)
+    MenuItem(more, "Restore from a backup...", (*) => ShowRestore(), 0xE777)
+    MenuItem(more, "Go back to the previous version...", (*) => GoBackVersion(), 0xE72B)
+    if SkippedVersion() != ""
+        MenuItem(more, "Offer the skipped update again (v" SkippedVersion() ")", (*) => ClearSkippedVersion(), 0xE896)
+    more.Add()
+    MenuItem(more, "Pause all shortcuts  (Ctrl+Alt+P)", (*) => TogglePause(), 0xE769)
+    MenuItem(more, "Reload Watchlog  (Ctrl+Alt+R)", (*) => Reload(), 0xE72C)
+    MenuItem(tm, "Advanced", more, 0xE712)
+    tm.Add()
+    MenuItem(tm, "Exit Watchlog", (*) => ExitApp(), 0xE711)
+
+    ; One click on the tray icon opens the home window
+    tm.Default := HOME_MENU
+    tm.ClickCount := 1
+}
+
+
 ; =====================================================================
 ;  CUSTOMIZE WATCHLOG  (v3.21.0)  -  tray menu > Customize Watchlog,
 ;  or the Customize button on the home window
