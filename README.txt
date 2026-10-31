@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.30.2  -  README
+  WATCHLOG  v3.31.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -50,7 +50,7 @@ CONTENTS
  16. Setting it up on another PC, or for a new operator (the exe)
  17. Troubleshooting
  18. Rules worth keeping
- 19. Newer features (Info From search, break tracker, safeguards, code words that fill the daily log, call pad)
+ 19. Newer features (break tracker, safeguards, code words that fill the daily log, call pad)
 
 
 -----------------------------------------------------------------------
@@ -726,7 +726,7 @@ and the less-used items sit in sub-menus):
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
                                 (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
                                 Teach the daily log fields (Ctrl+Alt+Shift+F),
-                                Teach Info From (v3.30.0), Share my setup (v3.19.0)
+                                Share my setup (v3.19.0)
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -1087,10 +1087,6 @@ Save it and it reloads itself.
   Pause=           ms after each click in the daily log (default 300)
   EntryWait=       ms to wait for a new daily log to open (default 8000)
   EntrySettle=     ms to let a new daily log finish drawing (default 600)
-  PersonnelWindow= how to find Info From's Personnel window (default:
-                   Personnel ahk_exe wfica32.exe)
-  InfoFromTypeDept= yes = type the department into Look For for you (default no:
-                   you type the name yourself, v3.30.2)
   RefuseIfResized= yes = don't click if iTrak is a different size than when
                    taught (default no)
 
@@ -1358,28 +1354,6 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.30, newest first)
 -----------------------------------------------------------------------
-INFO FROM PEOPLE SEARCH  (v3.30.0)
-  After a code word fills the daily log, Watchlog opens the people search for you: it
-  clicks the Info From button, then Personnel, then clicks into Look For and stops. You
-  type the person's name, press Enter, pick them and click Select (or Cancel to skip),
-  and it opens the search again for the next person. A tip says who it is on (for
-  example "1 of 2: type the cage person's name").
-  v3.30.2: it no longer types the department (that listed everyone who ever worked
-  there). settings.ini [ITrak] InfoFromTypeDept=yes brings that back.
-      ;fill, ;mfill    cage, then security        ;open, ;auto   dealer
-      ;jack            OPS, slots, then cage       ;bv            slots, then security
-      ;account         marketing
-  Set in templates.txt: end the code word's line with  | from cage, security  (one word
-  per person, in order; with InfoFromTypeDept=yes it is the exact text typed in Look For: audit, security, marketing, F&B, dealer, HR, surveillance,
-  property, slots, cage, OPS). Teach the three spots once per PC: open a daily log, then
-  tray > iTrak > Teach Info From (the Info From button itself, NOT the arrow beside the
-  box, which only lists recent names; then Personnel in its list; then the Look For box).
-  v3.30.1: spots taught with v3.30.0 (the arrow) are ignored: teach it again once.
-  Keep the daily log and Personnel windows the same size as when taught. It stops if a
-  window doesn't open, and waits up to 3 minutes for each pick.
-  settings.ini [ITrak] PersonnelWindow= how to find the Personnel window (default
-  Personnel ahk_exe wfica32.exe). Built, NOT run (the sandbox can't run AutoHotkey).
-
 BREAK TIME TRACKER  (v3.29.0)
   You get 60 minutes of break a shift, split however you like. Watchlog keeps count:
   - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The
