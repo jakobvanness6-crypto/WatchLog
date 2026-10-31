@@ -1,4 +1,21 @@
-; ===== Watchlog.ahk PART 9 of 9 (lines 9687-11007 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 9 of 9 (lines 9825-11162 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; The kinds of box, in the order the box form lists them
+BoxKinds() {
+    static kinds := [["plain", "Text you type"]
+        , ["list", "A list of choices"]
+        , ["shared", "A shared list (like @tables)"]
+        , ["next", "Steps: opens on the one after last time"]
+        , ["now", "The time now (can be changed)"]
+        , ["time", "A time you type (2130 becomes 21:30)"]
+        , ["money", "Money (10000 becomes 10,000)"]
+        , ["percent", "A percentage (67 becomes 67%)"]
+        , ["clip", "A copied number (copy it first)"]
+        , ["last", "Remembers what was typed last time"]
+        , ["alertcopy", "Facial rec alert # (copied in Edge)"]
+        , ["matchcopy", "Facial rec match % (copied in Edge)"]]
+    return kinds
+}
+
 ; ---- Reading and writing the file ------------------------------------
 ; A templates file as lines, plus where its templates, lists and section
 ; headings are. Only the lines that change are ever rewritten.

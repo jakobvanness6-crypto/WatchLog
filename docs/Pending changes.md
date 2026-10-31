@@ -3,11 +3,11 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.29.2 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.30.0 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
 
 ## Waiting to be built
 
-### Idea: "Info From" department search (Jakob's coworker, Oct 30, NOT built, waiting on Jakob's OK and "build it")
+### "Info From" department search: BUILT in v3.30.0 (Oct 31), notes kept for reference
 - Update Oct 31 (Jakob): he selects the person and clicks Select himself. The Look For box matches the START of what is typed: `dealer` finds dealers but `dealers` doesn't; `marketing` only lowercase; `F&B` for Food and Beverage; `security` and `audit` either case. So the list needs, for each department, the exact SEARCH TEXT (not just the department name below). Search text CONFIRMED (Jakob, Oct 31): Audit = audit, Security = security, Marketing = marketing, F&B (FOH and BOH) = F&B, Tables = dealer, HR = HR, Surveillance = surveillance, Property = property, Slots = slots, Cage = cage, OPS = OPS. Type exactly that text (case as given).
 - People attached per code word (Jakob, Oct 31; several people per log, one search each, in this order; he picks each person and clicks Select, then Watchlog opens Info From > Personnel for the next):
   - fill: cashier, officer
@@ -29,6 +29,9 @@ In iTrak's Info From section you attach anyone involved. Watchlog should not pic
 - Department list CONFIRMED complete for now (Jakob, Oct 30): Audit, HR, Marketing, Security, Surveillance, Property, Tables, Slots, Cage, OPS, Food & Beverage (FOH), Food & Beverage (BOH).
 - Must be editable (Jakob's rule: the program stays editable): the list lives in a shared list in templates.txt (like @tables, for example `@departments = ...`) AND gets a screen in Customize Watchlog to add, rename, reorder and remove departments, with the same backup-on-save as the other editors. Shipped with the 12 above.
 
+### Idea: paste instead of type in the daily log boxes (Jakob, Oct 31, NOT built)
+Synopsis is already pasted; Location, Topic, Reference and the Info From Look For box are typed key by key (EntryType, 20 ms a key). Option to test on one bay: settings.ini [ITrak] PasteFields=reference,lookfor (and maybe location,topic). Risks: Location/Topic are search drop-downs that may not narrow on a paste; every paste goes through the Citrix clipboard (has stuck before). Waiting on Jakob's word.
+
 ### Idea: autocorrect everywhere, including Citrix/iTrak (NOT built)
 Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Shorthand lines (step 1) shipped in v3.26.x, so this is next whenever Jakob wants it.
 
@@ -43,6 +46,9 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.30.0 (Oct 31)
+- Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From arrow, Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.
 
 ## Done in v3.29.2 (Oct 31)
 - ;cards logs the table's pit (%pit%, from @pit) instead of always Pit 2 (templates.txt, wording version Oct 31, 2026).

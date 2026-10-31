@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2379 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 2 of 9 (lines 1135-2437 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Picks the file the templates come from and reads it.
 ; Returns {src, file, text, label, note}: src is "team", "team-copy" (the
 ; last good copy, because the shared file couldn't be read) or "local".
@@ -353,9 +353,21 @@ TemplateFill(out, title) {
         return false
     ; several lines (Add another): each ends with its own  >> ..., the last one is used
     syn := Trim(RegExReplace(out, " >> [^\r\n]*", ""))
+    ; after the three boxes: "end" (click End Time Now) and/or "from a, b"
+    ; (the Info From people to search for, by department, v3.30.0)
+    isEnd := false, from := []
+    loop parts.Length - 3 {
+        extra := Trim(parts[A_Index + 3])
+        if StrLower(extra) = "end"
+            isEnd := true
+        else if RegExMatch(extra, "i)^from\s+(.+)$", &fm)
+            for d in StrSplit(fm[1], ",")
+                if Trim(d) != ""
+                    from.Push(Trim(d))
+    }
     RunEntry({name: title, loc: FillDerive(Trim(parts[1]), syn), topic: FillDerive(Trim(parts[2]), syn)
         , ref: FillDerive(Trim(parts[3]), syn), syn: syn
-        , end: parts.Length >= 4 && StrLower(Trim(parts[4])) = "end", src: "code"}, true)
+        , end: isEnd, from: from, src: "code"}, true)
     return true
 }
 
@@ -1243,4 +1255,50 @@ Space:: return
 Enter:: return
 NumpadEnter:: return
 #HotIf
+
+; Esc closes the login reminder from any window while it's showing
+#HotIf IsObject(ReminderGui)
+Esc:: CloseReminder()
+#HotIf
+
+; Tab / Shift+Tab / Enter only do this while a form is the active window
+#HotIf IsObject(CurForm) && WinActive("ahk_id " CurForm.hwnd)
+Tab:: FormMove(1)
++Tab:: FormMove(-1)
+Enter:: CurForm.submit()
+NumpadEnter:: CurForm.submit()
++Enter:: CurForm.submit()
++NumpadEnter:: CurForm.submit()
+^Enter:: FormMore()
+^NumpadEnter:: FormMore()
+#HotIf
+
+; Ctrl+Enter in a form that has "Add another"
+FormMore() {
+    if IsObject(CurForm.more)
+        CurForm.more()
+}
+
+; 2130 -> 21:30, 930 -> 09:30, 21:30 stays 21:30
+FixTime(s) {
+    s := Trim(s)
+    if RegExMatch(s, "^\d{3,4}$") {
+        if StrLen(s) = 3
+            s := "0" s
+        s := SubStr(s, 1, 2) ":" SubStr(s, 3)
+    }
+    return s
+}
+
+; 10000 -> 10,000
+FixMoney(s) {
+    s := StrReplace(StrReplace(Trim(s), "$"), ",")
+    if RegExMatch(s, "^\d+(\.\d+)?$") {
+        parts := StrSplit(s, ".")
+        s := RegExReplace(parts[1], "\G\d+?(?=(\d{3})+$)", "$0,")
+            . (parts.Length > 1 ? "." parts[2] : "")
+    }
+    return s
+}
+
 

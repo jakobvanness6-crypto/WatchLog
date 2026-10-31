@@ -2,13 +2,13 @@
 
 Oct 31, 2026 · Jakob
 
-Watchlog is a small Windows program I built that types our standard surveillance log entries. I type a short code like `;interior` and the full wording appears. It's written in AutoHotkey v2 and comes as one Watchlog.exe with the AutoHotkey runtime built in, so nothing else is installed. The same program is also available as one plain text script for anyone to read. I'm on version 3.29.2 and have been using it on my own shifts since October 13. I'm asking for approval so other operators and supervisors can use it if they choose to, on our 3 operator bays and the supervisor bay.
+Watchlog is a small Windows program I built that types our standard surveillance log entries. I type a short code like `;interior` and the full wording appears. It's written in AutoHotkey v2 and comes as one Watchlog.exe with the AutoHotkey runtime built in, so nothing else is installed. The same program is also available as one plain text script for anyone to read. I'm on version 3.30.0 and have been using it on my own shifts since October 13. I'm asking for approval so other operators and supervisors can use it if they choose to, on our 3 operator bays and the supervisor bay.
 
 ## What it does and doesn't do
 
 - It types and pastes what the operator would have typed. The operator still saves the entry. It doesn't change iTrak, SDS or any other system.
 - It clears the Alert Grid list when the operator presses Caps Lock or Ctrl+Alt+A. It clicks the same steps as by hand (Ctrl+A, right-click, Acknowledge as received, Submit, OK) using screen positions taught once per PC. The Acknowledge box is filled in by Alert Grid with the operator's own login. Watchlog never reads or types into it.
-- It can open a new iTrak daily log and fill in Location, Topic, Reference and Synopsis by clicking spots taught once per PC. It never clicks Save: the operator reads the entry and saves it.
+- It can open a new iTrak daily log and fill in Location, Topic, Reference and Synopsis by clicking spots taught once per PC, then search Info From > Personnel by department so the operator can pick the person. It never clicks Save: the operator reads the entry and saves it.
 - SDS signs the operator out after an hour. Watchlog types the saved SDS login again about 62 minutes after an SDS login the operator did, only if SDS is on its login screen, and then puts the operator's previous window back. It retries once a minute up to 6 times and can be turned off in Settings > Logins.
 - It doesn't connect to the internet or send anything anywhere. Its files only travel through OneDrive and SharePoint under our normal Microsoft 365 permissions.
 - It doesn't record what anyone types. It only watches for its own codes. It reads the clipboard only for a form box that takes a copy, and keeps a copied facial rec alert number or match % in memory for 2 minutes at most.

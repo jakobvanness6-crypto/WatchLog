@@ -1,4 +1,22 @@
-; ===== Watchlog.ahk PART 8 of 9 (lines 8487-9686 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 8 of 9 (lines 8623-9824 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; Adds a menu item with a picture from the icon font
+MenuItem(m, name, fn, glyph := 0) {
+    m.Add(name, fn)
+    if glyph && (h := GlyphIcon(glyph, 0x0E746E, DllCall("GetSystemMetrics", "Int", 49)))
+        try m.SetIcon(name, "HICON:*" h)
+}
+
+; A big button with a picture on the left and one or two lines of text
+IconButton(g, opt, text, glyph, color, fn) {
+    b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
+    color := Integer("0x" LookText(Format("{:06X}", color)))
+    if glyph && (h := GlyphIcon(glyph, color, 24))
+        SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
+    b.OnEvent("Click", fn)
+    return b
+}
+
+
 ; =====================================================================
 ;  TRAY MENU  (v3.10.0)
 ;  Click the teal icon by the clock = the Watchlog home window.
@@ -37,6 +55,7 @@ BuildTrayMenu() {
     MenuItem(itm, "Teach the click  (" HK("itrakteach") ")", (*) => TeachITrak(), 0xE7C9)
     MenuItem(itm, "Full-entry log  (" HK("entrypick") ")", (*) => ShowEntryPick(), 0xE8F1)
     MenuItem(itm, "Teach the daily log fields  (" HK("entryteach") ")", (*) => TeachEntryFields(), 0xE7C9)
+    MenuItem(itm, "Teach Info From (people search)", (*) => TeachInfoFrom(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 
@@ -1181,21 +1200,4 @@ HomeLogin(rec) {
 ;  into it doesn't open the jackpot form.
 ; =====================================================================
 ; (set up by RegisterHotkeys, see HotkeyDefs)
-
-; The kinds of box, in the order the box form lists them
-BoxKinds() {
-    static kinds := [["plain", "Text you type"]
-        , ["list", "A list of choices"]
-        , ["shared", "A shared list (like @tables)"]
-        , ["next", "Steps: opens on the one after last time"]
-        , ["now", "The time now (can be changed)"]
-        , ["time", "A time you type (2130 becomes 21:30)"]
-        , ["money", "Money (10000 becomes 10,000)"]
-        , ["percent", "A percentage (67 becomes 67%)"]
-        , ["clip", "A copied number (copy it first)"]
-        , ["last", "Remembers what was typed last time"]
-        , ["alertcopy", "Facial rec alert # (copied in Edge)"]
-        , ["matchcopy", "Facial rec match % (copied in Edge)"]]
-    return kinds
-}
 

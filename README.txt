@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.29.2  -  README
+  WATCHLOG  v3.30.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -50,7 +50,7 @@ CONTENTS
  16. Setting it up on another PC, or for a new operator (the exe)
  17. Troubleshooting
  18. Rules worth keeping
- 19. Newer features (break tracker, safeguards, code words that fill the daily log, call pad)
+ 19. Newer features (Info From search, break tracker, safeguards, code words that fill the daily log, call pad)
 
 
 -----------------------------------------------------------------------
@@ -726,7 +726,7 @@ and the less-used items sit in sub-menus):
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
                                 (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
                                 Teach the daily log fields (Ctrl+Alt+Shift+F),
-                                Share my setup (v3.19.0)
+                                Teach Info From (v3.30.0), Share my setup (v3.19.0)
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -1087,6 +1087,8 @@ Save it and it reloads itself.
   Pause=           ms after each click in the daily log (default 300)
   EntryWait=       ms to wait for a new daily log to open (default 8000)
   EntrySettle=     ms to let a new daily log finish drawing (default 600)
+  PersonnelWindow= how to find Info From's Personnel window (default:
+                   Personnel ahk_exe wfica32.exe)
   RefuseIfResized= yes = don't click if iTrak is a different size than when
                    taught (default no)
 
@@ -1352,8 +1354,25 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.29, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.30, newest first)
 -----------------------------------------------------------------------
+INFO FROM PEOPLE SEARCH  (v3.30.0)
+  After a code word fills the daily log, Watchlog can attach the people for you, up to
+  the point where you choose who: it clicks the Info From arrow, Personnel, types the
+  department into Look For and presses Enter. You pick the person and click Select (or
+  Cancel to skip), and it goes on to the next department. A tip shows which one it is on.
+      ;fill, ;mfill    cage, then security        ;open, ;auto   dealer
+      ;jack            OPS, slots, then cage       ;bv            slots, then security
+      ;account         marketing
+  Set in templates.txt: end the code word's line with  | from cage, security  (the exact
+  text that works in Look For: audit, security, marketing, F&B, dealer, HR, surveillance,
+  property, slots, cage, OPS). Teach the three spots once per PC: open a daily log, then
+  tray > iTrak > Teach Info From (Info From arrow, Personnel line, Look For box).
+  Keep the daily log and Personnel windows the same size as when taught. It stops if a
+  window doesn't open, and waits up to 3 minutes for each pick.
+  settings.ini [ITrak] PersonnelWindow= how to find the Personnel window (default
+  Personnel ahk_exe wfica32.exe). Built, NOT run (the sandbox can't run AutoHotkey).
+
 BREAK TIME TRACKER  (v3.29.0)
   You get 60 minutes of break a shift, split however you like. Watchlog keeps count:
   - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The

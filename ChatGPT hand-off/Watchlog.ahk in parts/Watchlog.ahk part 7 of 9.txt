@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 7 of 9 (lines 7407-8486 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 7 of 9 (lines 7561-8622 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
 CopyLogins() {
     list := []
     for l in LoginList
@@ -1060,22 +1060,4 @@ GlyphIcon(code, color := 0x0E746E, size := 16) {
     made[key] := h
     return h
 }
-
-; Adds a menu item with a picture from the icon font
-MenuItem(m, name, fn, glyph := 0) {
-    m.Add(name, fn)
-    if glyph && (h := GlyphIcon(glyph, 0x0E746E, DllCall("GetSystemMetrics", "Int", 49)))
-        try m.SetIcon(name, "HICON:*" h)
-}
-
-; A big button with a picture on the left and one or two lines of text
-IconButton(g, opt, text, glyph, color, fn) {
-    b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
-    color := Integer("0x" LookText(Format("{:06X}", color)))
-    if glyph && (h := GlyphIcon(glyph, color, 24))
-        SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
-    b.OnEvent("Click", fn)
-    return b
-}
-
 

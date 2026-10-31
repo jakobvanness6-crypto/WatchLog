@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 31, 2026
-# Program version: 3.29.2
+# Wording version: Oct 31, 2026 (2)
+# Program version: 3.30.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -95,7 +95,7 @@
 
 # ----- FORMS ---------------------------------------------------------
 
-;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot |
+;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot | | from OPS, slots, cage
 
 ;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed.
 
@@ -122,7 +122,7 @@
 ;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
 
 ;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
-;account (Account under review) = Account #{Account #: blank=XXXXXX} reviewed, not banned player. Account cleared and Guest Services notified. >> Guest Services | Account under review | M6 (417)
+;account (Account under review) = Account #{Account #: blank=XXXXXX} reviewed, not banned player. Account cleared and Guest Services notified. >> Guest Services | Account under review | M6 (417) | from marketing
 ;drop (Table drop) = Security Officers performed Table Drop >> Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690)
 ;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep. >> Cage ManTrap | Security Escort | M6 (972,973)
 
@@ -143,6 +143,11 @@
 #  daily log that is open in iTrak, or opens a new one. Press Shift+Enter on the form
 #  (or hold Shift when a no-box code word fires) to paste just the wording instead.
 #  Add  | end  last to click End Time's Now. Example:  the ;cards line below.
+#  Add  | from cage, security  (Look For search text, one per person, in order) to
+#  have Watchlog open Info From > Personnel and search each one after the log is
+#  filled; you pick the person and click Select. Teach it once: tray > iTrak >
+#  Teach Info From. Search text: audit, security, marketing, F&B, dealer, HR,
+#  surveillance, property, slots, cage, OPS.
 
 +Break = Surveillance | Duty | NA | Break
 +Table Drop = Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690) | Security Officers performed Table Drop
@@ -161,18 +166,18 @@
 # ----- TABLES --------------------------------------------------------
 
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes.
-;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
-;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
+;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA | from dealer
+;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA | from dealer
 ;cards (Card change) = Card change on {Table: @tables}. >> %pit% | Card Change | NA
 ;break (Break) = Break >> Surveillance | Duty | NA
-;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat} >> %pit% | Table Fill |
-;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat} >> ABM/NRT | ATM/NRT/CTR fill |
+;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat} >> %pit% | Table Fill | | from cage, security
+;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat} >> ABM/NRT | ATM/NRT/CTR fill | | from cage, security
 ;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=}
 
 
 # ----- SLOTS ---------------------------------------------------------
 
-;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency Pull |
+;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency Pull | | from slots, security
 ;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money})
 ;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found.
 ;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious.

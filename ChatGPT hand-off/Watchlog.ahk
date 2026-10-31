@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.29.2"
+VERSION := "3.30.0"
 VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -1486,9 +1486,21 @@ TemplateFill(out, title) {
         return false
     ; several lines (Add another): each ends with its own  >> ..., the last one is used
     syn := Trim(RegExReplace(out, " >> [^\r\n]*", ""))
+    ; after the three boxes: "end" (click End Time Now) and/or "from a, b"
+    ; (the Info From people to search for, by department, v3.30.0)
+    isEnd := false, from := []
+    loop parts.Length - 3 {
+        extra := Trim(parts[A_Index + 3])
+        if StrLower(extra) = "end"
+            isEnd := true
+        else if RegExMatch(extra, "i)^from\s+(.+)$", &fm)
+            for d in StrSplit(fm[1], ",")
+                if Trim(d) != ""
+                    from.Push(Trim(d))
+    }
     RunEntry({name: title, loc: FillDerive(Trim(parts[1]), syn), topic: FillDerive(Trim(parts[2]), syn)
         , ref: FillDerive(Trim(parts[3]), syn), syn: syn
-        , end: parts.Length >= 4 && StrLower(Trim(parts[4])) = "end", src: "code"}, true)
+        , end: isEnd, from: from, src: "code"}, true)
     return true
 }
 
@@ -4993,6 +5005,8 @@ RunEntry(e, useOpen := false) {
     if IsBreakLog(e)
         BreakBegin(win)
     Tip("Filled in: " e.name, 1500)
+    if e.HasOwnProp("from") && e.from.Length
+        SetTimer InfoFromRun.Bind(win, e.from, e.name), -400
     Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
     CountSaved("log", keys, "Full log: " e.name)
     Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
@@ -5166,6 +5180,146 @@ ShareITrakSetup() {
     }
     Activity("iTrak: shared this PC's click with the team (" scale "% scaling)")
     MsgBox "Shared. PCs that haven't been taught now use this click (once OneDrive has synced the team folder).`n`nThe iTrak window should be about the same size on those PCs (maximised is best).", "Share iTrak setup"
+}
+
+; =====================================================================
+;  INFO FROM PEOPLE SEARCH (v3.30.0)
+;  A code word line in templates.txt can end with  | from cage, security :
+;  once the daily log is filled, Watchlog opens Info From > Personnel, types
+;  each department into Look For and presses Enter, then waits while you
+;  pick the person and click Select (or Cancel to skip), and goes on to the
+;  next one. Taught once per PC (tray > iTrak > Teach Info From): the Info
+;  From arrow and the Personnel line (from the daily log window) and the
+;  Look For box (from the Personnel window). Kept in itrak.ini [InfoFrom].
+; =====================================================================
+PersonnelWin() {
+    SetTitleMatchMode 2
+    return WinExist(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")))
+}
+
+; The taught spots as a Map, or "" when not taught
+InfoFromLoad() {
+    c := Map()
+    for k in ["ArrowX", "ArrowY", "PersonnelX", "PersonnelY", "W", "H", "LookX", "LookY", "PW", "PH"] {
+        v := ""
+        try v := Trim(IniRead(ITrakFile, "InfoFrom", k, ""))
+        if !IsInteger(v)
+            return ""
+        c[k] := Integer(v)
+    }
+    return c
+}
+
+InfoFromRun(win, depts, name) {
+    c := InfoFromLoad()
+    if !c {
+        Tip("Info From isn't taught on this PC yet: tray > iTrak > Teach Info From.", 4000, true)
+        return
+    }
+    CoordMode "Mouse", "Screen"
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    for i, d in depts {
+        if !WinExist("ahk_id " win) {
+            Activity("Info From (" name "): stopped, the daily log was closed")
+            return
+        }
+        WinActivate "ahk_id " win
+        if !WinWaitActive("ahk_id " win, , 2) {
+            Tip("Couldn't bring the daily log to the front. Info From stopped.", 3000, true)
+            return
+        }
+        if !ITrakSpot(win, c["ArrowX"], c["ArrowY"], c["W"], c["H"], &x, &y) {
+            Tip("The Info From arrow is outside the daily log window. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): arrow spot outside the window")
+            return
+        }
+        Click x, y
+        Sleep pause
+        ITrakSpot(win, c["PersonnelX"], c["PersonnelY"], c["W"], c["H"], &x, &y)
+        Click x, y
+        SetTitleMatchMode 2
+        pw := WinWait(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")), , 6)
+        if !pw {
+            Tip("The Personnel window didn't open. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): the Personnel window didn't open for " d)
+            return
+        }
+        WinActivate "ahk_id " pw
+        WinWaitActive "ahk_id " pw, , 2
+        Sleep 250
+        if !ITrakSpot(pw, c["LookX"], c["LookY"], c["PW"], c["PH"], &x, &y) {
+            Tip("The Look For box is outside the Personnel window. Info From stopped.", 3500, true)
+            return
+        }
+        Click x, y
+        Sleep 150
+        EntryType d
+        Sleep 80
+        SendInput "{Enter}"
+        Tip(i " of " depts.Length ": pick the " d " person and click Select  (Cancel skips)", 0, true)
+        ; wait while the person is picked (3 minutes at most)
+        if !WinWaitClose("ahk_id " pw, , 180) {
+            Tip("")
+            Activity("Info From (" name "): stopped, the Personnel window stayed open 3 minutes")
+            return
+        }
+        Tip("")
+        Sleep 500
+    }
+    Activity("Info From (" name "): searched " depts.Length " department(s)")
+}
+
+TeachInfoFrom() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachInfoFromRun()
+    catch as err
+        MsgBox "Teach Info From stopped: " err.Message, "Teach Info From", "Icon!"
+    TeachBusy := false
+}
+
+TeachInfoFromRun() {
+    win := EntryWin()
+    if !win {
+        MsgBox "Open a daily log in iTrak first (the Daily Log Entry window), then run this again.", "Teach Info From", "Icon!"
+        return
+    }
+    if MsgBox("Three spots, once per PC. For each one hover the mouse and press F8 (or Ctrl+Alt+Shift+A; Ctrl+Alt+Esc cancels).`n`n"
+        . "1. The arrow at the right end of the Info From box (don't click it yet).`n"
+        . "2. Click that arrow yourself so the list opens, then hover over Personnel.`n"
+        . "3. Click Personnel yourself so the Personnel window opens, then hover over the Look For box.`n`n"
+        . "Afterwards press Cancel in the Personnel window. Start?", "Teach Info From", "YesNo Icon?") != "Yes"
+        return
+    if !TeachWait("1 of 3`nHover over the Info From arrow and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    if !WinExist("ahk_id " win) || !ITrakPoint(win, &ax, &ay) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach Info From", "Icon!"
+        return
+    }
+    if !TeachWait("2 of 3`nClick the Info From arrow, then hover over Personnel and press F8   (Ctrl+Alt+Esc cancels)")
+        return
+    ITrakPoint(win, &px, &py)          ; the list can hang outside the window: that's fine
+    if !TeachWait("3 of 3`nClick Personnel, then hover over the Look For box and press F8   (Ctrl+Alt+Esc cancels)")
+        return
+    pw := PersonnelWin()
+    if !pw || !ITrakPoint(pw, &lx, &ly) {
+        MsgBox "That spot isn't inside the Personnel window (or it isn't open). Nothing saved. Try again.", "Teach Info From", "Icon!"
+        return
+    }
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    WinGetClientPos , , &pcw, &pch, "ahk_id " pw
+    try {
+        for k, v in Map("ArrowX", ax, "ArrowY", ay, "PersonnelX", px, "PersonnelY", py, "W", cw, "H", ch
+                , "LookX", lx, "LookY", ly, "PW", pcw, "PH", pch)
+            IniWrite v, ITrakFile, "InfoFrom", k
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach Info From", "Icon!"
+        return
+    }
+    Activity("iTrak: Info From taught (daily log " cw "x" ch ", Personnel " pcw "x" pch ")")
+    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (;fill, ;open, ;auto, ;jack, ;bv, ;mfill, ;account) now search Info From for each department after the log is filled. Keep the daily log and Personnel windows the same size.", "Teach Info From"
 }
 
 ; =====================================================================
@@ -8522,6 +8676,7 @@ BuildTrayMenu() {
     MenuItem(itm, "Teach the click  (" HK("itrakteach") ")", (*) => TeachITrak(), 0xE7C9)
     MenuItem(itm, "Full-entry log  (" HK("entrypick") ")", (*) => ShowEntryPick(), 0xE8F1)
     MenuItem(itm, "Teach the daily log fields  (" HK("entryteach") ")", (*) => TeachEntryFields(), 0xE7C9)
+    MenuItem(itm, "Teach Info From (people search)", (*) => TeachInfoFrom(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 

@@ -30,7 +30,7 @@ Security has its own section further down. In short: passwords are kept in Windo
 
 ## What it does
 
-It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.29.2 now.
+It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.30.0 now.
 
 <!-- fig: image4.png 1.7 | The Watchlog icon sits by the clock. Right-clicking it opens this menu. -->
 
@@ -73,6 +73,8 @@ When an entry has details that change, a small form pops up with a box for each 
 Most codes can now do the whole iTrak entry, not just the wording. `;cards`, for example, opens a new daily log in iTrak (or uses the one already open), picks the Location, Topic and Reference, and puts the wording in the Synopsis. Seventeen codes work this way so far, including the door checks, patrols, table fills and openings, jackpots, BV pulls and machine fills. Where the Reference is a number I look up, it's left empty for me to fill in.
 
 Most of these entries start as a phone call. The call pad (the + key on the number pad) is a small box I jot the call into. If I write it in shorthand, like `fill 205 5.5` for a $5,500 fill on table 205, Ctrl+Enter turns it straight into the finished daily log. Ctrl+Alt+F opens a short list of logs that never change, like Break or Table Drop, and Ctrl+Alt+Shift+R repeats the last one.
+
+It also attaches the people. After the log is filled, it opens Info From, picks Personnel and searches the department for each person that log needs: the cage and a security officer for a fill, the dealer for a table opening, OPS, slots and the cage for a jackpot. I just click the right name and Select.
 
 Each PC is taught once where the New daily log button and the boxes are, the same way as Alert Grid. Watchlog never clicks Save. I still read the entry over and save it myself.
 
@@ -207,7 +209,7 @@ A few more things worth knowing:
 - It doesn't record what you type. It only watches for its own codes.
 - It only types a password when that login's code is typed, when the operator says yes to "Log in?" or to the start of shift sign-in, or when SDS comes back to its login screen after an SDS login the operator did. That last one can be turned off in Settings. Every time, it checks right before typing that the program in front is one that login is locked to. A login that isn't locked to a program is never typed automatically.
 - In Alert Grid it only clicks and presses Ctrl+A, Enter or Esc. It never types into the Acknowledge box.
-- In iTrak it only clicks New daily log, the Location, Topic, Reference and Synopsis boxes and End Time's Now button, and types or pastes the entry into them. It never clicks Save.
+- In iTrak it only clicks New daily log, the Location, Topic, Reference and Synopsis boxes, End Time's Now button and the Info From search, and types or pastes the entry and the department name into them. The operator picks the person. It never clicks Save.
 - It only looks at the clipboard when a form opens with a box that takes a copy, and for `;face` it notices copies made in Edge. Nothing it sees there is saved to a file.
 - It doesn't change iTrak or any other system. It types or clicks what the operator would have, and the operator still saves the entry.
 - The copy it makes for sharing never includes anyone's settings, passwords, journal or notes.
@@ -247,7 +249,7 @@ What IT would need to approve:
 
 ## Next steps
 
-Version 3.29.2 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.30.0 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.

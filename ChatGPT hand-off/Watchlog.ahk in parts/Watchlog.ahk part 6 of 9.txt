@@ -1,4 +1,105 @@
-; ===== Watchlog.ahk PART 6 of 9 (lines 6198-7406 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 9 (lines 6251-7560 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; A row of big numbers with a small label under each
+Tiles(g, tiles) {
+    ctrls := []
+    for i, t in tiles {
+        g.SetFont("s20 bold c0E746E", "Segoe UI")
+        c := g.AddText(i = 1 ? "xm+12 y+14 w135 Center BackgroundTrans" : "x+4 yp w135 Center BackgroundTrans", t[1])
+        ctrls.Push(c)
+    }
+    for i, t in tiles {
+        ctrls[i].GetPos(&x, &y, &w, &h)
+        g.SetFont("s9 norm c606060", "Segoe UI")
+        g.AddText("x" x " y" y + h " w135 Center BackgroundTrans", t[2])
+        bottom := y + h + 22
+    }
+    g.SetFont("s10 norm c000000", "Segoe UI")
+    return bottom
+}
+
+
+; =====================================================================
+;  TIME & DATE STAMPS
+;  ;t  = @21:42      ;dd = 2026-10-13      ;dt = 2026-10-13 @21:42
+;  (not in the template finder's search box, so ;t can be searched for,
+;  and not in Settings)
+; =====================================================================
+StampsOK(*) => !PickerActive() && !SettingsActive()
+
+; Registered here (not as fixed hotstrings) so the prefix can be changed
+RegisterStamps() {
+    HotIf StampsOK
+    Hotstring(":*:" TrigKey(";t"), StampTime)
+    Hotstring(":*:" TrigKey(";dd"), StampDate)
+    Hotstring(":*:" TrigKey(";dt"), StampDateTime)
+    HotIf
+}
+
+StampTime(*) {
+    SendInput "{Text}@" FormatTime(, "HH:mm")
+    CountSaved("stamp", 6 - 2, "Stamp `;t")
+}
+
+StampDate(*) {
+    SendInput "{Text}" FormatTime(, "yyyy-MM-dd")
+    CountSaved("stamp", 10 - 3, "Stamp `;dd")
+}
+
+StampDateTime(*) {
+    SendInput "{Text}" FormatTime(, "yyyy-MM-dd") " @" FormatTime(, "HH:mm")
+    CountSaved("stamp", 17 - 3, "Stamp `;dt")
+}
+
+
+; =====================================================================
+;  APP SWITCHING  (apps are set up in settings.ini)
+;  Ctrl+Alt+I = show the current window's title and program name
+; =====================================================================
+LoadApps() {
+    ; letters Watchlog's own Ctrl+Alt keys use (Pause, Exit, Reload, and the
+    ; shortcut keys as set in Customize), so an app can't take one (v3.29.1)
+    taken := "PXR"
+    for d in HotkeyDefs
+        if RegExMatch(HotkeyNorm(HotkeyKey(d.id)), "^\^!([a-z])$", &km)
+            taken .= StrUpper(km[1])
+    problems := "", named := ""
+    Loop 9 {
+        sec := "App" A_Index
+        name := Trim(IniRead(SettingsFile, sec, "Name", ""))
+        if name = ""
+            continue
+        named .= "|" name "|"
+        key := Trim(IniRead(SettingsFile, sec, "Key", ""))
+        path := Trim(IniRead(SettingsFile, sec, "Path", ""))
+        win := Trim(IniRead(SettingsFile, sec, "Window", ""))
+        if key = "" || key = "none"          ; Key=none turns an app off
+            continue
+        if StrLen(key) != 1 || InStr(taken, key) {
+            problems .= name ": Key must be one letter that isn't taken (" key ")`n"
+            continue
+        }
+        Hotkey "^!" StrLower(key), MakeSwitchHandler(name, win, path)
+        AppList.Push({name: name, key: StrUpper(key)})
+        taken .= key
+    }
+
+    ; Built-in app hotkeys. An [AppN] section with the same Name replaces
+    ; one (to change its letter), or turns it off with Key=none.
+    for a in [{name: "Teams",   key: "T", win: "ahk_exe ms-teams.exe", path: "msteams:"}
+            , {name: "Outlook", key: "U", win: "ahk_exe olk.exe",      path: "shell:AppsFolder\Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows"}
+            , {name: "Spotify", key: "Y", win: "ahk_exe Spotify.exe",  path: "spotify:"}
+            , {name: "Edge",    key: "G", win: "ahk_exe msedge.exe",   path: "msedge.exe"}] {
+        if InStr(named, "|" a.name "|") || InStr(taken, a.key)
+            continue
+        Hotkey "^!" StrLower(a.key), MakeSwitchHandler(a.name, a.win, a.path)
+        AppList.Push({name: a.name, key: a.key})
+        taken .= a.key
+    }
+
+    if problems != ""
+        MsgBox "Some apps in settings.ini were skipped:`n`n" problems, "Watchlog", "Icon!"
+}
+
 IsBallyPath(path) => InStr(path, "SDSUI") || InStr(path, "CMPDesktop") || InStr(path, "AlertGridUI")
 
 ; The saved login that belongs to the program in front: one locked to

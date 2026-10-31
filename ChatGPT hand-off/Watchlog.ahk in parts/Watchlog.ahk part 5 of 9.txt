@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 5001-6197 of 11007). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 5 of 9 (lines 5015-6250 of 11162). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Types text key by key (what Citrix handles best), a little slower than normal
 EntryType(text) {
     SetKeyDelay 20, 10
@@ -167,6 +167,146 @@ ShareITrakSetup() {
     }
     Activity("iTrak: shared this PC's click with the team (" scale "% scaling)")
     MsgBox "Shared. PCs that haven't been taught now use this click (once OneDrive has synced the team folder).`n`nThe iTrak window should be about the same size on those PCs (maximised is best).", "Share iTrak setup"
+}
+
+; =====================================================================
+;  INFO FROM PEOPLE SEARCH (v3.30.0)
+;  A code word line in templates.txt can end with  | from cage, security :
+;  once the daily log is filled, Watchlog opens Info From > Personnel, types
+;  each department into Look For and presses Enter, then waits while you
+;  pick the person and click Select (or Cancel to skip), and goes on to the
+;  next one. Taught once per PC (tray > iTrak > Teach Info From): the Info
+;  From arrow and the Personnel line (from the daily log window) and the
+;  Look For box (from the Personnel window). Kept in itrak.ini [InfoFrom].
+; =====================================================================
+PersonnelWin() {
+    SetTitleMatchMode 2
+    return WinExist(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")))
+}
+
+; The taught spots as a Map, or "" when not taught
+InfoFromLoad() {
+    c := Map()
+    for k in ["ArrowX", "ArrowY", "PersonnelX", "PersonnelY", "W", "H", "LookX", "LookY", "PW", "PH"] {
+        v := ""
+        try v := Trim(IniRead(ITrakFile, "InfoFrom", k, ""))
+        if !IsInteger(v)
+            return ""
+        c[k] := Integer(v)
+    }
+    return c
+}
+
+InfoFromRun(win, depts, name) {
+    c := InfoFromLoad()
+    if !c {
+        Tip("Info From isn't taught on this PC yet: tray > iTrak > Teach Info From.", 4000, true)
+        return
+    }
+    CoordMode "Mouse", "Screen"
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    for i, d in depts {
+        if !WinExist("ahk_id " win) {
+            Activity("Info From (" name "): stopped, the daily log was closed")
+            return
+        }
+        WinActivate "ahk_id " win
+        if !WinWaitActive("ahk_id " win, , 2) {
+            Tip("Couldn't bring the daily log to the front. Info From stopped.", 3000, true)
+            return
+        }
+        if !ITrakSpot(win, c["ArrowX"], c["ArrowY"], c["W"], c["H"], &x, &y) {
+            Tip("The Info From arrow is outside the daily log window. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): arrow spot outside the window")
+            return
+        }
+        Click x, y
+        Sleep pause
+        ITrakSpot(win, c["PersonnelX"], c["PersonnelY"], c["W"], c["H"], &x, &y)
+        Click x, y
+        SetTitleMatchMode 2
+        pw := WinWait(Trim(IniRead(SettingsFile, "ITrak", "PersonnelWindow", "Personnel ahk_exe wfica32.exe")), , 6)
+        if !pw {
+            Tip("The Personnel window didn't open. Info From stopped.", 3500, true)
+            Activity("Info From (" name "): the Personnel window didn't open for " d)
+            return
+        }
+        WinActivate "ahk_id " pw
+        WinWaitActive "ahk_id " pw, , 2
+        Sleep 250
+        if !ITrakSpot(pw, c["LookX"], c["LookY"], c["PW"], c["PH"], &x, &y) {
+            Tip("The Look For box is outside the Personnel window. Info From stopped.", 3500, true)
+            return
+        }
+        Click x, y
+        Sleep 150
+        EntryType d
+        Sleep 80
+        SendInput "{Enter}"
+        Tip(i " of " depts.Length ": pick the " d " person and click Select  (Cancel skips)", 0, true)
+        ; wait while the person is picked (3 minutes at most)
+        if !WinWaitClose("ahk_id " pw, , 180) {
+            Tip("")
+            Activity("Info From (" name "): stopped, the Personnel window stayed open 3 minutes")
+            return
+        }
+        Tip("")
+        Sleep 500
+    }
+    Activity("Info From (" name "): searched " depts.Length " department(s)")
+}
+
+TeachInfoFrom() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachInfoFromRun()
+    catch as err
+        MsgBox "Teach Info From stopped: " err.Message, "Teach Info From", "Icon!"
+    TeachBusy := false
+}
+
+TeachInfoFromRun() {
+    win := EntryWin()
+    if !win {
+        MsgBox "Open a daily log in iTrak first (the Daily Log Entry window), then run this again.", "Teach Info From", "Icon!"
+        return
+    }
+    if MsgBox("Three spots, once per PC. For each one hover the mouse and press F8 (or Ctrl+Alt+Shift+A; Ctrl+Alt+Esc cancels).`n`n"
+        . "1. The arrow at the right end of the Info From box (don't click it yet).`n"
+        . "2. Click that arrow yourself so the list opens, then hover over Personnel.`n"
+        . "3. Click Personnel yourself so the Personnel window opens, then hover over the Look For box.`n`n"
+        . "Afterwards press Cancel in the Personnel window. Start?", "Teach Info From", "YesNo Icon?") != "Yes"
+        return
+    if !TeachWait("1 of 3`nHover over the Info From arrow and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    if !WinExist("ahk_id " win) || !ITrakPoint(win, &ax, &ay) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach Info From", "Icon!"
+        return
+    }
+    if !TeachWait("2 of 3`nClick the Info From arrow, then hover over Personnel and press F8   (Ctrl+Alt+Esc cancels)")
+        return
+    ITrakPoint(win, &px, &py)          ; the list can hang outside the window: that's fine
+    if !TeachWait("3 of 3`nClick Personnel, then hover over the Look For box and press F8   (Ctrl+Alt+Esc cancels)")
+        return
+    pw := PersonnelWin()
+    if !pw || !ITrakPoint(pw, &lx, &ly) {
+        MsgBox "That spot isn't inside the Personnel window (or it isn't open). Nothing saved. Try again.", "Teach Info From", "Icon!"
+        return
+    }
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    WinGetClientPos , , &pcw, &pch, "ahk_id " pw
+    try {
+        for k, v in Map("ArrowX", ax, "ArrowY", ay, "PersonnelX", px, "PersonnelY", py, "W", cw, "H", ch
+                , "LookX", lx, "LookY", ly, "PW", pcw, "PH", pch)
+            IniWrite v, ITrakFile, "InfoFrom", k
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach Info From", "Icon!"
+        return
+    }
+    Activity("iTrak: Info From taught (daily log " cw "x" ch ", Personnel " pcw "x" pch ")")
+    MsgBox "Saved. Press Cancel in the Personnel window.`n`nCode words with  | from ...  at the end of their line in templates.txt (;fill, ;open, ;auto, ;jack, ;bv, ;mfill, ;account) now search Info From for each department after the log is filled. Keep the daily log and Personnel windows the same size.", "Teach Info From"
 }
 
 ; =====================================================================
@@ -1093,106 +1233,5 @@ ShowDashboard(tab := 1) {
         Activity("Shift dashboard: sheet saved")
         Run file
     }
-}
-
-; A row of big numbers with a small label under each
-Tiles(g, tiles) {
-    ctrls := []
-    for i, t in tiles {
-        g.SetFont("s20 bold c0E746E", "Segoe UI")
-        c := g.AddText(i = 1 ? "xm+12 y+14 w135 Center BackgroundTrans" : "x+4 yp w135 Center BackgroundTrans", t[1])
-        ctrls.Push(c)
-    }
-    for i, t in tiles {
-        ctrls[i].GetPos(&x, &y, &w, &h)
-        g.SetFont("s9 norm c606060", "Segoe UI")
-        g.AddText("x" x " y" y + h " w135 Center BackgroundTrans", t[2])
-        bottom := y + h + 22
-    }
-    g.SetFont("s10 norm c000000", "Segoe UI")
-    return bottom
-}
-
-
-; =====================================================================
-;  TIME & DATE STAMPS
-;  ;t  = @21:42      ;dd = 2026-10-13      ;dt = 2026-10-13 @21:42
-;  (not in the template finder's search box, so ;t can be searched for,
-;  and not in Settings)
-; =====================================================================
-StampsOK(*) => !PickerActive() && !SettingsActive()
-
-; Registered here (not as fixed hotstrings) so the prefix can be changed
-RegisterStamps() {
-    HotIf StampsOK
-    Hotstring(":*:" TrigKey(";t"), StampTime)
-    Hotstring(":*:" TrigKey(";dd"), StampDate)
-    Hotstring(":*:" TrigKey(";dt"), StampDateTime)
-    HotIf
-}
-
-StampTime(*) {
-    SendInput "{Text}@" FormatTime(, "HH:mm")
-    CountSaved("stamp", 6 - 2, "Stamp `;t")
-}
-
-StampDate(*) {
-    SendInput "{Text}" FormatTime(, "yyyy-MM-dd")
-    CountSaved("stamp", 10 - 3, "Stamp `;dd")
-}
-
-StampDateTime(*) {
-    SendInput "{Text}" FormatTime(, "yyyy-MM-dd") " @" FormatTime(, "HH:mm")
-    CountSaved("stamp", 17 - 3, "Stamp `;dt")
-}
-
-
-; =====================================================================
-;  APP SWITCHING  (apps are set up in settings.ini)
-;  Ctrl+Alt+I = show the current window's title and program name
-; =====================================================================
-LoadApps() {
-    ; letters Watchlog's own Ctrl+Alt keys use (Pause, Exit, Reload, and the
-    ; shortcut keys as set in Customize), so an app can't take one (v3.29.1)
-    taken := "PXR"
-    for d in HotkeyDefs
-        if RegExMatch(HotkeyNorm(HotkeyKey(d.id)), "^\^!([a-z])$", &km)
-            taken .= StrUpper(km[1])
-    problems := "", named := ""
-    Loop 9 {
-        sec := "App" A_Index
-        name := Trim(IniRead(SettingsFile, sec, "Name", ""))
-        if name = ""
-            continue
-        named .= "|" name "|"
-        key := Trim(IniRead(SettingsFile, sec, "Key", ""))
-        path := Trim(IniRead(SettingsFile, sec, "Path", ""))
-        win := Trim(IniRead(SettingsFile, sec, "Window", ""))
-        if key = "" || key = "none"          ; Key=none turns an app off
-            continue
-        if StrLen(key) != 1 || InStr(taken, key) {
-            problems .= name ": Key must be one letter that isn't taken (" key ")`n"
-            continue
-        }
-        Hotkey "^!" StrLower(key), MakeSwitchHandler(name, win, path)
-        AppList.Push({name: name, key: StrUpper(key)})
-        taken .= key
-    }
-
-    ; Built-in app hotkeys. An [AppN] section with the same Name replaces
-    ; one (to change its letter), or turns it off with Key=none.
-    for a in [{name: "Teams",   key: "T", win: "ahk_exe ms-teams.exe", path: "msteams:"}
-            , {name: "Outlook", key: "U", win: "ahk_exe olk.exe",      path: "shell:AppsFolder\Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows"}
-            , {name: "Spotify", key: "Y", win: "ahk_exe Spotify.exe",  path: "spotify:"}
-            , {name: "Edge",    key: "G", win: "ahk_exe msedge.exe",   path: "msedge.exe"}] {
-        if InStr(named, "|" a.name "|") || InStr(taken, a.key)
-            continue
-        Hotkey "^!" StrLower(a.key), MakeSwitchHandler(a.name, a.win, a.path)
-        AppList.Push({name: a.name, key: a.key})
-        taken .= a.key
-    }
-
-    if problems != ""
-        MsgBox "Some apps in settings.ini were skipped:`n`n" problems, "Watchlog", "Icon!"
 }
 
