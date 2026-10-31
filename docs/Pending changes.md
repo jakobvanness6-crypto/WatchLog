@@ -9,7 +9,16 @@ Current version: v3.29.2 (Oct 31, 2026): code and docs review fixes (see PROJECT
 
 ### Idea: "Info From" department search (Jakob's coworker, Oct 30, NOT built, waiting on Jakob's OK and "build it")
 - Update Oct 31 (Jakob): he selects the person and clicks Select himself. The Look For box matches the START of what is typed: `dealer` finds dealers but `dealers` doesn't; `marketing` only lowercase; `F&B` for Food and Beverage; `security` and `audit` either case. So the list needs, for each department, the exact SEARCH TEXT (not just the department name below). Search text CONFIRMED (Jakob, Oct 31): Audit = audit, Security = security, Marketing = marketing, F&B (FOH and BOH) = F&B, Tables = dealer, HR = HR, Surveillance = surveillance, Property = property, Slots = slots, Cage = cage, OPS = OPS. Type exactly that text (case as given).
-- Default department per code word (proposed Oct 31, waiting on his OK): fill/open/auto dealer, jack security, bv security, mfill audit, account marketing; a department word typed in a call pad shorthand line overrides it. He said he can't say how he'd write it, so pull it from the log type.
+- People attached per code word (Jakob, Oct 31; several people per log, one search each, in this order; he picks each person and clicks Select, then Watchlog opens Info From > Personnel for the next):
+  - fill: cashier, officer
+  - open: dealer
+  - auto: dealer
+  - jack: OPS, slots, cage
+  - bv: slot tech, security
+  - mfill: cashier, officer
+  - account: guest services
+  To confirm: cashier = search "cage"? officer = "security"? slot tech = "slots"? guest services = what search text (not in the 11 above)?
+  A department word typed in a call pad shorthand line could still override. Waiting on those answers and "build it".
 In iTrak's Info From section you attach anyone involved. Watchlog should not pick the person (no people data stored). It can do the boring part instead: open the Info From search, type the department, and then stop so you double-click the right name.
 - How it would run: after a full-entry log or template fills in, a small list pops up: Cage, Security, Slots, Table Games, Surveillance, ... (type first letters, Enter). Watchlog clicks the taught Info From search spot, types the department, presses Enter, and leaves the results for you to double-click. Esc = skip, nothing attached.
 - Logs that always need the same department can have it set ahead of time (for example `| from Security` on the line), and the list still shows with that one already highlighted, so you can change it with one key.
