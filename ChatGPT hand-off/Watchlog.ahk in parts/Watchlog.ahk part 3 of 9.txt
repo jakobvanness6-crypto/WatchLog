@@ -1,47 +1,4 @@
-; ===== Watchlog.ahk PART 3 of 9 (lines 2343-3704 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; 2130 -> 21:30, 930 -> 09:30, 21:30 stays 21:30
-FixTime(s) {
-    s := Trim(s)
-    if RegExMatch(s, "^\d{3,4}$") {
-        if StrLen(s) = 3
-            s := "0" s
-        s := SubStr(s, 1, 2) ":" SubStr(s, 3)
-    }
-    return s
-}
-
-; 10000 -> 10,000
-FixMoney(s) {
-    s := StrReplace(StrReplace(Trim(s), "$"), ",")
-    if RegExMatch(s, "^\d+(\.\d+)?$") {
-        parts := StrSplit(s, ".")
-        s := RegExReplace(parts[1], "\G\d+?(?=(\d{3})+$)", "$0,")
-            . (parts.Length > 1 ? "." parts[2] : "")
-    }
-    return s
-}
-
-
-; =====================================================================
-;  AUTO-RELOAD  -  checks every 2 seconds whether templates.txt,
-;  my-templates.txt, settings.ini or the team's shared file was saved,
-;  and reloads if so (so a supervisor's change to the team file reaches
-;  every PC as soon as OneDrive syncs it). Waits while a form or window
-;  is open, and while settings.ini is missing (OneDrive can briefly
-;  remove a file while it syncs - reloading then would start with no
-;  settings). Any other file that goes missing is skipped until it's back.
-; =====================================================================
-StartWatching() {
-    files := [TemplatesFile, MyTemplatesFile, SettingsFile]
-    if Cfg["SharedTemplates"] != ""
-        files.Push(Cfg["SharedTemplates"])
-    if TeamProgramFile() != ""
-        files.Push(TeamProgramFile())
-    for f in files
-        WatchTimes[f] := FileTimeOf(f)
-    SetTimer CheckForEdits, 2000
-}
-
+; ===== Watchlog.ahk PART 3 of 9 (lines 2388-3750 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
 FileTimeOf(f) {
     try return FileGetTime(f, "M")
     return ""
@@ -1359,5 +1316,49 @@ ShowJournal() {
         }
         g.Destroy()
     }
+}
+
+; The logs in some journal text: [{head, name, keys, tagged}] in order
+JournalLogs(text) {
+    logs := []
+    p := LastPos(text, "=== Shift started")
+    if p > 0
+        text := SubStr(text, p)
+    Loop Parse text, "`n", "`r" {
+        if !RegExMatch(A_LoopField, "^(\d\d:\d\d) +(\S.*)$", &e)
+            continue
+        name := Trim(e[2]), keys := 0, tagged := false
+        if RegExMatch(name, "\s*\[k(-?\d+)\]$", &k) {
+            keys := Integer(k[1]), tagged := true
+            name := Trim(SubStr(name, 1, k.Pos - 1))
+        }
+        logs.Push({head: A_LoopField, name: name, keys: keys, tagged: tagged})
+    }
+    return logs
+}
+
+; Logs in `a` that have no match left in `b` (matched by their whole first line)
+LogsMissingFrom(a, b) {
+    left := Map()
+    for l in b
+        left[l.head] := (left.Has(l.head) ? left[l.head] : 0) + 1
+    miss := []
+    for l in a {
+        if left.Has(l.head) && left[l.head] > 0
+            left[l.head] -= 1
+        else
+            miss.Push(l)
+    }
+    return miss
+}
+
+; What a log saved: its [k] tag, or (an older journal) the average for its type
+LogKeys(l, day) {
+    if l.tagged
+        return l.keys
+    it := ItemRow(IniRead(SavedFile, "DayItems", day "|" l.name, ""))
+    if it.n < 1
+        it := ItemRow(IniRead(SavedFile, "ShiftItems", l.name, ""))
+    return it.n > 0 ? Round(it.keys / it.n) : 0
 }
 

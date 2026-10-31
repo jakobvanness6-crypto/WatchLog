@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 1 of 9 (lines 1-1088 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 1 of 9 (lines 1-1133 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ; Speed: AutoHotkey pauses 100 ms after every window switch by default,
@@ -33,8 +33,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.28.0"
-VERSION_DATE := "Oct 30, 2026"
+VERSION := "3.29.0"
+VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -103,6 +103,7 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
     , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
     , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
+    , {id: "endnow", key: "^!+e", label: "End Time Now in the open daily log", fn: (*) => EntryEndNow()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
 
@@ -185,6 +186,7 @@ CheckScale()
 DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
+BreakResume()
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000
@@ -195,7 +197,7 @@ if FileExist(IconFile)
 
 ; Click the tray icon for the home window, right-click it for the menu
 ; (see TRAY MENU below)
-A_IconTip := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
+SetIconTip()
 BuildTrayMenu()
 
 ; The red Caps Lock tag (see CAPS LOCK below)
@@ -1086,4 +1088,47 @@ Window=ahk_exe CMPDesktop.exe
     Activity("First run on this PC: new settings.ini made in " HomeDir)
 }
 
+
+; =====================================================================
+;  TEMPLATES
+;  Read from the team's shared file when one is set in Settings (on
+;  SharePoint, synced by OneDrive), otherwise templates.txt in this
+;  folder. Then my-templates.txt, your own extras, on top. A trigger the
+;  team file already uses is skipped in my-templates.txt, so the team
+;  wording always wins.
+;  If the shared file can't be opened (OneDrive not running, not synced
+;  yet), the last good copy saved on this PC is used and it says so.
+; =====================================================================
+LoadTemplates() {
+    problems := ""
+    ; Every trigger fires the moment it's typed, so no trigger may be the start
+    ; of another one (;count would fire before you finish typing ;counttables)
+    trigs := Map()
+    for l in LoginList
+        trigs[l.trig] := "login"
+    main := ReadTemplateSource()
+    if main.note != ""
+        problems .= main.note "`n`n"
+    mine := ""
+    if FileExist(MyTemplatesFile) {
+        try mine := FileRead(MyTemplatesFile, "UTF-8")
+        catch
+            problems .= "Couldn't open my-templates.txt, so your own templates aren't loaded.`n`n"
+    }
+    ; Shared lists first (team ones, then your own), so any template can use them
+    ReadLists(main.text, main.label, false, &problems)
+    ReadLists(mine, "my-templates.txt", true, &problems)
+    Tpl.count := AddTemplates(main.text, main.src = "local" ? "local" : "team", main.label, trigs, &problems)
+    Tpl.mine := AddTemplates(mine, "mine", "my-templates.txt", trigs, &problems)
+    Entries := []
+    ReadEntries(main.text, main.label, &problems, "main")
+    ReadEntries(mine, "my-templates.txt", &problems, "mine")
+    Activity("Templates: " TemplateSummary())
+    if main.text = "" && main.note = ""
+        problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" HomeDir "`n`n"
+    if problems != "" {
+        Activity("Template problems: " StrReplace(Trim(problems, "`n"), "`n", " / "))
+        MsgBox "Some templates weren't loaded:`n`n" problems, "Watchlog", "Icon!"
+    }
+}
 

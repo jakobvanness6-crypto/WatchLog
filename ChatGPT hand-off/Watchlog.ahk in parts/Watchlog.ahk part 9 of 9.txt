@@ -1,4 +1,50 @@
-; ===== Watchlog.ahk PART 9 of 9 (lines 9499-10773 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 9 of 9 (lines 9624-10944 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ---- Reading and writing the file ------------------------------------
+; A templates file as lines, plus where its templates, lists and section
+; headings are. Only the lines that change are ever rewritten.
+EdRead(file) {
+    raw := FileRead(file, "RAW")
+    bom := raw.Size >= 3 && NumGet(raw, 0, "UChar") = 0xEF && NumGet(raw, 1, "UChar") = 0xBB && NumGet(raw, 2, "UChar") = 0xBF
+    text := FileRead(file, "UTF-8")
+    doc := {file: file, crlf: InStr(text, "`r`n") > 0, bom: bom, time: FileTimeOf(file)
+        , lines: StrSplit(StrReplace(text, "`r`n", "`n"), "`n")}
+    EdScan(doc)
+    return doc
+}
+
+EdScan(doc) {
+    doc.tpls := [], doc.lists := [], doc.sections := []
+    section := ""
+    for i, raw in doc.lines {
+        line := Trim(raw)
+        if line = ""
+            continue
+        c := SubStr(line, 1, 1)
+        if c = "#" {
+            ; a heading like  # ----- FORMS -----
+            if RegExMatch(line, "^#\s*-{3,}\s*(.+?)\s*-*\s*$", &m) {
+                section := EdSectionName(m[1])
+                doc.sections.Push({name: section, line: i})
+            }
+            continue
+        }
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        if c = "@" {
+            doc.lists.Push({line: i, name: Trim(SubStr(line, 2, eq - 2)), items: EdItems(SubStr(line, eq + 1))})
+            continue
+        }
+        left := Trim(SubStr(line, 1, eq - 1)), body := Trim(SubStr(line, eq + 1))
+        trig := left, name := ""
+        if RegExMatch(left, "^(\S+)\s*\((.*)\)$", &m)
+            trig := m[1], name := Trim(m[2])
+        rep := RegExMatch(body, "i)\{repeat\}") > 0
+        body := RegExReplace(body, "i)\s*\{repeat\}")
+        doc.tpls.Push({line: i, trig: trig, name: name, body: StrReplace(body, "\n", "`n"), repeat: rep, section: section})
+    }
+}
+
 ; "START / END OF SHIFT  (asks which bay)" -> "Start / end of shift"
 EdSectionName(s) {
     s := Trim(RegExReplace(s, "\s*\(.*$"))

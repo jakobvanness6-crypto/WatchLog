@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.28.0"
-VERSION_DATE := "Oct 30, 2026"
+VERSION := "3.29.0"
+VERSION_DATE := "Oct 31, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -102,6 +102,7 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
     , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
     , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
+    , {id: "endnow", key: "^!+e", label: "End Time Now in the open daily log", fn: (*) => EntryEndNow()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
 
@@ -184,6 +185,7 @@ CheckScale()
 DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
+BreakResume()
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000
@@ -194,7 +196,7 @@ if FileExist(IconFile)
 
 ; Click the tray icon for the home window, right-click it for the menu
 ; (see TRAY MENU below)
-A_IconTip := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
+SetIconTip()
 BuildTrayMenu()
 
 ; The red Caps Lock tag (see CAPS LOCK below)
@@ -4930,6 +4932,8 @@ RunEntry(e, useOpen := false) {
             Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
     }
     MouseMove ox, oy, 0
+    if IsBreakLog(e)
+        BreakBegin(win)
     Tip("Filled in: " e.name, 1500)
     Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
     CountSaved("log", keys, "Full log: " e.name)
@@ -5104,6 +5108,169 @@ ShareITrakSetup() {
     }
     Activity("iTrak: shared this PC's click with the team (" scale "% scaling)")
     MsgBox "Shared. PCs that haven't been taught now use this click (once OneDrive has synced the team folder).`n`nThe iTrak window should be about the same size on those PCs (maximised is best).", "Share iTrak setup"
+}
+
+; =====================================================================
+;  BREAK TIME TRACKER (v3.29.0)
+;  The ;break daily log (any full-entry log named Break) starts the clock;
+;  the break ends when that Daily Log Entry window closes (Save & Close).
+;  The minutes add up for the shift against [Break] Minutes= in
+;  settings.ini (default 60). Kept in last used.ini [Break] so a reload
+;  doesn't lose it; cleared by Start of shift or after 14 hours.
+; =====================================================================
+IsBreakLog(e) => RegExMatch(e.name, "i)^break\b")
+
+BreakAllowed() {
+    m := IniRead(SettingsFile, "Break", "Minutes", "60")
+    return IsNumber(m) && m > 0 ? m * 60 : 3600
+}
+
+; Seconds of break used this shift (the open one counted up to now)
+BreakUsedSecs() {
+    BreakCheckStale()
+    used := 0, openAt := ""
+    try used := Integer(IniRead(LastUsedFile, "Break", "Used", "0"))
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt != ""
+        used += DateDiff(A_Now, openAt, "Seconds")
+    return used
+}
+
+BreakLeftSecs() => BreakAllowed() - BreakUsedSecs()
+
+; "Break left: 42 min (18 of 60 used)" or "On break 12 min, 30 min left"
+BreakText() {
+    left := BreakLeftSecs()
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    mins := (left >= 0 ? left : -left) // 60
+    tail := left >= 0 ? mins " min left" : "over by " mins " min"
+    if openAt != ""
+        return "On break " DateDiff(A_Now, openAt, "Seconds") // 60 " min, " tail
+    return "Break: " tail " (" BreakUsedSecs() // 60 " of " BreakAllowed() // 60 " used)"
+}
+
+; Clears a tally from an earlier shift (14 hours after the first break)
+BreakCheckStale() {
+    since := ""
+    try since := IniRead(LastUsedFile, "Break", "Since", "")
+    if since != "" && DateDiff(A_Now, since, "Hours") >= 14
+        BreakReset()
+}
+
+BreakReset() {
+    try IniDelete LastUsedFile, "Break"
+    SetTimer BreakWatch, 0
+    SetIconTip()
+}
+
+BreakBegin(win) {
+    BreakCheckStale()
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        if IniRead(LastUsedFile, "Break", "Since", "") = ""
+            IniWrite A_Now, LastUsedFile, "Break", "Since"
+        ; a break log already open is ended first (it can't be counted twice)
+        if IniRead(LastUsedFile, "Break", "OpenSince", "") != ""
+            BreakEnd()
+        IniWrite A_Now, LastUsedFile, "Break", "OpenSince"
+        IniWrite win, LastUsedFile, "Break", "Win"
+    }
+    Activity("Break started (" BreakText() ")")
+    SetTimer BreakWatch, 2000
+    SetIconTip()
+}
+
+; After a reload: keep watching a break log that is still open
+BreakResume() {
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt != ""
+        SetTimer BreakWatch, 2000
+    SetIconTip()
+}
+
+BreakWatch() {
+    win := 0, openAt := ""
+    try win := Integer(IniRead(LastUsedFile, "Break", "Win", "0"))
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt = "" {
+        SetTimer BreakWatch, 0
+        return
+    }
+    if !win || !WinExist("ahk_id " win)
+        BreakEnd()
+    else
+        SetIconTip()
+}
+
+BreakEnd() {
+    openAt := "", used := 0
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt = ""
+        return
+    secs := DateDiff(A_Now, openAt, "Seconds")
+    try used := Integer(IniRead(LastUsedFile, "Break", "Used", "0"))
+    try {
+        IniWrite used + secs, LastUsedFile, "Break", "Used"
+        IniDelete LastUsedFile, "Break", "OpenSince"
+        IniDelete LastUsedFile, "Break", "Win"
+    }
+    SetTimer BreakWatch, 0
+    Activity("Break ended after " secs // 60 " min (" BreakText() ")")
+    Tip("Break " secs // 60 " min. " BreakText(), 4000)
+    SetIconTip()
+}
+
+; The tray icon's hover text: version, and break time once a break was taken
+SetIconTip() {
+    iconTxt := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
+    since := ""
+    try since := IniRead(LastUsedFile, "Break", "Since", "")
+    if since != ""
+        iconTxt .= "`n" BreakText()
+    A_IconTip := iconTxt
+}
+
+; Clicks End Time's Now button in the Daily Log Entry in front (or the
+; break log, or the only one open)
+EntryEndNow() {
+    f := EntryLoad()
+    if !f || !f.Has("EndNowX") {
+        Tip("End Time's Now button isn't taught yet: press " HK("entryteach") " to teach it.", 4000, true)
+        return
+    }
+    ents := EntryWins()
+    win := 0
+    if ents.Has(WinExist("A"))
+        win := WinExist("A")
+    else {
+        bw := 0
+        try bw := Integer(IniRead(LastUsedFile, "Break", "Win", "0"))
+        if bw && ents.Has(bw)
+            win := bw
+        else if ents.Count = 1
+            for h in ents
+                win := h
+    }
+    if !win {
+        Tip("Click the daily log first, then press " HK("endnow") " again.", 3000, true)
+        return
+    }
+    WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 2)
+        return
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), Integer(f["W"]), Integer(f["H"]), &x, &y) && AlertOnScreen(x, y) {
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        MouseMove ox, oy, 0
+        Activity("End Time Now clicked by " HK("endnow"))
+    } else
+        Tip("The End Time Now spot is outside the daily log window.", 3000, true)
 }
 
 ; =====================================================================
@@ -5794,6 +5961,8 @@ ShowDashboard(tab := 1) {
 
     tb.UseTab(1)
     y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
+    g.AddText("xm+12 y" y " w560 BackgroundTrans", BreakText())
+    y += 24
     g.AddText("xm+12 y" y " w560 BackgroundTrans", "Logs by type (" f.span ")")
     lv := g.AddListView("xm+12 y+6 w570 r11 -Multi NoSortHdr", ["Log type", "Times", ""])
     top := f.types.Length ? f.types[1].n : 0
@@ -6120,6 +6289,7 @@ BrowserOpen() {
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 StartOfShift() {
+    BreakReset()
     sites := true
     if BrowserOpen()
         sites := MsgBox("Edge is already open, so the Citrix page is probably open too.`n`n"
@@ -9298,6 +9468,7 @@ ShowHome() {
     Status(it != "" ? "2E7D32" : "B86E00", it = "here" ? "iTrak new daily log is taught on this PC"
         : it = "team" ? "iTrak new daily log: using the team's shared setup"
         : "iTrak new daily log isn't taught on this PC yet (Ctrl+Alt+Shift+I)")
+    Status(BreakLeftSecs() < 0 ? "C62828" : "0E746E", BreakText())
     sh := SavedShift()
     Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")
         . ", " SavedTime(sh.keys) " saved")

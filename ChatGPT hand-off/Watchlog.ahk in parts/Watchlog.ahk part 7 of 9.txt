@@ -1,4 +1,45 @@
-; ===== Watchlog.ahk PART 7 of 9 (lines 7215-8342 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 7 of 9 (lines 7344-8512 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+CopyLogins() {
+    list := []
+    for l in LoginList
+        list.Push({trig: l.trig, user: l.user, win: l.win, remind: l.remind, pw: ""})
+    return list
+}
+
+IndexOf(arr, val) {
+    for i, v in arr
+        if v = val
+            return i
+    return 0
+}
+
+; What's wrong with a login typed into Settings ("" if nothing)
+LoginProblem(trig, user, win, remind, logins, row) {
+    if trig = "" || trig = ";"
+        return "Type the shortcut, like `;me"
+    if InStr(trig, " ")
+        return "The shortcut can't have spaces in it."
+    if SubStr(trig, 1, 1) != ";" && win = ""
+        return "Start the shortcut with `; (like `;me). Without it, it could fire in a chat or an email and type your password there.`n`n(Or fill in the window box, so it only works in that one program.)"
+    if RegExMatch(trig, "i)^(;t|;dd|;dt)")
+        return trig " starts like a time/date stamp (;t `;dd `;dt), so it would never fire. Pick another shortcut."
+    for i, l in logins {
+        if i != row && (InStr(l.trig, trig) = 1 || InStr(trig, l.trig) = 1)
+            return trig " and the login " l.trig " start the same way, so the shorter one would fire before you finish typing the longer one. Pick another shortcut."
+    }
+    for t in TemplateList {
+        if InStr(t.trig, trig) = 1 || InStr(trig, t.trig) = 1
+            return trig " and the template " t.trig " start the same way, so the shorter one would fire before you finish typing the longer one. Pick another shortcut."
+    }
+    if user = ""
+        return "Type the username."
+    if InStr(user, " ")
+        return "The username can't have spaces in it."
+    if remind != "" && remind != "0" && Integer(remind) > 600
+        return "The reminder is in minutes, up to 600 (like 55)."
+    return ""
+}
+
 ; Writes the logins as [Login1] ... [Login9] (no passwords), and removes
 ; the older single login under [User]
 WriteLogins(logins) {

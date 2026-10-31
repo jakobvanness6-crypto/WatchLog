@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 4939-6034 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 5 of 9 (lines 4943-6134 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Types text key by key (what Citrix handles best), a little slower than normal
 EntryType(text) {
     SetKeyDelay 20, 10
@@ -167,6 +167,169 @@ ShareITrakSetup() {
     }
     Activity("iTrak: shared this PC's click with the team (" scale "% scaling)")
     MsgBox "Shared. PCs that haven't been taught now use this click (once OneDrive has synced the team folder).`n`nThe iTrak window should be about the same size on those PCs (maximised is best).", "Share iTrak setup"
+}
+
+; =====================================================================
+;  BREAK TIME TRACKER (v3.29.0)
+;  The ;break daily log (any full-entry log named Break) starts the clock;
+;  the break ends when that Daily Log Entry window closes (Save & Close).
+;  The minutes add up for the shift against [Break] Minutes= in
+;  settings.ini (default 60). Kept in last used.ini [Break] so a reload
+;  doesn't lose it; cleared by Start of shift or after 14 hours.
+; =====================================================================
+IsBreakLog(e) => RegExMatch(e.name, "i)^break\b")
+
+BreakAllowed() {
+    m := IniRead(SettingsFile, "Break", "Minutes", "60")
+    return IsNumber(m) && m > 0 ? m * 60 : 3600
+}
+
+; Seconds of break used this shift (the open one counted up to now)
+BreakUsedSecs() {
+    BreakCheckStale()
+    used := 0, openAt := ""
+    try used := Integer(IniRead(LastUsedFile, "Break", "Used", "0"))
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt != ""
+        used += DateDiff(A_Now, openAt, "Seconds")
+    return used
+}
+
+BreakLeftSecs() => BreakAllowed() - BreakUsedSecs()
+
+; "Break left: 42 min (18 of 60 used)" or "On break 12 min, 30 min left"
+BreakText() {
+    left := BreakLeftSecs()
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    mins := (left >= 0 ? left : -left) // 60
+    tail := left >= 0 ? mins " min left" : "over by " mins " min"
+    if openAt != ""
+        return "On break " DateDiff(A_Now, openAt, "Seconds") // 60 " min, " tail
+    return "Break: " tail " (" BreakUsedSecs() // 60 " of " BreakAllowed() // 60 " used)"
+}
+
+; Clears a tally from an earlier shift (14 hours after the first break)
+BreakCheckStale() {
+    since := ""
+    try since := IniRead(LastUsedFile, "Break", "Since", "")
+    if since != "" && DateDiff(A_Now, since, "Hours") >= 14
+        BreakReset()
+}
+
+BreakReset() {
+    try IniDelete LastUsedFile, "Break"
+    SetTimer BreakWatch, 0
+    SetIconTip()
+}
+
+BreakBegin(win) {
+    BreakCheckStale()
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        if IniRead(LastUsedFile, "Break", "Since", "") = ""
+            IniWrite A_Now, LastUsedFile, "Break", "Since"
+        ; a break log already open is ended first (it can't be counted twice)
+        if IniRead(LastUsedFile, "Break", "OpenSince", "") != ""
+            BreakEnd()
+        IniWrite A_Now, LastUsedFile, "Break", "OpenSince"
+        IniWrite win, LastUsedFile, "Break", "Win"
+    }
+    Activity("Break started (" BreakText() ")")
+    SetTimer BreakWatch, 2000
+    SetIconTip()
+}
+
+; After a reload: keep watching a break log that is still open
+BreakResume() {
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt != ""
+        SetTimer BreakWatch, 2000
+    SetIconTip()
+}
+
+BreakWatch() {
+    win := 0, openAt := ""
+    try win := Integer(IniRead(LastUsedFile, "Break", "Win", "0"))
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt = "" {
+        SetTimer BreakWatch, 0
+        return
+    }
+    if !win || !WinExist("ahk_id " win)
+        BreakEnd()
+    else
+        SetIconTip()
+}
+
+BreakEnd() {
+    openAt := "", used := 0
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    if openAt = ""
+        return
+    secs := DateDiff(A_Now, openAt, "Seconds")
+    try used := Integer(IniRead(LastUsedFile, "Break", "Used", "0"))
+    try {
+        IniWrite used + secs, LastUsedFile, "Break", "Used"
+        IniDelete LastUsedFile, "Break", "OpenSince"
+        IniDelete LastUsedFile, "Break", "Win"
+    }
+    SetTimer BreakWatch, 0
+    Activity("Break ended after " secs // 60 " min (" BreakText() ")")
+    Tip("Break " secs // 60 " min. " BreakText(), 4000)
+    SetIconTip()
+}
+
+; The tray icon's hover text: version, and break time once a break was taken
+SetIconTip() {
+    iconTxt := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
+    since := ""
+    try since := IniRead(LastUsedFile, "Break", "Since", "")
+    if since != ""
+        iconTxt .= "`n" BreakText()
+    A_IconTip := iconTxt
+}
+
+; Clicks End Time's Now button in the Daily Log Entry in front (or the
+; break log, or the only one open)
+EntryEndNow() {
+    f := EntryLoad()
+    if !f || !f.Has("EndNowX") {
+        Tip("End Time's Now button isn't taught yet: press " HK("entryteach") " to teach it.", 4000, true)
+        return
+    }
+    ents := EntryWins()
+    win := 0
+    if ents.Has(WinExist("A"))
+        win := WinExist("A")
+    else {
+        bw := 0
+        try bw := Integer(IniRead(LastUsedFile, "Break", "Win", "0"))
+        if bw && ents.Has(bw)
+            win := bw
+        else if ents.Count = 1
+            for h in ents
+                win := h
+    }
+    if !win {
+        Tip("Click the daily log first, then press " HK("endnow") " again.", 3000, true)
+        return
+    }
+    WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 2)
+        return
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), Integer(f["W"]), Integer(f["H"]), &x, &y) && AlertOnScreen(x, y) {
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        MouseMove ox, oy, 0
+        Activity("End Time Now clicked by " HK("endnow"))
+    } else
+        Tip("The End Time Now spot is outside the daily log window.", 3000, true)
 }
 
 ; =====================================================================
@@ -857,6 +1020,8 @@ ShowDashboard(tab := 1) {
 
     tb.UseTab(1)
     y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
+    g.AddText("xm+12 y" y " w560 BackgroundTrans", BreakText())
+    y += 24
     g.AddText("xm+12 y" y " w560 BackgroundTrans", "Logs by type (" f.span ")")
     lv := g.AddListView("xm+12 y+6 w570 r11 -Multi NoSortHdr", ["Log type", "Times", ""])
     top := f.types.Length ? f.types[1].n : 0
@@ -1024,74 +1189,5 @@ LoadApps() {
 
     if problems != ""
         MsgBox "Some apps in settings.ini were skipped:`n`n" problems, "Watchlog", "Icon!"
-}
-
-IsBallyPath(path) => InStr(path, "SDSUI") || InStr(path, "CMPDesktop") || InStr(path, "AlertGridUI")
-
-; The saved login that belongs to the program in front: one locked to
-; its window (Window= in settings.ini, e.g. ;prd for SDS, CMP, Alert Grid)
-LoginForWindow() {
-    for rec in LoginList
-        if rec.win != "" && SubStr(rec.trig, 1, 1) = ";" && LoginWindowActive(rec.win)
-            return rec
-    return ""
-}
-
-; After a Bally program comes to the front: asks, and types its login on a yes.
-; Closes itself after 6 seconds (counts as no).
-OfferLogin(name) {
-    rec := LoginForWindow()
-    if !rec
-        return
-    r := MsgBox("Log in to " name " as " rec.user "?`n`nEnter = yes, Esc = no. Only say yes on the login screen.", "Watchlog", "YesNo Icon? T6")
-    if r = "Yes"
-        DoLogin(rec.trig, rec.user, rec.pw, rec)
-}
-
-MakeSwitchHandler(name, win, path) {
-    return (*) => SwitchTo(name, win, path)
-}
-
-; Switches to the app, minimizes it if it's already in front, or opens it
-SwitchTo(name, match, runTarget := "") {
-    SetTitleMatchMode 2
-    CountSaved("", 0, "Switch to " name)
-    if match != "" && WinExist(match) {
-        if WinActive(match)
-            WinMinimize
-        else {
-            WinActivate
-            if IsBallyPath(runTarget) && WinWaitActive(match, , 2)
-                OfferLogin(name)
-        }
-        return
-    }
-    if runTarget = ""
-        return
-    ; Links like msteams: or shell:AppsFolder\... open apps from the Microsoft
-    ; Store (Teams, new Outlook). They aren't files, so there's nothing to check.
-    if RegExMatch(runTarget, "i)^[a-z][a-z0-9+.-]+:(?!\\)") {
-        try Run runTarget
-        catch
-            MsgBox "Couldn't open " name " with:`n" runTarget "`n`nCheck its Path in settings.ini", "Watchlog", "Icon!"
-        return
-    }
-    path := ResolvePath(runTarget)
-    if InStr(runTarget, "\") && (path = "" || !FileExist(path)) {
-        MsgBox name " wasn't found here:`n" runTarget "`n`nCheck its Path in settings.ini", "Watchlog", "Icon!"
-        return
-    }
-    SplitPath path, , &dir
-    Run path, dir
-    ; A Bally program just opened: once its window is up, offer to log in
-    if IsBallyPath(runTarget) {
-        w := match != "" ? match : DefaultStartWindow(path)
-        if w != "" && WinWait(w, , 30) {
-            Sleep 2000
-            WinActivate "ahk_id " WinExist(w)
-            if WinWaitActive(w, , 3)
-                OfferLogin(name)
-        }
-    }
 }
 

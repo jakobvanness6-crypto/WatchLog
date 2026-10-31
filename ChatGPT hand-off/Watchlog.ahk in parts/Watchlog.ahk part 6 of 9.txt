@@ -1,4 +1,73 @@
-; ===== Watchlog.ahk PART 6 of 9 (lines 6035-7214 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 9 (lines 6135-7343 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
+IsBallyPath(path) => InStr(path, "SDSUI") || InStr(path, "CMPDesktop") || InStr(path, "AlertGridUI")
+
+; The saved login that belongs to the program in front: one locked to
+; its window (Window= in settings.ini, e.g. ;prd for SDS, CMP, Alert Grid)
+LoginForWindow() {
+    for rec in LoginList
+        if rec.win != "" && SubStr(rec.trig, 1, 1) = ";" && LoginWindowActive(rec.win)
+            return rec
+    return ""
+}
+
+; After a Bally program comes to the front: asks, and types its login on a yes.
+; Closes itself after 6 seconds (counts as no).
+OfferLogin(name) {
+    rec := LoginForWindow()
+    if !rec
+        return
+    r := MsgBox("Log in to " name " as " rec.user "?`n`nEnter = yes, Esc = no. Only say yes on the login screen.", "Watchlog", "YesNo Icon? T6")
+    if r = "Yes"
+        DoLogin(rec.trig, rec.user, rec.pw, rec)
+}
+
+MakeSwitchHandler(name, win, path) {
+    return (*) => SwitchTo(name, win, path)
+}
+
+; Switches to the app, minimizes it if it's already in front, or opens it
+SwitchTo(name, match, runTarget := "") {
+    SetTitleMatchMode 2
+    CountSaved("", 0, "Switch to " name)
+    if match != "" && WinExist(match) {
+        if WinActive(match)
+            WinMinimize
+        else {
+            WinActivate
+            if IsBallyPath(runTarget) && WinWaitActive(match, , 2)
+                OfferLogin(name)
+        }
+        return
+    }
+    if runTarget = ""
+        return
+    ; Links like msteams: or shell:AppsFolder\... open apps from the Microsoft
+    ; Store (Teams, new Outlook). They aren't files, so there's nothing to check.
+    if RegExMatch(runTarget, "i)^[a-z][a-z0-9+.-]+:(?!\\)") {
+        try Run runTarget
+        catch
+            MsgBox "Couldn't open " name " with:`n" runTarget "`n`nCheck its Path in settings.ini", "Watchlog", "Icon!"
+        return
+    }
+    path := ResolvePath(runTarget)
+    if InStr(runTarget, "\") && (path = "" || !FileExist(path)) {
+        MsgBox name " wasn't found here:`n" runTarget "`n`nCheck its Path in settings.ini", "Watchlog", "Icon!"
+        return
+    }
+    SplitPath path, , &dir
+    Run path, dir
+    ; A Bally program just opened: once its window is up, offer to log in
+    if IsBallyPath(runTarget) {
+        w := match != "" ? match : DefaultStartWindow(path)
+        if w != "" && WinWait(w, , 30) {
+            Sleep 2000
+            WinActivate "ahk_id " WinExist(w)
+            if WinWaitActive(w, , 3)
+                OfferLogin(name)
+        }
+    }
+}
+
 ; The window each Bally app shows, so Ctrl+Alt+L can skip it if it's already open
 DefaultStartWindow(path) {
     if InStr(path, "AlertGridUI")
@@ -87,6 +156,7 @@ BrowserOpen() {
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 StartOfShift() {
+    BreakReset()
     sites := true
     if BrowserOpen()
         sites := MsgBox("Edge is already open, so the Citrix page is probably open too.`n`n"
@@ -1136,46 +1206,5 @@ ShowSettings(welcome := false, startTab := 1) {
         SetSettingsWin("")
         g.Destroy()
     }
-}
-
-CopyLogins() {
-    list := []
-    for l in LoginList
-        list.Push({trig: l.trig, user: l.user, win: l.win, remind: l.remind, pw: ""})
-    return list
-}
-
-IndexOf(arr, val) {
-    for i, v in arr
-        if v = val
-            return i
-    return 0
-}
-
-; What's wrong with a login typed into Settings ("" if nothing)
-LoginProblem(trig, user, win, remind, logins, row) {
-    if trig = "" || trig = ";"
-        return "Type the shortcut, like `;me"
-    if InStr(trig, " ")
-        return "The shortcut can't have spaces in it."
-    if SubStr(trig, 1, 1) != ";" && win = ""
-        return "Start the shortcut with `; (like `;me). Without it, it could fire in a chat or an email and type your password there.`n`n(Or fill in the window box, so it only works in that one program.)"
-    if RegExMatch(trig, "i)^(;t|;dd|;dt)")
-        return trig " starts like a time/date stamp (;t `;dd `;dt), so it would never fire. Pick another shortcut."
-    for i, l in logins {
-        if i != row && (InStr(l.trig, trig) = 1 || InStr(trig, l.trig) = 1)
-            return trig " and the login " l.trig " start the same way, so the shorter one would fire before you finish typing the longer one. Pick another shortcut."
-    }
-    for t in TemplateList {
-        if InStr(t.trig, trig) = 1 || InStr(trig, t.trig) = 1
-            return trig " and the template " t.trig " start the same way, so the shorter one would fire before you finish typing the longer one. Pick another shortcut."
-    }
-    if user = ""
-        return "Type the username."
-    if InStr(user, " ")
-        return "The username can't have spaces in it."
-    if remind != "" && remind != "0" && Integer(remind) > 600
-        return "The reminder is in minutes, up to 600 (like 55)."
-    return ""
 }
 

@@ -1,48 +1,4 @@
-; ===== Watchlog.ahk PART 4 of 9 (lines 3705-4938 of 10773). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; The logs in some journal text: [{head, name, keys, tagged}] in order
-JournalLogs(text) {
-    logs := []
-    p := LastPos(text, "=== Shift started")
-    if p > 0
-        text := SubStr(text, p)
-    Loop Parse text, "`n", "`r" {
-        if !RegExMatch(A_LoopField, "^(\d\d:\d\d) +(\S.*)$", &e)
-            continue
-        name := Trim(e[2]), keys := 0, tagged := false
-        if RegExMatch(name, "\s*\[k(-?\d+)\]$", &k) {
-            keys := Integer(k[1]), tagged := true
-            name := Trim(SubStr(name, 1, k.Pos - 1))
-        }
-        logs.Push({head: A_LoopField, name: name, keys: keys, tagged: tagged})
-    }
-    return logs
-}
-
-; Logs in `a` that have no match left in `b` (matched by their whole first line)
-LogsMissingFrom(a, b) {
-    left := Map()
-    for l in b
-        left[l.head] := (left.Has(l.head) ? left[l.head] : 0) + 1
-    miss := []
-    for l in a {
-        if left.Has(l.head) && left[l.head] > 0
-            left[l.head] -= 1
-        else
-            miss.Push(l)
-    }
-    return miss
-}
-
-; What a log saved: its [k] tag, or (an older journal) the average for its type
-LogKeys(l, day) {
-    if l.tagged
-        return l.keys
-    it := ItemRow(IniRead(SavedFile, "DayItems", day "|" l.name, ""))
-    if it.n < 1
-        it := ItemRow(IniRead(SavedFile, "ShiftItems", l.name, ""))
-    return it.n > 0 ? Round(it.keys / it.n) : 0
-}
-
+; ===== Watchlog.ahk PART 4 of 9 (lines 3751-4942 of 10944). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; The edit made in the journal window goes through to every count: Shift count,
 ; this shift, Time saved (day, week, month, since the start) and the dashboard.
 ; A log taken out comes off with its own keystrokes; one added by hand goes on
@@ -1227,6 +1183,8 @@ RunEntry(e, useOpen := false) {
             Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
     }
     MouseMove ox, oy, 0
+    if IsBreakLog(e)
+        BreakBegin(win)
     Tip("Filled in: " e.name, 1500)
     Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
     CountSaved("log", keys, "Full log: " e.name)

@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.28.0  -  README
+  WATCHLOG  v3.29.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -81,7 +81,7 @@ Documents\AutoHotkey). Either way:
 Elsewhere:
   LaunchWork.bat      Opens iTrak facial rec and the Citrix page in Edge, for
                       double-clicking. Ctrl+Alt+L no longer uses it since
-                      v3.28.0 (Documents, or the program folder).
+                      v3.29.0 (Documents, or the program folder).
   Quick Notes.md      Your quick notes (Documents). Made automatically.
   Shift Journal       A folder in Documents with every log you insert,
                       one file per shift. Made automatically.
@@ -234,7 +234,8 @@ couple of seconds. No need to press anything.
                     Now button once the log is filled (the End log does); {Bay} in a
                     synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
                     asks which bay and keeps the answer for the shift (v3.20.3).
-  Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.28.0)
+  Ctrl+Alt+Shift+E  Click End Time Now in the daily log in front (v3.29.0)
+  Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.29.0)
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
                     run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
                     on each (nothing is clicked for you). The daily log form is its own window
@@ -875,7 +876,7 @@ UPDATING EVERYONE (with a team templates file on SharePoint)
 -----------------------------------------------------------------------
  12. EDITING templates.txt
 -----------------------------------------------------------------------
-SDS SIGN-IN FIX  (v3.28.0)
+SDS SIGN-IN FIX  (v3.29.0)
   The hourly SDS sign-in could stop with "no saved login is locked to SDS" when something else
   took the keyboard a moment after SDS came to the front. It now brings SDS back and tries
   again, then uses the login whose Only in names SDS (or the one last typed into SDS), even
@@ -901,6 +902,20 @@ SAFEGUARDS  (v3.27.0)
     puts it back (Esc again, without changing anything, throws it away). Kept in memory only.
   - An unexpected error now shows a short plain box ("That didn't finish, but Watchlog is
     still running") with the line number, instead of AutoHotkey's error window.
+
+BREAK TIME TRACKER  (v3.29.0)
+  You get 60 minutes of break a shift, split however you like. Watchlog keeps count:
+  - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The
+    break ends when you Save & Close that Daily Log Entry window. Nothing else to press.
+  - Break time left shows on the home window, the shift dashboard ("This shift" tab) and when
+    you hover over the tray icon, e.g. "Break: 42 min left (18 of 60 used)" or
+    "On break 12 min, 30 min left".
+  - Ctrl+Alt+Shift+E clicks End Time's Now button in the daily log in front (or the break
+    log). It uses the spot taught with Ctrl+Alt+Shift+F.
+  - The count starts over at Start of shift (Ctrl+Alt+L), or 14 hours after the first break.
+  - settings.ini [Break] Minutes=60 sets the allowance. If you close a break log by mistake,
+    only the first one counts.
+  Built, NOT run (the sandbox can't run AutoHotkey).
 
 MORE SAFEGUARDS  (v3.28.0)
   - Repeat the last log: Ctrl+Alt+Shift+R opens a new daily log in iTrak and fills it in with
