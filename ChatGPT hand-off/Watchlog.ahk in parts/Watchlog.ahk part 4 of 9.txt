@@ -1,82 +1,4 @@
-; ===== Watchlog.ahk PART 4 of 9 (lines 3773-5008 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; The logs in some journal text: [{head, name, keys, tagged}] in order
-JournalLogs(text) {
-    logs := []
-    p := LastPos(text, "=== Shift started")
-    if p > 0
-        text := SubStr(text, p)
-    Loop Parse text, "`n", "`r" {
-        if !RegExMatch(A_LoopField, "^(\d\d:\d\d) +(\S.*)$", &e)
-            continue
-        name := Trim(e[2]), keys := 0, tagged := false
-        if RegExMatch(name, "\s*\[k(-?\d+)\]$", &k) {
-            keys := Integer(k[1]), tagged := true
-            name := Trim(SubStr(name, 1, k.Pos - 1))
-        }
-        logs.Push({head: A_LoopField, name: name, keys: keys, tagged: tagged})
-    }
-    return logs
-}
-
-; Logs in `a` that have no match left in `b` (matched by their whole first line)
-LogsMissingFrom(a, b) {
-    left := Map()
-    for l in b
-        left[l.head] := (left.Has(l.head) ? left[l.head] : 0) + 1
-    miss := []
-    for l in a {
-        if left.Has(l.head) && left[l.head] > 0
-            left[l.head] -= 1
-        else
-            miss.Push(l)
-    }
-    return miss
-}
-
-; What a log saved: its [k] tag, or (an older journal) the average for its type
-LogKeys(l, day) {
-    if l.tagged
-        return l.keys
-    it := ItemRow(IniRead(SavedFile, "DayItems", day "|" l.name, ""))
-    if it.n < 1
-        it := ItemRow(IniRead(SavedFile, "ShiftItems", l.name, ""))
-    return it.n > 0 ? Round(it.keys / it.n) : 0
-}
-
-; The edit made in the journal window goes through to every count: Shift count,
-; this shift, Time saved (day, week, month, since the start) and the dashboard.
-; A log taken out comes off with its own keystrokes; one added by hand goes on
-; with whatever its [k] tag says (none = 0). Returns {removed, added}.
-JournalApplyEdit(oldText, newText, day) {
-    oldL := JournalLogs(oldText), newL := JournalLogs(newText)
-    gone := LogsMissingFrom(oldL, newL), came := LogsMissingFrom(newL, oldL)
-    for l in gone
-        AdjustCount(l.name, -1, -LogKeys(l, day), day)
-    for l in came
-        AdjustCount(l.name, 1, l.tagged ? l.keys : 0, day)
-    return {removed: gone.Length, added: came.Length}
-}
-
-; Adds dn logs and dkeys keystrokes (either can be negative, never below 0)
-; to the item in every tally
-AdjustCount(name, dn, dkeys, day) {
-    name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
-    try {
-        inShift := CountBump("ShiftItems", name, dn, dkeys)
-        CountBump("DayItems", day "|" name, dn, dkeys)
-        d := SavedRow(IniRead(SavedFile, "Days", day, ""))
-        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys)
-        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
-        ; this shift's totals only when this shift's item tally had the log
-        ; (or, for an added log, while the shift is still going)
-        if dn < 0 ? inShift : !IniRead(SavedFile, "Shift", "Ended", 0) {
-            sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
-            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys)
-            IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
-        }
-    }
-}
-
+; ===== Watchlog.ahk PART 4 of 9 (lines 3859-5080 of 11292). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; One "times,keystrokes" line: add dn / dkeys (clamped at 0, deleted at 0 times).
 ; Returns whether the line had anything in it before.
 CountBump(section, key, dn, dkeys) {
@@ -1233,5 +1155,69 @@ RunEntry(e, useOpen := false) {
     Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
     CountSaved("log", keys, "Full log: " e.name)
     Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
+}
+
+; Types text key by key (what Citrix handles best), a little slower than normal
+EntryType(text) {
+    SetKeyDelay 20, 10
+    SendEvent "{Text}" text
+}
+
+TeachEntryFields() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachEntryFieldsRun()
+    catch as err
+        MsgBox "Teach daily log fields stopped: " err.Message, "Teach daily log fields", "Icon!"
+    TeachBusy := false
+}
+
+TeachEntryFieldsRun() {
+    global ITrakFile, EntryFields
+    win := EntryWin()
+    if !win {
+        MsgBox "Open a new daily log in iTrak first, so the empty Daily Log Entry form is showing (its window title starts with Daily Log Entry), then run this again.", "Teach daily log fields", "Icon!"
+        return
+    }
+    if MsgBox("Leave the empty Daily Log Entry form showing.`n`nFor each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching. The fifth spot is End Time's Now button.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
+        return
+    SetTitleMatchMode 2
+    pts := Map()
+    for i, k in EntryFields {
+        if !TeachWait(i " of 5`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+            return
+        win := EntryWin()
+        if !win || !ITrakPoint(win, &x, &y) {
+            MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+            return
+        }
+        pts[k] := [x, y]
+    }
+    if !TeachWait("5 of 5`nHover over End Time's  Now  button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    win := EntryWin()
+    if !win || !ITrakPoint(win, &x, &y) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
+        return
+    }
+    pts["EndNow"] := [x, y]
+    WinGetClientPos , , &cw, &ch, "ahk_id " win
+    try {
+        for k in EntryFields {
+            IniWrite pts[k][1], ITrakFile, "Fields", k "X"
+            IniWrite pts[k][2], ITrakFile, "Fields", k "Y"
+        }
+        IniWrite pts["EndNow"][1], ITrakFile, "Fields", "EndNowX"
+        IniWrite pts["EndNow"][2], ITrakFile, "Fields", "EndNowY"
+        IniWrite cw, ITrakFile, "Fields", "W"
+        IniWrite ch, ITrakFile, "Fields", "H"
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach daily log fields", "Icon!"
+        return
+    }
+    Activity("iTrak: daily log fields taught (window " cw "x" ch ")")
+    MsgBox "Saved. Ctrl+Alt+F now fills in a full-entry log (add them to templates.txt as lines like  +Break = Surveillance | Duty | NA | Break ).`n`nThe form can open anywhere, but keep it the same size.", "Teach daily log fields"
 }
 

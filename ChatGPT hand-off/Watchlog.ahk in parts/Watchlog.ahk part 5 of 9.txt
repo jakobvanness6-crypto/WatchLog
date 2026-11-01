@@ -1,68 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 9 (lines 5009-6205 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
-; Types text key by key (what Citrix handles best), a little slower than normal
-EntryType(text) {
-    SetKeyDelay 20, 10
-    SendEvent "{Text}" text
-}
-
-TeachEntryFields() {
-    global TeachBusy
-    if TeachBusy
-        return
-    TeachBusy := true
-    try TeachEntryFieldsRun()
-    catch as err
-        MsgBox "Teach daily log fields stopped: " err.Message, "Teach daily log fields", "Icon!"
-    TeachBusy := false
-}
-
-TeachEntryFieldsRun() {
-    global ITrakFile, EntryFields
-    win := EntryWin()
-    if !win {
-        MsgBox "Open a new daily log in iTrak first, so the empty Daily Log Entry form is showing (its window title starts with Daily Log Entry), then run this again.", "Teach daily log fields", "Icon!"
-        return
-    }
-    if MsgBox("Leave the empty Daily Log Entry form showing.`n`nFor each of Location, Topic, Reference and Synopsis, hover the mouse over that box and press F8, or Ctrl+Alt+Shift+A if F8 needs the Fn key (Ctrl+Alt+Esc cancels). Nothing is clicked for you while teaching. The fifth spot is End Time's Now button.`n`nStart?", "Teach daily log fields", "YesNo Icon?") != "Yes"
-        return
-    SetTitleMatchMode 2
-    pts := Map()
-    for i, k in EntryFields {
-        if !TeachWait(i " of 5`nHover over the " k " box on the daily log and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
-            return
-        win := EntryWin()
-        if !win || !ITrakPoint(win, &x, &y) {
-            MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
-            return
-        }
-        pts[k] := [x, y]
-    }
-    if !TeachWait("5 of 5`nHover over End Time's  Now  button and press F8 (or Ctrl+Alt+Shift+A)   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
-        return
-    win := EntryWin()
-    if !win || !ITrakPoint(win, &x, &y) {
-        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach daily log fields", "Icon!"
-        return
-    }
-    pts["EndNow"] := [x, y]
-    WinGetClientPos , , &cw, &ch, "ahk_id " win
-    try {
-        for k in EntryFields {
-            IniWrite pts[k][1], ITrakFile, "Fields", k "X"
-            IniWrite pts[k][2], ITrakFile, "Fields", k "Y"
-        }
-        IniWrite pts["EndNow"][1], ITrakFile, "Fields", "EndNowX"
-        IniWrite pts["EndNow"][2], ITrakFile, "Fields", "EndNowY"
-        IniWrite cw, ITrakFile, "Fields", "W"
-        IniWrite ch, ITrakFile, "Fields", "H"
-    } catch {
-        MsgBox "Couldn't save the spots to " ITrakFile, "Teach daily log fields", "Icon!"
-        return
-    }
-    Activity("iTrak: daily log fields taught (window " cw "x" ch ")")
-    MsgBox "Saved. Ctrl+Alt+F now fills in a full-entry log (add them to templates.txt as lines like  +Break = Surveillance | Duty | NA | Break ).`n`nThe form can open anywhere, but keep it the same size.", "Teach daily log fields"
-}
-
+; ===== Watchlog.ahk PART 5 of 9 (lines 5081-6332 of 11292). Delete this first line from each part, then join all 9 in order to get the full file. =====
 TeachITrak() {
     global TeachBusy
     if TeachBusy
@@ -1194,5 +1130,124 @@ LoadApps() {
 
     if problems != ""
         MsgBox "Some apps in settings.ini were skipped:`n`n" problems, "Watchlog", "Icon!"
+}
+
+IsBallyPath(path) => InStr(path, "SDSUI") || InStr(path, "CMPDesktop") || InStr(path, "AlertGridUI")
+
+; The saved login that belongs to the program in front: one locked to
+; its window (Window= in settings.ini, e.g. ;prd for SDS, CMP, Alert Grid)
+LoginForWindow() {
+    for rec in LoginList
+        if rec.win != "" && SubStr(rec.trig, 1, 1) = ";" && LoginWindowActive(rec.win)
+            return rec
+    return ""
+}
+
+; After a Bally program comes to the front: asks, and types its login on a yes.
+; Closes itself after 6 seconds (counts as no).
+OfferLogin(name) {
+    rec := LoginForWindow()
+    if !rec
+        return
+    r := MsgBox("Log in to " name " as " rec.user "?`n`nEnter = yes, Esc = no. Only say yes on the login screen.", "Watchlog", "YesNo Icon? T6")
+    if r = "Yes"
+        DoLogin(rec.trig, rec.user, rec.pw, rec)
+}
+
+MakeSwitchHandler(name, win, path) {
+    return (*) => SwitchTo(name, win, path)
+}
+
+; Switches to the app, minimizes it if it's already in front, or opens it
+SwitchTo(name, match, runTarget := "") {
+    SetTitleMatchMode 2
+    CountSaved("", 0, "Switch to " name)
+    if match != "" && WinExist(match) {
+        if WinActive(match)
+            WinMinimize
+        else {
+            WinActivate
+            if IsBallyPath(runTarget) && WinWaitActive(match, , 2)
+                OfferLogin(name)
+        }
+        return
+    }
+    if runTarget = ""
+        return
+    ; Links like msteams: or shell:AppsFolder\... open apps from the Microsoft
+    ; Store (Teams, new Outlook). They aren't files, so there's nothing to check.
+    if RegExMatch(runTarget, "i)^[a-z][a-z0-9+.-]+:(?!\\)") {
+        try Run runTarget
+        catch
+            MsgBox "Couldn't open " name " with:`n" runTarget "`n`nCheck its Path in settings.ini", "Watchlog", "Icon!"
+        return
+    }
+    path := ResolvePath(runTarget)
+    if InStr(runTarget, "\") && (path = "" || !FileExist(path)) {
+        MsgBox name " wasn't found here:`n" runTarget "`n`nCheck its Path in settings.ini", "Watchlog", "Icon!"
+        return
+    }
+    SplitPath path, , &dir
+    Run path, dir
+    ; A Bally program just opened: once its window is up, offer to log in
+    if IsBallyPath(runTarget) {
+        w := match != "" ? match : DefaultStartWindow(path)
+        if w != "" && WinWait(w, , 30) {
+            Sleep 2000
+            WinActivate "ahk_id " WinExist(w)
+            if WinWaitActive(w, , 3)
+                OfferLogin(name)
+        }
+    }
+}
+
+; The window each Bally app shows, so Ctrl+Alt+L can skip it if it's already open
+DefaultStartWindow(path) {
+    if InStr(path, "AlertGridUI")
+        return "Alert Grid ahk_exe javaw.exe"
+    if InStr(path, "SDSUI")
+        return "SDS ahk_exe javaw.exe"
+    if InStr(path, "CMPDesktop")
+        return "ahk_exe CMPDesktop.exe"
+    return ""
+}
+
+; Turns a path with * in it into a real one, picking the newest version:
+; C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
+;   -> C:\BallyTechnologies\CMPDesktop15_14_2\CMPDesktop\CMPDesktop.exe
+; Returns "" if nothing matches. Paths without * come back unchanged.
+ResolvePath(path) {
+    if !RegExMatch(path, "[*?]")
+        return path
+    parts := StrSplit(path, "\")
+    return ResolveParts(parts[1], parts, 2)
+}
+
+ResolveParts(base, parts, i) {
+    if i > parts.Length
+        return FileExist(base) ? base : ""
+    part := parts[i]
+    if !RegExMatch(part, "[*?]")
+        return ResolveParts(base "\" part, parts, i + 1)
+    found := []
+    Loop Files base "\" part, (i = parts.Length ? "FD" : "D")
+        found.Push(A_LoopFileName)
+    ; newest version first (15_14_2 is newer than 15_9)
+    if found.Length > 1 {
+        Loop found.Length - 1 {
+            Loop found.Length - A_Index {
+                j := A_Index
+                if VerCompare(VersionOf(found[j]), VersionOf(found[j + 1])) < 0 {
+                    tmp := found[j], found[j] := found[j + 1], found[j + 1] := tmp
+                }
+            }
+        }
+    }
+    for name in found {
+        r := ResolveParts(base "\" name, parts, i + 1)
+        if r != ""
+            return r
+    }
+    return ""
 }
 

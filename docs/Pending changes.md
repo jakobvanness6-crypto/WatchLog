@@ -3,9 +3,51 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.31.0 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.32.0 (Nov 1, 2026): taskbar clock bottom-left, hide taskbar previews, Ctrl+Alt+I shows the window under the mouse (built, NOT run). Before that v3.31.0 (Oct 31): Info From people search removed.
 
 ## Waiting to be built
+
+### PLAN: Incident report "Report opened on behalf of Security" (Jakob, Oct 31). NOT built, waiting on answers + "build it"
+Why: incident reports are where the most shift time goes. Start with the quick, very common "opened on behalf of Security" report, then add medicals, trespass and self-exclusion violation.
+
+How iTrak works today (from Jakob's screenshots): make the daily log, click Create New Incident in that same window, and an "Incident File" window opens attached to the log (Property, Location, Reference and Synopsis carry over). Report Details tab: Incident Type, Specific, Category, Risk Classification (drop-downs with Add), Checklist button, Secondary Operator, Custom 3, Reported / Occurred / To dates, Executive Brief, Closing Remarks. Other tabs: Narrative, Participants, Media, Supplemental Entries, Custom Forms.
+
+Proposed design:
+1. One line in templates.txt per kind of report, like code words, for example
+   `+Incident Refusal intox = Alcohol Event | Refusal - Signs of Intoxication | Low | <custom 3> | <executive brief> | <narrative>`
+   with {boxes} for the parts that change (times, employee #s, camera reference, security report #). Employee #s are typed on the form each time and never remembered.
+2. Chained from the daily log: ;refuse (and later others) makes the daily log as now, then clicks Create New Incident and fills the incident in one go. A separate hotkey (suggest Ctrl+Alt+I) does the incident alone when the daily log is already open.
+3. Watchlog fills Report Details (drop-downs typed + Enter, like the daily log), Custom 3 = the log's Reference, Executive Brief, Closing Remarks, then clicks the Narrative tab and types the narrative, then Supplemental Entries if it is always the same. It stops before Save so Jakob checks it. Secondary Operator and Participants stay by hand at first (people).
+4. Click spots taught once per bay, like the daily log fields (Ctrl+Alt+Shift+F style), measured from the Incident File window.
+5. Counted in Time saved.
+
+Answers (Jakob, Oct 31): Narrative is NEVER filled by surveillance (Security writes it after we send the report): drop step 3's narrative part. Start = "Create Incident" button inside the daily log window (teach that spot). Secondary Operator = always his supervisor. All dates/times stay manual for now (Watchlog skips them). Drop-downs narrow when typed; Enter picks (same as daily log Location/Topic).
+
+First kind (Jakob, Nov 1): Refusal intox = Type Alcohol Event, Specific Refusal - Signs of Intoxication, Risk Low, Executive Brief "Report opened on behalf of Security. Security Officer advised of one patron refused entry due to showing signs of intoxication." (patron count should follow ;refuse's Patrons box). Custom 3 = Reference always (operator reviews before saving). Supplemental Entries: Jakob will send the template or the whole report-templates PDF. More wording later.
+
+Report Templates PDF (Jakob sent Master V19.1, Nov 1; marked Confidential): NOT saved in project files or GitHub. Each template = Incident Type, Specific, Category, Risk, Executive Brief with (X) gaps, Supplemental lines "Cam Time SID # ..." (some "If applicable"). Supplemental is NOT needed for a plain refusal (photo to Media instead) and for most "on behalf of Security" reports, so phase 1 is the Report Details tab only. Jakob's real refusal uses Alcohol Event / Refusal - Signs of Intoxication / Low with the "Report opened on behalf of Security..." brief (the PDF's generic one says General / Interior or Exterior): follow Jakob.
+
+Revised plan:
+- Phase 1 (Report Details): incident lines kept in a NEW file incidents.txt beside templates.txt (kept out of GitHub since the wording comes from a confidential document), e.g. `!refuse intox = Alcohol Event | Refusal - Signs of Intoxication | | Low | Report opened on behalf of Security. Security Officer advised of {Patrons} refused entry due to showing signs of intoxication.` Gaps like (X), (on foot/in a taxi) become form boxes/pick lists. Watchlog: Create Incident click, types Type/Specific/Category/Risk + Enter, Custom 3 = Reference, Executive Brief, Secondary Operator (TBD), stops before Save. Dates manual. Narrative never.
+- Phase 1 kinds (suggested): refusal intox (on behalf of Security), generic on behalf of Security (reason box), Patron Trespass (24 h / indefinite / violation), Medical, Self-Exclusion (Facial Rec / AlertGrid / Manual).
+- Phase 2 (Supplemental builder): a window listing the template's supplemental lines, each with Cam and Time boxes (and SID #), tick the "If applicable" lines, Watchlog types them into Supplemental Entries. Needs a screenshot of that tab.
+
+FINAL PLAN for v3.32.0 (Jakob, Nov 1). Scope: ONLY "Report opened on behalf of Security" reports. Medicals and self-exclusion left out for now.
+- Kinds: (1) Refusal, signs of intox (Alcohol Event / Refusal - Signs of Intoxication / Low; brief "Report opened on behalf of Security. Security Officer advised of {patrons} refused entry due to showing signs of intoxication."), (2) General on behalf of Security (General / Interior or Exterior / Low; brief "Report opened on behalf of Security. {reason}"), (3) Trespass 24 h / indefinite / violation (Patron Trespass / timeframe / Low-Medium; PDF brief with location + reason boxes). Wording in incidents.txt (kept off GitHub), editable.
+- Flow: ;refuse daily log (or any open daily log) -> Ctrl+Alt+I (suggested) -> pick kind -> small form for the gaps -> Watchlog clicks Create Incident, types Type / Specific / Category / Risk + Enter, Custom 3 = Reference, Executive Brief, then clicks INTO Secondary Operator and stops there so the operator types the supervisor (nothing stored). Dates manual. Narrative never.
+- Supplemental: NOT in v3.32.0 (Jakob, Nov 1): surveillance writes no supplemental for on-behalf-of-Security reports; the screenshot one was Security's own. Jakob writes supplementals for other reports and is sending an example of his: use it for phase 2 (supplemental helper). Old note: (Jakob's screenshot): Supplemental Entries tab > New opens "Supplemental Form" with one blank Details text box. Option: Watchlog opens it and pastes a skeleton (property line, "Employee's Involved:", "Incident Details:", "Nothing further to report.") with no names/numbers. Asked whether surveillance or Security fills it.
+- Teach once per bay: Create Incident button, Incident Type, Specific, Category, Risk, Custom 3, Executive Brief, Secondary Operator (measured from the Incident File window).
+- Counted in Time saved. Built, not run (no AHK in sandbox) until Jakob tests.
+
+Questions for Jakob (still open: Checklist/Supplemental/Custom Forms contents, Custom 3, Closing Remarks, report kinds + wording, how to fill Secondary Operator):
+- How do you start the incident: a button or the Actions menu in the daily log window? Does the Incident File always open the same size and place?
+- Do the drop-downs (Incident Type, Specific, Risk) narrow when you type, like Location/Topic, or must you click Add and pick from a list?
+- What do the Checklist, Supplemental Entries and Custom Forms hold for an "on behalf of Security" report? Same every time?
+- Custom 3: always the same as Reference? Closing Remarks number: the Security report #? Who fills it, you or the supervisor who closes?
+- Dates: Reported = now? Occurred and To = times Security gives you? Typed or picked?
+- Secondary Operator: is it always your supervisor? (could be a pick list of operator usernames if you want; not stored otherwise)
+- The "on behalf of Security" kinds you do most (refused entry intox / no ID, ...?) and their Type / Specific / Risk, plus the narrative wording (fake numbers are fine).
+
 
 ### Info From: type the name instead of the department: option 1 BUILT in v3.30.2 (Oct 31). Option 2 (name box on the form) DROPPED (Jakob, Oct 31): he types a few letters into Look For and that's enough; option 2 would add privacy worry for no gain.
 - v3.30.1 works on his bay, but a department search (dealer) lists every dealer past and present, so he still scrolls. He'd rather type the name.
@@ -34,6 +76,12 @@ Your autocorrect list working in every program, not just the call pad and form b
 - Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
 - Optional quick insert when every form box is already filled (off by default).
 - Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.32.0 (Nov 1)
+- Taskbar clock (Jakob: main monitor, seconds and date): bottom-left of the taskbar, 24 h HH:mm:ss over "ddd MMM d", click-through, follows taskbar light/dark, re-asserts on top every tick, hides for full-screen windows; tray > Windows toggle (this PC, last used.ini [Clock] Show); settings.ini [Clock] Seconds/Date/Monitor/OffsetX/OffsetY. Windows clock can be hidden in Settings on newer Windows 11.
+- Hide taskbar window previews: ExtendedUIHoverTime did nothing on his PC; Policies key locked by IT. Watchlog hides class TaskListThumbnailWnd on EVENT_OBJECT_SHOW (SetWinEventHook); other explorer pop-ups near the taskbar are logged once as "Taskbar pop-up seen: class ..."; settings.ini [Taskbar] PreviewClasses= adds more. Tray > Windows toggle (this PC, [Taskbar] HidePreviews).
+- Ctrl+Alt+I also shows the window under the mouse and both classes.
+- Built, NOT run.
 
 ## Done in v3.30.0 (Oct 31)
 - Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From button (v3.30.1; v3.30.0 wrongly taught the arrow), Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.

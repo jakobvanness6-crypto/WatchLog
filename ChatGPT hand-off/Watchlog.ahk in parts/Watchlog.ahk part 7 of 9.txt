@@ -1,194 +1,4 @@
-; ===== Watchlog.ahk PART 7 of 9 (lines 7415-8494 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
-CopyLogins() {
-    list := []
-    for l in LoginList
-        list.Push({trig: l.trig, user: l.user, win: l.win, remind: l.remind, pw: ""})
-    return list
-}
-
-IndexOf(arr, val) {
-    for i, v in arr
-        if v = val
-            return i
-    return 0
-}
-
-; What's wrong with a login typed into Settings ("" if nothing)
-LoginProblem(trig, user, win, remind, logins, row) {
-    if trig = "" || trig = ";"
-        return "Type the shortcut, like `;me"
-    if InStr(trig, " ")
-        return "The shortcut can't have spaces in it."
-    if SubStr(trig, 1, 1) != ";" && win = ""
-        return "Start the shortcut with `; (like `;me). Without it, it could fire in a chat or an email and type your password there.`n`n(Or fill in the window box, so it only works in that one program.)"
-    if RegExMatch(trig, "i)^(;t|;dd|;dt)")
-        return trig " starts like a time/date stamp (;t `;dd `;dt), so it would never fire. Pick another shortcut."
-    for i, l in logins {
-        if i != row && (InStr(l.trig, trig) = 1 || InStr(trig, l.trig) = 1)
-            return trig " and the login " l.trig " start the same way, so the shorter one would fire before you finish typing the longer one. Pick another shortcut."
-    }
-    for t in TemplateList {
-        if InStr(t.trig, trig) = 1 || InStr(trig, t.trig) = 1
-            return trig " and the template " t.trig " start the same way, so the shorter one would fire before you finish typing the longer one. Pick another shortcut."
-    }
-    if user = ""
-        return "Type the username."
-    if InStr(user, " ")
-        return "The username can't have spaces in it."
-    if remind != "" && remind != "0" && Integer(remind) > 600
-        return "The reminder is in minutes, up to 600 (like 55)."
-    return ""
-}
-
-; Writes the logins as [Login1] ... [Login9] (no passwords), and removes
-; the older single login under [User]
-WriteLogins(logins) {
-    for key in ["LoginTrigger", "LoginUser", "LoginPassword"]
-        try IniDelete SettingsFile, "User", key
-    Loop 9 {
-        sec := "Login" A_Index
-        if A_Index > logins.Length {
-            try IniDelete SettingsFile, sec
-            continue
-        }
-        l := logins[A_Index]
-        IniWrite l.trig, SettingsFile, sec, "Trigger"
-        IniWrite l.user, SettingsFile, sec, "User"
-        IniSetOrDelete(sec, "Window", l.win)
-        IniSetOrDelete(sec, "Remind", l.remind ? l.remind : "")
-        try IniDelete SettingsFile, sec, "Password"
-    }
-}
-
-IniSetOrDelete(sec, key, val) {
-    if val != ""
-        IniWrite val, SettingsFile, sec, key
-    else
-        try IniDelete SettingsFile, sec, key
-}
-
-; Deletes the saved password of every login that's gone (unless another
-; login still uses the same username)
-RemovePasswords(newLogins) {
-    keep := Map()
-    keep.CaseSense := false
-    for x in newLogins
-        keep[x.user] := true
-    for l in LoginList {
-        if keep.Has(l.user)
-            continue
-        keep[l.user] := true
-        if CredExists(l.user) && CredRemove(l.user)
-            Activity("Password deleted from this PC for " l.user " (login removed)")
-    }
-}
-
-
-; =====================================================================
-;  START WITH WINDOWS  (Settings > Windows)
-;  A shortcut in your Startup folder (shell:startup) opens the script
-;  when you sign in to Windows.
-; =====================================================================
-StartupShortcuts() {
-    found := []
-    Loop Files A_Startup "\*.lnk" {
-        try {
-            FileGetShortcut A_LoopFileFullPath, &target, , &args
-            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName)
-                found.Push(A_LoopFileFullPath)
-        }
-    }
-    return found
-}
-
-SetStartup(on) {
-    have := StartupShortcuts()
-    if on && !have.Length {
-        try {
-            FileCreateShortcut A_ScriptFullPath, A_Startup "\Watchlog.lnk", A_ScriptDir, , "Watchlog", FileExist(IconFile) ? IconFile : ""
-            Activity("Start with Windows turned on")
-        } catch as e {
-            MsgBox "Couldn't add it to the Startup folder:`n" e.Message, "Watchlog", "Icon!"
-        }
-    } else if !on && have.Length {
-        for f in have
-            try FileDelete f
-        Activity("Start with Windows turned off")
-    }
-}
-
-
-; =====================================================================
-;  SECURITY AND STATUS  -  tray menu > Security and status
-;  Everything the tool keeps, where it is and what it never keeps,
-;  checked live on this PC. Copy report puts it on the clipboard, to
-;  send to IT or a supervisor. It never shows a password.
-; =====================================================================
-ShowSecurity() {
-    report := SecurityReport()
-    teal := "0F766E", ink := "1F2933", muted := "6B7280"
-    g := WGui("+AlwaysOnTop", "Security and status  -  v" VERSION)
-    g.BackColor := "F4F7F7"
-    g.MarginX := 18, g.MarginY := 14
-    g.SetFont("s18 bold c" teal, "Segoe UI")
-    g.AddText("w800", "Security and status")
-    g.SetFont("s10 norm c" muted, "Segoe UI")
-    g.AddText("w800 y+0", "What Watchlog keeps on this PC, where it is, and what it never keeps. Checked just now.")
-    ; Traffic lights: green = fine, amber = look at it, red = fix it
-    good := "15803D", warn := "B45309", bad := "B91C1C"
-    lights := []
-    pw := PasswordInSettings()
-    lights.Push(pw ? [bad, "A password is typed into settings.ini. Press Ctrl+Alt+R and it is moved out."]
-        : [good, "No passwords in settings.ini. Saved passwords live in Windows Credential Manager only."])
-    lights.Push([InStr(VersionStatus(), "OUT OF DATE") ? bad : good, "Version v" VERSION ", check code " ProgramCode() ". " VersionStatus()])
-    od := !InStr(HomeDir, "OneDrive") ? "The Watchlog folder is not in OneDrive."
-        : ProcessExist("OneDrive.exe") ? "OneDrive is running, so this PC gets changes as they sync." : "OneDrive is NOT running, so this PC may have older files."
-    lights.Push([InStr(od, "NOT") ? warn : good, od])
-    lights.Push([good, "Makes no internet connections and sends nothing anywhere itself."])
-    conflicts := ""
-    Loop Files HomeDir "\settings-*.ini"
-        conflicts .= (conflicts = "" ? "" : ", ") A_LoopFileName
-    if conflicts != ""
-        lights.Push([warn, "OneDrive made copies of settings.ini: " conflicts ". Compare them, then delete them."])
-    g.SetFont("s10 norm c" ink, "Segoe UI")
-    for l in lights {
-        g.SetFont("s12 bold c" l[1], "Segoe UI")
-        g.AddText("x18 y+8 w22", Chr(0x25CF))
-        g.SetFont("s10 norm c" ink, "Segoe UI")
-        g.AddText("x42 yp+2 w776", l[2])
-    }
-    ; One tab for each part of the report
-    secs := SecuritySections(report)
-    names := []
-    for sc in secs
-        names.Push(sc.tab)
-    g.SetFont("s10 norm c" ink, "Segoe UI")
-    tabs := g.AddTab3("x18 y+14 w800 h330", names)
-    for sc in secs {
-        tabs.UseTab(A_Index)
-        g.SetFont("s10 norm c" ink, "Consolas")
-        g.AddEdit("x30 y+10 w776 h286 ReadOnly -WantReturn -TabStop VScroll BackgroundWhite", sc.body)
-    }
-    tabs.UseTab()
-    g.SetFont("s10 norm c" ink, "Segoe UI")
-    g.AddButton("x18 y+14 w150 Default", "Copy full report").OnEvent("Click", CopyIt)
-    g.AddButton("x+6 w150", "Open activity log").OnEvent("Click", (*) => OpenActivity())
-    g.AddButton("x+6 w150", "Settings...").OnEvent("Click", OpenSettings)
-    g.AddButton("x+6 w150", "Close").OnEvent("Click", (*) => g.Destroy())
-    g.OnEvent("Escape", (*) => g.Destroy())
-    g.Show()
-
-    CopyIt(*) {
-        A_Clipboard := report
-        Tip("Report copied. Paste it with Ctrl+V.")
-    }
-
-    OpenSettings(*) {
-        g.Destroy()
-        ShowSettings()
-    }
-}
-
+; ===== Watchlog.ahk PART 7 of 9 (lines 7623-8747 of 11292). Delete this first line from each part, then join all 9 in order to get the full file. =====
 ; Splits the report into tabs: [{tab, body}]. A heading is a line of capital
 ; letters after a blank line; the first block (before any heading) is Overview.
 SecuritySections(report) {
@@ -660,6 +470,259 @@ ToggleCapsGuard(*) {
 
 
 ; =====================================================================
+;  TASKBAR CLOCK  -  bottom-left of the main monitor  (v3.32.0)
+;  Windows 11 can't move its own clock, so Watchlog shows one on the
+;  left end of the taskbar: 24-hour time with seconds, the date under it.
+;  Clicks go straight through it to the taskbar. It follows the taskbar's
+;  light/dark colour, puts itself back on top when the taskbar is clicked,
+;  and hides while a full-screen window covers that monitor.
+;  On/off: tray > Windows > Clock (this PC). settings.ini [Clock]:
+;  Seconds=yes  Date=yes  Monitor=main (or a number)  OffsetX=0  OffsetY=0
+;  (nudge it right/down in pixels, e.g. if it covers the Widgets button).
+; =====================================================================
+ClockStart() {
+    global ClockGui, ClockTime, ClockDate, ClockLast, ClockGeo, ClockDark
+    if !ClockOn {
+        ClockStop()
+        return
+    }
+    if IsObject(ClockGui)
+        return
+    ClockLast := "", ClockGeo := "", ClockDark := -1
+    ; layered + click-through (WS_EX_LAYERED 0x80000 | WS_EX_TRANSPARENT 0x20), no taskbar button, never takes focus
+    ClockGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x80020 +E0x08000000", "Watchlog clock")
+    ClockGui.MarginX := 0, ClockGui.MarginY := 0
+    ClockGui.SetFont("s9", "Segoe UI")
+    ClockTime := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockDate := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockPlace(true)
+    ClockTick()
+    SetTimer ClockTick, 250
+    Activity("Taskbar clock on")
+}
+
+ClockStop() {
+    global ClockGui
+    SetTimer ClockTick, 0
+    if IsObject(ClockGui) {
+        try ClockGui.Destroy()
+        ClockGui := ""
+    }
+}
+
+; settings.ini [Clock] Seconds= / Date=  (both on unless set to no)
+ClockOpt(key) => !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Clock", key, "yes"))), "^(no|off|0|false)$")
+
+; The monitor it sits on: [Clock] Monitor= a number, or the main one
+ClockMonitor() {
+    m := Trim(IniRead(SettingsFile, "Clock", "Monitor", "main"))
+    if IsInteger(m) && m >= 1 && m <= MonitorGetCount()
+        return Integer(m)
+    return MonitorGetPrimary()
+}
+
+; Sizes and places the clock on the taskbar of its monitor. force = always
+; move it; otherwise only when the screen or taskbar changed.
+ClockPlace(force := false) {
+    global ClockGeo, ClockDark
+    if !IsObject(ClockGui)
+        return
+    n := ClockMonitor()
+    MonitorGet n, &l, &t, &r, &b
+    MonitorGetWorkArea n, &wl, &wt, &wr, &wb
+    s := A_ScreenDPI / 96
+    tbH := b - wb                                ; the taskbar's height when it's at the bottom
+    if tbH < 24 * s || tbH > 200 * s
+        tbH := Round(48 * s)                      ; taskbar hidden or elsewhere: a normal taskbar's height
+    dx := 0, dy := 0
+    try dx := Integer(IniRead(SettingsFile, "Clock", "OffsetX", "0"))
+    try dy := Integer(IniRead(SettingsFile, "Clock", "OffsetY", "0"))
+    dark := ClockTaskbarDark()
+    geo := n "," l "," b "," tbH "," dx "," dy "," A_ScreenDPI "," ClockOpt("Date") "," ClockOpt("Seconds")
+    if !force && geo = ClockGeo && dark = ClockDark
+        return
+    ClockGeo := geo
+    if dark != ClockDark {
+        ClockDark := dark
+        ClockGui.BackColor := dark ? "1C1C1C" : "EEEEEE"
+        ClockTime.SetFont(dark ? "cFFFFFF" : "c000000")
+        ClockDate.SetFont(dark ? "cFFFFFF" : "c000000")
+    }
+    w := Round(84 * s)
+    lineH := Round(17 * s)
+    if ClockOpt("Date") {
+        top := (tbH - 2 * lineH) // 2
+        ClockTime.Move(0, top, w, lineH)
+        ClockDate.Move(0, top + lineH, w, lineH)
+        ClockDate.Visible := true
+    } else {
+        ClockTime.Move(0, (tbH - lineH) // 2, w, lineH)
+        ClockDate.Visible := false
+    }
+    ClockGui.Show("NA x" (l + Round(6 * s) + dx) " y" (b - tbH + dy) " w" w " h" tbH)
+    try WinSetTransparent 255, "ahk_id " ClockGui.Hwnd
+}
+
+; True when the taskbar is dark (Settings > Personalization > Colors > Windows mode)
+ClockTaskbarDark() {
+    try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme") = 0
+    return false
+}
+
+ClockTick() {
+    global ClockLast, ClockHidden
+    if !IsObject(ClockGui)
+        return
+    now := FormatTime(, ClockOpt("Seconds") ? "HH:mm:ss" : "HH:mm")
+    if now = ClockLast
+        return
+    ClockLast := now
+    ClockTime.Text := now
+    if ClockOpt("Date")
+        ClockDate.Text := FormatTime(, "ddd MMM d")
+    ; every 5 seconds: has the screen, taskbar or light/dark changed?
+    if !ClockHidden && (SubStr(A_Sec, 2) = "0" || SubStr(A_Sec, 2) = "5")
+        ClockPlace()
+    ; a full-screen window on this monitor hides it, like the taskbar
+    full := ClockFullScreen()
+    if full != ClockHidden {
+        ClockHidden := full
+        if full
+            ClockGui.Hide()
+        else
+            ClockPlace(true)
+    }
+    ; back on top of the taskbar (clicking the taskbar raises it over us)
+    if !full
+        DllCall("SetWindowPos", "ptr", ClockGui.Hwnd, "ptr", -1, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0013)
+}
+
+ClockFullScreen() {
+    try {
+        a := WinExist("A")
+        if !a
+            return false
+        cls := WinGetClass("ahk_id " a)
+        if cls = "Progman" || cls = "WorkerW" || cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd"
+            return false
+        n := ClockMonitor()
+        MonitorGet n, &l, &t, &r, &b
+        WinGetPos &x, &y, &w, &h, "ahk_id " a
+        return x <= l && y <= t && x + w >= r && y + h >= b
+    }
+    return false
+}
+
+ToggleClock(*) {
+    global ClockOn
+    ClockOn := !ClockOn
+    try WinMenu.ToggleCheck(CLOCK_MENU)
+    try DirCreate DataDir
+    try IniWrite ClockOn ? "1" : "0", LastUsedFile, "Clock", "Show"
+    if ClockOn
+        ClockStart()
+    else {
+        ClockStop()
+        Activity("Taskbar clock off")
+    }
+    Tip("Taskbar clock " (ClockOn ? "ON" : "OFF"), 1500, true)
+}
+
+
+; =====================================================================
+;  HIDE TASKBAR PREVIEWS  (v3.32.0)
+;  The little window pictures that pop up over the taskbar when the mouse
+;  rests on a button. Windows 11 ignores the old registry tweak and the
+;  policy is locked, so Watchlog hides the pop-up the moment it shows.
+;  Which windows count as previews: settings.ini [Taskbar]
+;  PreviewClasses=TaskListThumbnailWnd (more can be added, | between).
+;  Any OTHER pop-up Windows shows near the taskbar is written to the
+;  Activity log once ("Taskbar pop-up seen: class ...") so its class can
+;  be added there without a new version. On/off: tray > Windows (this PC).
+; =====================================================================
+PreviewStart() {
+    global PreviewHook, PreviewCB, PreviewSeen
+    if !PreviewHideOn {
+        PreviewStop()
+        return
+    }
+    if PreviewHook
+        return
+    PreviewSeen := Map()
+    PreviewCB := CallbackCreate(PreviewEvent, "F", 7)
+    ; EVENT_OBJECT_SHOW (0x8002), out of context (0) and not for our own windows (2)
+    PreviewHook := DllCall("SetWinEventHook", "uint", 0x8002, "uint", 0x8002, "ptr", 0, "ptr", PreviewCB
+        , "uint", 0, "uint", 0, "uint", 0x0002, "ptr")
+    if !PreviewHook {
+        CallbackFree(PreviewCB), PreviewCB := 0
+        Activity("Hide taskbar previews: Windows refused the window watcher, so previews aren't hidden")
+        return
+    }
+    Activity("Hide taskbar previews on (" PreviewClasses().Count " window type" (PreviewClasses().Count = 1 ? "" : "s") ")")
+}
+
+PreviewStop() {
+    global PreviewHook, PreviewCB
+    if PreviewHook
+        DllCall("UnhookWinEvent", "ptr", PreviewHook)
+    if PreviewCB
+        CallbackFree(PreviewCB)
+    PreviewHook := 0, PreviewCB := 0
+}
+
+PreviewClasses() {
+    static cache := "", raw := "-"
+    v := Trim(IniRead(SettingsFile, "Taskbar", "PreviewClasses", "TaskListThumbnailWnd"))
+    if v == raw
+        return cache
+    raw := v, cache := Map()
+    cache.CaseSense := false
+    for c in StrSplit(v, "|")
+        if Trim(c) != ""
+            cache[Trim(c)] := true
+    return cache
+}
+
+PreviewEvent(hook, event, hwnd, idObject, idChild, thread, time) {
+    Critical
+    if idObject != 0 || !hwnd
+        return
+    try {
+        cls := WinGetClass("ahk_id " hwnd)
+        if PreviewClasses().Has(cls) {
+            DllCall("ShowWindow", "ptr", hwnd, "int", 0)      ; SW_HIDE
+            return
+        }
+        ; anything else explorer shows while the mouse is on the taskbar: note its class once
+        if PreviewSeen.Has(cls) || WinGetProcessName("ahk_id " hwnd) != "explorer.exe"
+            return
+        CoordMode "Mouse", "Screen"
+        MouseGetPos &mx, &my, &under
+        ucls := WinGetClass("ahk_id " under)
+        if ucls = "Shell_TrayWnd" || ucls = "Shell_SecondaryTrayWnd" || ucls = cls {
+            PreviewSeen[cls] := true
+            Activity("Taskbar pop-up seen: class " cls " (if this was the preview, add it to settings.ini [Taskbar] PreviewClasses=)")
+        }
+    }
+}
+
+TogglePreviewHide(*) {
+    global PreviewHideOn
+    PreviewHideOn := !PreviewHideOn
+    try WinMenu.ToggleCheck(PREVIEW_MENU)
+    try DirCreate DataDir
+    try IniWrite PreviewHideOn ? "1" : "0", LastUsedFile, "Taskbar", "HidePreviews"
+    if PreviewHideOn
+        PreviewStart()
+    else {
+        PreviewStop()
+        Activity("Hide taskbar previews off")
+    }
+    Tip("Taskbar previews " (PreviewHideOn ? "HIDDEN" : "back on"), 1500, true)
+}
+
+
+; =====================================================================
 ;  THE EXE: INSTALLING ON THIS PC  (v3.5.0)
 ;  Watchlog.exe copies itself to %LOCALAPPDATA%\Programs\Watchlog (no
 ;  administrator rights), adds a Start menu entry and the Start with
@@ -1060,22 +1123,4 @@ GlyphIcon(code, color := 0x0E746E, size := 16) {
     made[key] := h
     return h
 }
-
-; Adds a menu item with a picture from the icon font
-MenuItem(m, name, fn, glyph := 0) {
-    m.Add(name, fn)
-    if glyph && (h := GlyphIcon(glyph, 0x0E746E, DllCall("GetSystemMetrics", "Int", 49)))
-        try m.SetIcon(name, "HICON:*" h)
-}
-
-; A big button with a picture on the left and one or two lines of text
-IconButton(g, opt, text, glyph, color, fn) {
-    b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
-    color := Integer("0x" LookText(Format("{:06X}", color)))
-    if glyph && (h := GlyphIcon(glyph, color, 24))
-        SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
-    b.OnEvent("Click", fn)
-    return b
-}
-
 

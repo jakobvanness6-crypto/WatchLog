@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 1 of 9 (lines 1-1134 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 1 of 9 (lines 1-1142 of 11292). Delete this first line from each part, then join all 9 in order to get the full file. =====
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ; Speed: AutoHotkey pauses 100 ms after every window switch by default,
@@ -33,14 +33,16 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.31.0"
-VERSION_DATE := "Oct 31, 2026"
+VERSION := "3.32.0"
+VERSION_DATE := "Nov 1, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
+CLOCK_MENU := "Clock at the bottom left of the taskbar"
+PREVIEW_MENU := "Hide taskbar window previews"
 HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
 INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
 INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
@@ -76,6 +78,10 @@ CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, th
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
+ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
+ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
+PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
+PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -187,6 +193,8 @@ DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 BreakResume()
+ClockStart()
+PreviewStart()
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000

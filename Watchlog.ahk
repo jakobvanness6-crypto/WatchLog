@@ -32,14 +32,16 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.31.0"
-VERSION_DATE := "Oct 31, 2026"
+VERSION := "3.32.0"
+VERSION_DATE := "Nov 1, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
+CLOCK_MENU := "Clock at the bottom left of the taskbar"
+PREVIEW_MENU := "Hide taskbar window previews"
 HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
 INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
 INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
@@ -75,6 +77,10 @@ CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, th
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
+ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
+ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
+PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
+PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -186,6 +192,8 @@ DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 BreakResume()
+ClockStart()
+PreviewStart()
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000
@@ -6336,8 +6344,18 @@ VersionOf(name) {
 WindowInfo() {
     title := WinGetTitle("A")
     exe := WinGetProcessName("A")
-    A_Clipboard := "Title: " title "  |  Program: " exe
-    Tip("Title: " title "`nProgram: " exe "`n(Copied to clipboard)", 5000)
+    ; and the window under the mouse, with its class (v3.32.0), for pop-ups
+    ; that never come to the front (taskbar previews, menus)
+    under := ""
+    try {
+        CoordMode "Mouse", "Screen"
+        MouseGetPos , , &h
+        if h
+            under := "Under the mouse: " WinGetTitle("ahk_id " h) "  |  Program: " WinGetProcessName("ahk_id " h) "  |  Class: " WinGetClass("ahk_id " h)
+    }
+    text := "Title: " title "  |  Program: " exe "  |  Class: " WinGetClass("A") (under != "" ? "`n" under : "")
+    A_Clipboard := text
+    Tip(StrReplace(text, "  |  ", "`n") "`n(Copied to clipboard)", 6000)
 }
 
 
@@ -8073,6 +8091,259 @@ ToggleCapsGuard(*) {
 
 
 ; =====================================================================
+;  TASKBAR CLOCK  -  bottom-left of the main monitor  (v3.32.0)
+;  Windows 11 can't move its own clock, so Watchlog shows one on the
+;  left end of the taskbar: 24-hour time with seconds, the date under it.
+;  Clicks go straight through it to the taskbar. It follows the taskbar's
+;  light/dark colour, puts itself back on top when the taskbar is clicked,
+;  and hides while a full-screen window covers that monitor.
+;  On/off: tray > Windows > Clock (this PC). settings.ini [Clock]:
+;  Seconds=yes  Date=yes  Monitor=main (or a number)  OffsetX=0  OffsetY=0
+;  (nudge it right/down in pixels, e.g. if it covers the Widgets button).
+; =====================================================================
+ClockStart() {
+    global ClockGui, ClockTime, ClockDate, ClockLast, ClockGeo, ClockDark
+    if !ClockOn {
+        ClockStop()
+        return
+    }
+    if IsObject(ClockGui)
+        return
+    ClockLast := "", ClockGeo := "", ClockDark := -1
+    ; layered + click-through (WS_EX_LAYERED 0x80000 | WS_EX_TRANSPARENT 0x20), no taskbar button, never takes focus
+    ClockGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x80020 +E0x08000000", "Watchlog clock")
+    ClockGui.MarginX := 0, ClockGui.MarginY := 0
+    ClockGui.SetFont("s9", "Segoe UI")
+    ClockTime := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockDate := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockPlace(true)
+    ClockTick()
+    SetTimer ClockTick, 250
+    Activity("Taskbar clock on")
+}
+
+ClockStop() {
+    global ClockGui
+    SetTimer ClockTick, 0
+    if IsObject(ClockGui) {
+        try ClockGui.Destroy()
+        ClockGui := ""
+    }
+}
+
+; settings.ini [Clock] Seconds= / Date=  (both on unless set to no)
+ClockOpt(key) => !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Clock", key, "yes"))), "^(no|off|0|false)$")
+
+; The monitor it sits on: [Clock] Monitor= a number, or the main one
+ClockMonitor() {
+    m := Trim(IniRead(SettingsFile, "Clock", "Monitor", "main"))
+    if IsInteger(m) && m >= 1 && m <= MonitorGetCount()
+        return Integer(m)
+    return MonitorGetPrimary()
+}
+
+; Sizes and places the clock on the taskbar of its monitor. force = always
+; move it; otherwise only when the screen or taskbar changed.
+ClockPlace(force := false) {
+    global ClockGeo, ClockDark
+    if !IsObject(ClockGui)
+        return
+    n := ClockMonitor()
+    MonitorGet n, &l, &t, &r, &b
+    MonitorGetWorkArea n, &wl, &wt, &wr, &wb
+    s := A_ScreenDPI / 96
+    tbH := b - wb                                ; the taskbar's height when it's at the bottom
+    if tbH < 24 * s || tbH > 200 * s
+        tbH := Round(48 * s)                      ; taskbar hidden or elsewhere: a normal taskbar's height
+    dx := 0, dy := 0
+    try dx := Integer(IniRead(SettingsFile, "Clock", "OffsetX", "0"))
+    try dy := Integer(IniRead(SettingsFile, "Clock", "OffsetY", "0"))
+    dark := ClockTaskbarDark()
+    geo := n "," l "," b "," tbH "," dx "," dy "," A_ScreenDPI "," ClockOpt("Date") "," ClockOpt("Seconds")
+    if !force && geo = ClockGeo && dark = ClockDark
+        return
+    ClockGeo := geo
+    if dark != ClockDark {
+        ClockDark := dark
+        ClockGui.BackColor := dark ? "1C1C1C" : "EEEEEE"
+        ClockTime.SetFont(dark ? "cFFFFFF" : "c000000")
+        ClockDate.SetFont(dark ? "cFFFFFF" : "c000000")
+    }
+    w := Round(84 * s)
+    lineH := Round(17 * s)
+    if ClockOpt("Date") {
+        top := (tbH - 2 * lineH) // 2
+        ClockTime.Move(0, top, w, lineH)
+        ClockDate.Move(0, top + lineH, w, lineH)
+        ClockDate.Visible := true
+    } else {
+        ClockTime.Move(0, (tbH - lineH) // 2, w, lineH)
+        ClockDate.Visible := false
+    }
+    ClockGui.Show("NA x" (l + Round(6 * s) + dx) " y" (b - tbH + dy) " w" w " h" tbH)
+    try WinSetTransparent 255, "ahk_id " ClockGui.Hwnd
+}
+
+; True when the taskbar is dark (Settings > Personalization > Colors > Windows mode)
+ClockTaskbarDark() {
+    try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme") = 0
+    return false
+}
+
+ClockTick() {
+    global ClockLast, ClockHidden
+    if !IsObject(ClockGui)
+        return
+    now := FormatTime(, ClockOpt("Seconds") ? "HH:mm:ss" : "HH:mm")
+    if now = ClockLast
+        return
+    ClockLast := now
+    ClockTime.Text := now
+    if ClockOpt("Date")
+        ClockDate.Text := FormatTime(, "ddd MMM d")
+    ; every 5 seconds: has the screen, taskbar or light/dark changed?
+    if !ClockHidden && (SubStr(A_Sec, 2) = "0" || SubStr(A_Sec, 2) = "5")
+        ClockPlace()
+    ; a full-screen window on this monitor hides it, like the taskbar
+    full := ClockFullScreen()
+    if full != ClockHidden {
+        ClockHidden := full
+        if full
+            ClockGui.Hide()
+        else
+            ClockPlace(true)
+    }
+    ; back on top of the taskbar (clicking the taskbar raises it over us)
+    if !full
+        DllCall("SetWindowPos", "ptr", ClockGui.Hwnd, "ptr", -1, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0013)
+}
+
+ClockFullScreen() {
+    try {
+        a := WinExist("A")
+        if !a
+            return false
+        cls := WinGetClass("ahk_id " a)
+        if cls = "Progman" || cls = "WorkerW" || cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd"
+            return false
+        n := ClockMonitor()
+        MonitorGet n, &l, &t, &r, &b
+        WinGetPos &x, &y, &w, &h, "ahk_id " a
+        return x <= l && y <= t && x + w >= r && y + h >= b
+    }
+    return false
+}
+
+ToggleClock(*) {
+    global ClockOn
+    ClockOn := !ClockOn
+    try WinMenu.ToggleCheck(CLOCK_MENU)
+    try DirCreate DataDir
+    try IniWrite ClockOn ? "1" : "0", LastUsedFile, "Clock", "Show"
+    if ClockOn
+        ClockStart()
+    else {
+        ClockStop()
+        Activity("Taskbar clock off")
+    }
+    Tip("Taskbar clock " (ClockOn ? "ON" : "OFF"), 1500, true)
+}
+
+
+; =====================================================================
+;  HIDE TASKBAR PREVIEWS  (v3.32.0)
+;  The little window pictures that pop up over the taskbar when the mouse
+;  rests on a button. Windows 11 ignores the old registry tweak and the
+;  policy is locked, so Watchlog hides the pop-up the moment it shows.
+;  Which windows count as previews: settings.ini [Taskbar]
+;  PreviewClasses=TaskListThumbnailWnd (more can be added, | between).
+;  Any OTHER pop-up Windows shows near the taskbar is written to the
+;  Activity log once ("Taskbar pop-up seen: class ...") so its class can
+;  be added there without a new version. On/off: tray > Windows (this PC).
+; =====================================================================
+PreviewStart() {
+    global PreviewHook, PreviewCB, PreviewSeen
+    if !PreviewHideOn {
+        PreviewStop()
+        return
+    }
+    if PreviewHook
+        return
+    PreviewSeen := Map()
+    PreviewCB := CallbackCreate(PreviewEvent, "F", 7)
+    ; EVENT_OBJECT_SHOW (0x8002), out of context (0) and not for our own windows (2)
+    PreviewHook := DllCall("SetWinEventHook", "uint", 0x8002, "uint", 0x8002, "ptr", 0, "ptr", PreviewCB
+        , "uint", 0, "uint", 0, "uint", 0x0002, "ptr")
+    if !PreviewHook {
+        CallbackFree(PreviewCB), PreviewCB := 0
+        Activity("Hide taskbar previews: Windows refused the window watcher, so previews aren't hidden")
+        return
+    }
+    Activity("Hide taskbar previews on (" PreviewClasses().Count " window type" (PreviewClasses().Count = 1 ? "" : "s") ")")
+}
+
+PreviewStop() {
+    global PreviewHook, PreviewCB
+    if PreviewHook
+        DllCall("UnhookWinEvent", "ptr", PreviewHook)
+    if PreviewCB
+        CallbackFree(PreviewCB)
+    PreviewHook := 0, PreviewCB := 0
+}
+
+PreviewClasses() {
+    static cache := "", raw := "-"
+    v := Trim(IniRead(SettingsFile, "Taskbar", "PreviewClasses", "TaskListThumbnailWnd"))
+    if v == raw
+        return cache
+    raw := v, cache := Map()
+    cache.CaseSense := false
+    for c in StrSplit(v, "|")
+        if Trim(c) != ""
+            cache[Trim(c)] := true
+    return cache
+}
+
+PreviewEvent(hook, event, hwnd, idObject, idChild, thread, time) {
+    Critical
+    if idObject != 0 || !hwnd
+        return
+    try {
+        cls := WinGetClass("ahk_id " hwnd)
+        if PreviewClasses().Has(cls) {
+            DllCall("ShowWindow", "ptr", hwnd, "int", 0)      ; SW_HIDE
+            return
+        }
+        ; anything else explorer shows while the mouse is on the taskbar: note its class once
+        if PreviewSeen.Has(cls) || WinGetProcessName("ahk_id " hwnd) != "explorer.exe"
+            return
+        CoordMode "Mouse", "Screen"
+        MouseGetPos &mx, &my, &under
+        ucls := WinGetClass("ahk_id " under)
+        if ucls = "Shell_TrayWnd" || ucls = "Shell_SecondaryTrayWnd" || ucls = cls {
+            PreviewSeen[cls] := true
+            Activity("Taskbar pop-up seen: class " cls " (if this was the preview, add it to settings.ini [Taskbar] PreviewClasses=)")
+        }
+    }
+}
+
+TogglePreviewHide(*) {
+    global PreviewHideOn
+    PreviewHideOn := !PreviewHideOn
+    try WinMenu.ToggleCheck(PREVIEW_MENU)
+    try DirCreate DataDir
+    try IniWrite PreviewHideOn ? "1" : "0", LastUsedFile, "Taskbar", "HidePreviews"
+    if PreviewHideOn
+        PreviewStart()
+    else {
+        PreviewStop()
+        Activity("Hide taskbar previews off")
+    }
+    Tip("Taskbar previews " (PreviewHideOn ? "HIDDEN" : "back on"), 1500, true)
+}
+
+
+; =====================================================================
 ;  THE EXE: INSTALLING ON THIS PC  (v3.5.0)
 ;  Watchlog.exe copies itself to %LOCALAPPDATA%\Programs\Watchlog (no
 ;  administrator rights), adds a Start menu entry and the Start with
@@ -8539,6 +8810,12 @@ BuildTrayMenu() {
     WinMenu.Add(CAPS_MENU, (*) => ToggleCapsGuard())
     if CapsGuard
         WinMenu.Check(CAPS_MENU)
+    WinMenu.Add(CLOCK_MENU, (*) => ToggleClock())
+    if ClockOn
+        WinMenu.Check(CLOCK_MENU)
+    WinMenu.Add(PREVIEW_MENU, (*) => TogglePreviewHide())
+    if PreviewHideOn
+        WinMenu.Check(PREVIEW_MENU)
     MenuItem(tm, "Windows", WinMenu, 0xE7F4)
     tm.Add()
 

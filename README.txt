@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.31.0  -  README
+  WATCHLOG  v3.32.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -270,9 +270,11 @@ couple of seconds. No need to press anything.
                     templates and boxes, change lists like @tables,
                     without Notepad. See section 12. (Notepad is still
                     there: tray menu > Advanced.)
-  Ctrl+Alt+I        Window info. Shows the title and program name of the
-                    window in front and copies them. Use it when you
-                    need a Window= line in settings.ini.
+  Ctrl+Alt+I        Window info. Shows the title, program and class of the
+                    window in front, and of the window under the mouse
+                    (v3.32.0: for pop-ups that never come to the front),
+                    and copies them. Use it when you need a Window= line
+                    in settings.ini.
 
   Ctrl+Alt+P        Pause / resume every shortcut (high beep = on,
   Ctrl+Alt+X        low beep = paused). Same thing, two keys. Handy if
@@ -731,7 +733,9 @@ and the less-used items sit in sub-menus):
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
   Windows >                     Save window layout, Put windows back,
-                                Caps Lock guard (ticked = on)
+                                Caps Lock guard, Clock at the bottom left
+                                of the taskbar, Hide taskbar window
+                                previews (ticked = on; v3.32.0)
   Template editor               Same as Ctrl+Alt+E (section 12)
   Customize Watchlog...         Shortcut keys, shift programs, lists,
                                 autocorrect, timing, full-entry logs (v3.21.0)
@@ -1352,8 +1356,27 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.30, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.32, newest first)
 -----------------------------------------------------------------------
+TASKBAR CLOCK AND NO MORE TASKBAR PREVIEWS  (v3.32.0)
+  - Clock: Windows 11 can't move its clock, so Watchlog shows one at the left end of the
+    taskbar on your main monitor: 24-hour time with seconds, the date under it
+    (e.g. 01:15:21 / Sat Nov 1). Clicks go straight through it to the taskbar. It follows
+    the taskbar's light/dark colour, comes back on top when you click the taskbar, and
+    hides while a full-screen window covers that monitor, like the taskbar does.
+    On/off: tray > Windows > Clock at the bottom left of the taskbar (this PC only).
+    settings.ini [Clock]: Seconds=no, Date=no, Monitor=2 (another monitor), OffsetX=60 /
+    OffsetY=0 (nudge it right or down in pixels, e.g. if it covers the Widgets button).
+    To hide the Windows clock on the right (newer Windows 11): Settings > Time & language >
+    Date & time > turn off "Show time and date in the System tray".
+  - Taskbar previews: the window pictures that pop up when the mouse rests on a taskbar
+    button are hidden the moment they show. On/off: tray > Windows > Hide taskbar window
+    previews (this PC only). If a preview still shows, the Activity log has a line
+    "Taskbar pop-up seen: class ..."; add that class to settings.ini [Taskbar]
+    PreviewClasses=TaskListThumbnailWnd|<that class> (no new version needed).
+  - Ctrl+Alt+I also shows the window under the mouse, with its class.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 BREAK TIME TRACKER  (v3.29.0)
   You get 60 minutes of break a shift, split however you like. Watchlog keeps count:
   - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The
