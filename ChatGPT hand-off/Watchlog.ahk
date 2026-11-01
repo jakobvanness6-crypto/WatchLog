@@ -32,14 +32,16 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.31.0"
-VERSION_DATE := "Oct 31, 2026"
+VERSION := "3.33.0"
+VERSION_DATE := "Nov 1, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
+CLOCK_MENU := "Clock at the bottom left of the taskbar"
+PREVIEW_MENU := "Hide taskbar window previews"
 HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
 INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
 INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
@@ -75,6 +77,14 @@ CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, th
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
+ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
+ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
+PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
+PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
+IncidentFile := HomeDir "\incidents.txt"   ; incident reports (v3.33.0), kept beside templates.txt
+EntryRefs := Map()       ; daily log window -> the Reference Watchlog typed in it (Custom 3 of an incident)
+AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", "1") != "0"   ; autocorrect in every program, this PC (v3.33.0)
+AutoHot := Map(), AutoHotStamp := "-"
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -102,6 +112,7 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
     , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
     , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
+    , {id: "incident", key: "^!+n", label: "incident report from the open daily log", fn: (*) => ShowIncidentPick()}
     , {id: "endnow", key: "^!+e", label: "End Time Now in the open daily log", fn: (*) => EntryEndNow()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
@@ -186,6 +197,11 @@ DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 BreakResume()
+ClockStart()
+PreviewStart()
+SetTimer PreviewPoll, 150
+AutoEverywhereSync()
+SetTimer AutoEverywhereSync, 5000
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000
@@ -432,6 +448,7 @@ LoadSettings() {
     ; Call pad: Numpad + opens it (Ctrl+Alt+N always does). Key=off frees the + key.
     Cfg["PadKey"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Key", "NumpadAdd"))), "^(off|no|0|false|none)$")
     ; Casino autocorrect in the call pad and the log forms
+    Cfg["QuickInsert"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Forms", "QuickInsert", "no"))), "^(yes|on|1|true)$") > 0
     Cfg["Autocorrect"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Autocorrect", "yes"))), "^(no|off|0|false)$")
     ; Beep with the login reminder pop-up (off unless asked for in Settings)
     Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
@@ -2077,6 +2094,18 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
     ; a shorthand line that had everything: make the log without waiting for Enter (v3.26.0)
     if padUsed && hints.Has("go") && hints["go"] && (!hints.Has("expect") || padUsed >= hints["expect"])
         Submit()
+    else if Cfg["QuickInsert"] && !repeat && QuickReady()
+        Submit()        ; every box already filled in, nothing to pick (v3.33.0)
+
+    QuickReady() {
+        for i, c in ctrls {
+            if c.Text = ""
+                return false
+            if fields[i].HasOwnProp("items") && !(padMarks.Has(i) && padMarks[i])
+                return false
+        }
+        return ctrls.Length > 0
+    }
 
     Cancel(*) {
         global Cancelled
@@ -3033,7 +3062,7 @@ PadShortcut(text) {
         }
         hints["rows"] := rows, hints["go"] := ok && rows.Length > 0
     } else if code = "jack" {
-        machine := "", amount := "", window := "", time := "", afterWin := false
+        machine := "", amount := "", window := "", time := "", paid := "", afterWin := false
         k := 1
         while k <= rest.Length {
             w := rest[k]
@@ -3047,6 +3076,9 @@ PadShortcut(text) {
                 afterWin := true
             } else if afterWin && time = "" && RegExMatch(w, "^(\d{4}|\d{1,2}:\d\d)$") {
                 time := w
+            } else if paid = "" && RegExMatch(w, "i)^(cash|cheque|check|chq)$") {
+                ; how it was paid (v3.33.0): cash = all cash, cheque/chq = by cheque
+                paid := StrLower(w) = "cash" ? "all cash" : "by cheque"
             } else if amount = "" && RegExMatch(w, "^\$?[\d,]+(?:\.\d+)?k?$") {
                 amount := PadAmount(w)
             }
@@ -3057,7 +3089,9 @@ PadShortcut(text) {
             hints["machine"] := machine
             if time != ""
                 hints["time"] := time
-            hints["expect"] := 3 + (time != "" ? 1 : 0)
+            if paid != ""
+                hints["paid"] := paid
+            hints["expect"] := 3 + (time != "" ? 1 : 0) + (paid != "" ? 1 : 0)
             hints["go"] := true
         }
     } else if code = "bv" {
@@ -3198,6 +3232,8 @@ PadFill(fields, ctrls, labs, hints, marks) {
             val := hints.Get("account", "")
         else if RegExMatch(k, "^window") && IsObject(jack)
             val := jack.window
+        else if k = "paid"
+            val := hints.Get("paid", "")
         if val = ""
             continue
         if PadPut(f, ctrls[i], val) {
@@ -4949,6 +4985,7 @@ RunEntry(e, useOpen := false) {
     MouseGetPos &ox, &oy
     vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
     LastRun := {e: e, syn: syn}
+    EntryRefs[win] := e.ref        ; Custom 3 of an incident made from this log (v3.33.0)
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
     keys := 2
     for k in EntryFields {
@@ -6336,8 +6373,18 @@ VersionOf(name) {
 WindowInfo() {
     title := WinGetTitle("A")
     exe := WinGetProcessName("A")
-    A_Clipboard := "Title: " title "  |  Program: " exe
-    Tip("Title: " title "`nProgram: " exe "`n(Copied to clipboard)", 5000)
+    ; and the window under the mouse, with its class (v3.32.0), for pop-ups
+    ; that never come to the front (taskbar previews, menus)
+    under := ""
+    try {
+        CoordMode "Mouse", "Screen"
+        MouseGetPos , , &h
+        if h
+            under := "Under the mouse: " WinGetTitle("ahk_id " h) "  |  Program: " WinGetProcessName("ahk_id " h) "  |  Class: " WinGetClass("ahk_id " h)
+    }
+    text := "Title: " title "  |  Program: " exe "  |  Class: " WinGetClass("A") (under != "" ? "`n" under : "")
+    A_Clipboard := text
+    Tip(StrReplace(text, "  |  ", "`n") "`n(Copied to clipboard)", 6000)
 }
 
 
@@ -8073,6 +8120,727 @@ ToggleCapsGuard(*) {
 
 
 ; =====================================================================
+;  TASKBAR CLOCK  -  bottom-left of the main monitor  (v3.32.0)
+;  Windows 11 can't move its own clock, so Watchlog shows one on the
+;  left end of the taskbar: 24-hour time with seconds, the date under it.
+;  Clicks go straight through it to the taskbar. It follows the taskbar's
+;  light/dark colour, puts itself back on top when the taskbar is clicked,
+;  and hides while a full-screen window covers that monitor.
+;  On/off: tray > Windows > Clock (this PC). settings.ini [Clock]:
+;  Seconds=yes  Date=yes  Monitor=main (or a number)  OffsetX=0  OffsetY=0
+;  (nudge it right/down in pixels, e.g. if it covers the Widgets button).
+; =====================================================================
+ClockStart() {
+    global ClockGui, ClockTime, ClockDate, ClockLast, ClockGeo, ClockDark
+    if !ClockOn {
+        ClockStop()
+        return
+    }
+    if IsObject(ClockGui)
+        return
+    ClockLast := "", ClockGeo := "", ClockDark := -1
+    ; layered + click-through (WS_EX_LAYERED 0x80000 | WS_EX_TRANSPARENT 0x20), no taskbar button, never takes focus
+    ClockGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x80020 +E0x08000000", "Watchlog clock")
+    ClockGui.MarginX := 0, ClockGui.MarginY := 0
+    ClockGui.SetFont("s9", "Segoe UI")
+    ClockTime := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockDate := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockPlace(true)
+    ClockTick()
+    SetTimer ClockTick, 250
+    Activity("Taskbar clock on")
+}
+
+ClockStop() {
+    global ClockGui
+    SetTimer ClockTick, 0
+    if IsObject(ClockGui) {
+        try ClockGui.Destroy()
+        ClockGui := ""
+    }
+}
+
+; settings.ini [Clock] Seconds= / Date=  (both on unless set to no)
+ClockOpt(key) => !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Clock", key, "yes"))), "^(no|off|0|false)$")
+
+; The monitor it sits on: [Clock] Monitor= a number, or the main one
+ClockMonitor() {
+    m := Trim(IniRead(SettingsFile, "Clock", "Monitor", "main"))
+    if IsInteger(m) && m >= 1 && m <= MonitorGetCount()
+        return Integer(m)
+    return MonitorGetPrimary()
+}
+
+; Sizes and places the clock on the taskbar of its monitor. force = always
+; move it; otherwise only when the screen or taskbar changed.
+ClockPlace(force := false) {
+    global ClockGeo, ClockDark
+    if !IsObject(ClockGui)
+        return
+    n := ClockMonitor()
+    MonitorGet n, &l, &t, &r, &b
+    MonitorGetWorkArea n, &wl, &wt, &wr, &wb
+    s := A_ScreenDPI / 96
+    tbH := b - wb                                ; the taskbar's height when it's at the bottom
+    if tbH < 24 * s || tbH > 200 * s
+        tbH := Round(48 * s)                      ; taskbar hidden or elsewhere: a normal taskbar's height
+    dx := 0, dy := 0
+    try dx := Integer(IniRead(SettingsFile, "Clock", "OffsetX", "0"))
+    try dy := Integer(IniRead(SettingsFile, "Clock", "OffsetY", "0"))
+    dark := ClockTaskbarDark()
+    geo := n "," l "," b "," tbH "," dx "," dy "," A_ScreenDPI "," ClockOpt("Date") "," ClockOpt("Seconds")
+    if !force && geo = ClockGeo && dark = ClockDark
+        return
+    ClockGeo := geo
+    if dark != ClockDark {
+        ClockDark := dark
+        ClockGui.BackColor := dark ? "1C1C1C" : "EEEEEE"
+        ClockTime.SetFont(dark ? "cFFFFFF" : "c000000")
+        ClockDate.SetFont(dark ? "cFFFFFF" : "c000000")
+    }
+    w := Round(84 * s)
+    lineH := Round(17 * s)
+    if ClockOpt("Date") {
+        top := (tbH - 2 * lineH) // 2
+        ClockTime.Move(0, top, w, lineH)
+        ClockDate.Move(0, top + lineH, w, lineH)
+        ClockDate.Visible := true
+    } else {
+        ClockTime.Move(0, (tbH - lineH) // 2, w, lineH)
+        ClockDate.Visible := false
+    }
+    ClockGui.Show("NA x" (l + Round(6 * s) + dx) " y" (b - tbH + dy) " w" w " h" tbH)
+    try WinSetTransparent 255, "ahk_id " ClockGui.Hwnd
+}
+
+; True when the taskbar is dark (Settings > Personalization > Colors > Windows mode)
+ClockTaskbarDark() {
+    try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme") = 0
+    return false
+}
+
+ClockTick() {
+    global ClockLast, ClockHidden
+    if !IsObject(ClockGui)
+        return
+    now := FormatTime(, ClockOpt("Seconds") ? "HH:mm:ss" : "HH:mm")
+    if now = ClockLast
+        return
+    ClockLast := now
+    ClockTime.Text := now
+    if ClockOpt("Date")
+        ClockDate.Text := FormatTime(, "ddd MMM d")
+    ; every 5 seconds: has the screen, taskbar or light/dark changed?
+    if !ClockHidden && (SubStr(A_Sec, 2) = "0" || SubStr(A_Sec, 2) = "5")
+        ClockPlace()
+    ; a full-screen window on this monitor hides it, like the taskbar
+    full := ClockFullScreen()
+    if full != ClockHidden {
+        ClockHidden := full
+        if full
+            ClockGui.Hide()
+        else
+            ClockPlace(true)
+    }
+    ; back on top of the taskbar (clicking the taskbar raises it over us)
+    if !full
+        DllCall("SetWindowPos", "ptr", ClockGui.Hwnd, "ptr", -1, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0013)
+}
+
+ClockFullScreen() {
+    try {
+        a := WinExist("A")
+        if !a
+            return false
+        cls := WinGetClass("ahk_id " a)
+        if cls = "Progman" || cls = "WorkerW" || cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd"
+            return false
+        n := ClockMonitor()
+        MonitorGet n, &l, &t, &r, &b
+        WinGetPos &x, &y, &w, &h, "ahk_id " a
+        return x <= l && y <= t && x + w >= r && y + h >= b
+    }
+    return false
+}
+
+ToggleClock(*) {
+    global ClockOn
+    ClockOn := !ClockOn
+    try WinMenu.ToggleCheck(CLOCK_MENU)
+    try DirCreate DataDir
+    try IniWrite ClockOn ? "1" : "0", LastUsedFile, "Clock", "Show"
+    if ClockOn
+        ClockStart()
+    else {
+        ClockStop()
+        Activity("Taskbar clock off")
+    }
+    Tip("Taskbar clock " (ClockOn ? "ON" : "OFF"), 1500, true)
+}
+
+
+; =====================================================================
+;  HIDE TASKBAR PREVIEWS  (v3.32.0)
+;  The little window pictures that pop up over the taskbar when the mouse
+;  rests on a button. Windows 11 ignores the old registry tweak and the
+;  policy is locked, so Watchlog hides the pop-up the moment it shows.
+;  Which windows count as previews: settings.ini [Taskbar]
+;  PreviewClasses=TaskListThumbnailWnd (more can be added, | between).
+;  Any OTHER pop-up Windows shows near the taskbar is written to the
+;  Activity log once ("Taskbar pop-up seen: class ...") so its class can
+;  be added there without a new version. On/off: tray > Windows (this PC).
+; =====================================================================
+PreviewStart() {
+    global PreviewHook, PreviewCB, PreviewSeen
+    if !PreviewHideOn {
+        PreviewStop()
+        return
+    }
+    if PreviewHook
+        return
+    PreviewSeen := Map()
+    PreviewCB := CallbackCreate(PreviewEvent, "F", 7)
+    ; EVENT_OBJECT_SHOW (0x8002), out of context (0) and not for our own windows (2)
+    PreviewHook := DllCall("SetWinEventHook", "uint", 0x8002, "uint", 0x8002, "ptr", 0, "ptr", PreviewCB
+        , "uint", 0, "uint", 0, "uint", 0x0002, "ptr")
+    if !PreviewHook {
+        CallbackFree(PreviewCB), PreviewCB := 0
+        Activity("Hide taskbar previews: Windows refused the window watcher, so previews aren't hidden")
+        return
+    }
+    Activity("Hide taskbar previews on (" PreviewClasses().Count " window type" (PreviewClasses().Count = 1 ? "" : "s") ")")
+}
+
+PreviewStop() {
+    global PreviewHook, PreviewCB
+    if PreviewHook
+        DllCall("UnhookWinEvent", "ptr", PreviewHook)
+    if PreviewCB
+        CallbackFree(PreviewCB)
+    PreviewHook := 0, PreviewCB := 0
+}
+
+PreviewClasses() {
+    static cache := "", raw := "-"
+    v := Trim(IniRead(SettingsFile, "Taskbar", "PreviewClasses", "TaskListThumbnailWnd"))
+    if v == raw
+        return cache
+    raw := v, cache := Map()
+    cache.CaseSense := false
+    for c in StrSplit(v, "|")
+        if Trim(c) != ""
+            cache[Trim(c)] := true
+    return cache
+}
+
+PreviewEvent(hook, event, hwnd, idObject, idChild, thread, time) {
+    Critical
+    if idObject != 0 || !hwnd
+        return
+    try {
+        cls := WinGetClass("ahk_id " hwnd)
+        if PreviewClasses().Has(cls) {
+            DllCall("ShowWindow", "ptr", hwnd, "int", 0)      ; SW_HIDE
+            return
+        }
+        ; anything else explorer shows while the mouse is on the taskbar: note its class once
+        if PreviewSeen.Has(cls) || WinGetProcessName("ahk_id " hwnd) != "explorer.exe"
+            return
+        CoordMode "Mouse", "Screen"
+        MouseGetPos &mx, &my, &under
+        ucls := WinGetClass("ahk_id " under)
+        if ucls = "Shell_TrayWnd" || ucls = "Shell_SecondaryTrayWnd" || ucls = cls {
+            PreviewSeen[cls] := true
+            Activity("Taskbar pop-up seen: class " cls " (if this was the preview, add it to settings.ini [Taskbar] PreviewClasses=)")
+        }
+    }
+}
+
+TogglePreviewHide(*) {
+    global PreviewHideOn
+    PreviewHideOn := !PreviewHideOn
+    try WinMenu.ToggleCheck(PREVIEW_MENU)
+    try DirCreate DataDir
+    try IniWrite PreviewHideOn ? "1" : "0", LastUsedFile, "Taskbar", "HidePreviews"
+    if PreviewHideOn
+        PreviewStart()
+    else {
+        PreviewStop()
+        Activity("Hide taskbar previews off")
+    }
+    Tip("Taskbar previews " (PreviewHideOn ? "HIDDEN" : "back on"), 1500, true)
+}
+
+
+; =====================================================================
+;  INCIDENT REPORTS  -  Ctrl+Alt+Shift+N  (v3.33.0)
+;  "Report opened on behalf of Security" incidents, built off the daily
+;  log that is open. The reports are lines in incidents.txt (beside
+;  templates.txt):  Name = Incident Type | Specific | Category | Risk | Executive Brief
+;  Pick one (type the first letters, Enter), fill any {boxes}, and Watchlog
+;  clicks Create Incident in the daily log, waits for the Incident File
+;  window, types Incident Type, Specific, Category and Risk (each + Enter),
+;  Custom 3 (the daily log's Reference) and the Executive Brief, then clicks
+;  into Secondary Operator and stops there for you to type your supervisor.
+;  Dates, Narrative, Checklist, Closing Remarks and Save stay yours. An
+;  Incident File already in front is filled as it is (no Create click).
+;  Teach the spots once per PC: tray > iTrak > Teach the incident report spots.
+; =====================================================================
+IncidentFields := ["Type", "Specific", "Category", "Risk", "Custom3", "Brief", "Secondary"]
+IncidentNames := Map("Type", "Incident Type", "Specific", "Specific", "Category", "Category", "Risk", "Risk Classification"
+    , "Custom3", "Custom 3", "Brief", "Executive Brief", "Secondary", "Secondary Operator")
+IncidentPickWin := ""
+
+IncidentWins() {
+    SetTitleMatchMode 2
+    m := Map()
+    spec := Trim(IniRead(SettingsFile, "ITrak", "IncidentWindow", "Incident File ahk_exe wfica32.exe"))
+    for h in WinGetList(spec)
+        m[h] := true
+    return m
+}
+
+; The reports in incidents.txt, as {name, text} (text = everything after =)
+LoadIncidents(&problem) {
+    list := [], problem := ""
+    if !FileExist(IncidentFile) {
+        problem := "incidents.txt isn't there. Copy it from the Watchlog zip into`n" HomeDir "`n(beside templates.txt)."
+        return list
+    }
+    try text := FileRead(IncidentFile, "UTF-8")
+    catch {
+        problem := "Couldn't open incidents.txt (OneDrive may not be running)."
+        return list
+    }
+    for line in StrSplit(text, "`n", "`r") {
+        line := Trim(line)
+        if line = "" || SubStr(line, 1, 1) = "#"
+            continue
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        name := Trim(SubStr(line, 1, eq - 1)), right := Trim(SubStr(line, eq + 1))
+        if name = "" || SplitTop(right).Length < 5 {
+            problem .= 'incidents.txt: "' SubStr(line, 1, 40) '..." needs 5 parts: Type | Specific | Category | Risk | Executive Brief`n'
+            continue
+        }
+        list.Push({name: name, text: right})
+    }
+    return list
+}
+
+; The spots as a Map, or "" when they haven't been taught
+IncidentLoad() {
+    global ITrakFile
+    c := Map()
+    try {
+        for k in ["CreateX", "CreateY", "DW", "DH", "W", "H"]
+            c[k] := Trim(IniRead(ITrakFile, "Incident", k, ""))
+        for k in IncidentFields
+            for ax in ["X", "Y"]
+                c[k ax] := Trim(IniRead(ITrakFile, "Incident", k ax, ""))
+    } catch
+        return ""
+    for k, v in c
+        if !IsInteger(v)
+            return ""
+    return c
+}
+
+ShowIncidentPick() {
+    global IncidentPickWin
+    if IsObject(IncidentPickWin) {
+        try WinActivate "ahk_id " IncidentPickWin.gui.Hwnd
+        return
+    }
+    act := WinExist("A")
+    incWin := IncidentWins().Has(act) ? act : 0
+    dl := 0
+    if !incWin {
+        ents := EntryWins()
+        if ents.Has(act)
+            dl := act
+        else
+            for h in ents {
+                dl := h
+                break
+            }
+        if !dl {
+            MsgBox "Open the daily log the incident belongs to first (the Daily Log Entry window), then press " HK("incident") " again.", "Incident report", "Icon!"
+            return
+        }
+    }
+    list := LoadIncidents(&problem)
+    if !list.Length {
+        MsgBox (problem != "" ? problem : "incidents.txt has no reports in it.") "`n`nEach report is one line:`nName = Incident Type | Specific | Category | Risk | Executive Brief", "Incident report", "Icon!"
+        return
+    }
+    g := WGui("+AlwaysOnTop +ToolWindow", "Incident report")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText(, incWin ? "Fills the Incident File in front. Type the first letters, then Enter."
+        : "Opens an incident from the daily log and fills it in. Type the first letters, then Enter.")
+    ed := g.AddEdit("w420")
+    lb := g.AddListBox("w420 r" Min(Max(list.Length, 3), 10))
+    g.AddButton("Default w100", "Next").OnEvent("Click", Go)
+    g.AddButton("x+8 yp w100", "Cancel").OnEvent("Click", Cancel)
+    shown := []
+    IncidentPickWin := {gui: g, lb: lb}
+    ed.OnEvent("Change", Refill)
+    g.OnEvent("Escape", Cancel)
+    g.OnEvent("Close", Cancel)
+    Refill()
+    g.Show()
+    if problem != ""
+        Tip(problem, 5000, true)
+
+    Refill(*) {
+        typed := StrLower(Trim(ed.Text))
+        shown := []
+        for r in list
+            if typed = "" || InStr(StrLower(r.name), typed) = 1
+                shown.Push(r)
+        for r in list
+            if typed != "" && InStr(StrLower(r.name), typed) > 1
+                shown.Push(r)
+        lb.Delete()
+        names := []
+        for r in shown
+            names.Push(r.name)
+        if names.Length {
+            lb.Add(names)
+            lb.Choose(1)
+        }
+    }
+    Cancel(*) {
+        global IncidentPickWin
+        IncidentPickWin := ""
+        g.Destroy()
+    }
+    Go(*) {
+        global IncidentPickWin
+        i := lb.Value
+        if !i || i > shown.Length
+            return
+        r := shown[i]
+        IncidentPickWin := ""
+        g.Destroy()
+        IncidentForm(r, dl, incWin)
+    }
+}
+
+#HotIf IsObject(IncidentPickWin) && WinActive("ahk_id " IncidentPickWin.gui.Hwnd)
+Down:: IncidentPickMove(1)
+Up:: IncidentPickMove(-1)
+#HotIf
+
+IncidentPickMove(d) {
+    lb := IncidentPickWin.lb
+    n := SendMessage(0x18B, 0, 0, lb.Hwnd)      ; LB_GETCOUNT
+    if n >= 1
+        lb.Choose(Max(1, Min(n, lb.Value + d)))
+}
+
+; Asks for the {boxes} of the report and Custom 3 when it isn't known
+IncidentForm(r, dl, incWin) {
+    fields := ParseFields(r.text)
+    ref := dl && EntryRefs.Has(dl) ? EntryRefs[dl] : ""
+    if !fields.Length && ref != "" {
+        IncidentRun(r, FillTemplate(r.text, fields, []), ref, dl, incWin)
+        return
+    }
+    g := WGui("+AlwaysOnTop +ToolWindow", "Incident: " r.name)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    ctrls := []
+    for f in fields {
+        g.AddText(A_Index > 1 ? "y+10" : "", f.label)
+        kind := f.HasOwnProp("kind") ? f.kind : ""
+        n := f.HasOwnProp("choose") ? f.choose : 1
+        rows := f.HasOwnProp("items") ? " r" Min(f.items.Length, 12) : ""
+        if kind = "list"
+            c := g.AddDropDownList("w420 Choose" n rows, f.items)
+        else if f.HasOwnProp("items")
+            c := g.AddComboBox("w420 Choose" n rows, f.items)
+        else
+            c := g.AddEdit("w420", f.HasOwnProp("def") ? f.def : "")
+        ctrls.Push(c)
+    }
+    g.AddText(fields.Length ? "y+10" : "", "Custom 3 (the daily log's Reference; empty = you type it)")
+    refBox := g.AddEdit("w420", ref)
+    g.AddButton("xm+212 y+14 w100", "Cancel").OnEvent("Click", (*) => g.Destroy())
+    g.AddButton("x+8 yp w100 Default", "Fill it in").OnEvent("Click", Ok)
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+    (ctrls.Length ? ctrls[1] : refBox).Focus()
+
+    Ok(*) {
+        vals := []
+        for c in ctrls
+            vals.Push(c.Text)
+        out := FillTemplate(r.text, fields, vals)
+        cr := Trim(refBox.Text)
+        g.Destroy()
+        IncidentRun(r, out, cr, dl, incWin)
+    }
+}
+
+; Clicks Create Incident (unless an Incident File is already in front) and fills it in
+IncidentRun(r, out, ref, dl, incWin) {
+    global IncidentFields
+    sp := IncidentLoad()
+    if !sp {
+        MsgBox "The incident report spots haven't been taught on this PC yet.`n`nOpen a daily log, then tray > iTrak > Teach the incident report spots.", "Incident report", "Icon!"
+        return
+    }
+    parts := SplitTop(out)
+    brief := ""
+    loop parts.Length - 4
+        brief .= (A_Index > 1 ? "|" : "") parts[A_Index + 4]
+    vals := Map("Type", Trim(parts[1]), "Specific", Trim(parts[2]), "Category", Trim(parts[3]), "Risk", Trim(parts[4])
+        , "Custom3", ref, "Brief", Trim(brief))
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    keys := 0
+    if !incWin {
+        try WinActivate "ahk_id " dl
+        if !WinWaitActive("ahk_id " dl, , 3) {
+            Tip("Couldn't bring the daily log to the front. Nothing was clicked.", 4000, true)
+            return
+        }
+        Sleep 200
+        if !ITrakSpot(dl, Integer(sp["CreateX"]), Integer(sp["CreateY"]), Integer(sp["DW"]), Integer(sp["DH"]), &x, &y) || !AlertOnScreen(x, y) {
+            Tip("The daily log is too small for the Create Incident spot (or off the screen). Stopped.", 4000, true)
+            Activity("Incident " r.name ": Create Incident spot outside the daily log window")
+            return
+        }
+        before := IncidentWins()
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        keys += 2
+        wait := Integer(IniRead(SettingsFile, "ITrak", "IncidentWait", "10000"))
+        deadline := A_TickCount + wait
+        while !incWin && A_TickCount < deadline {
+            for h in IncidentWins()
+                if !before.Has(h)
+                    incWin := h
+            if !incWin
+                Sleep 100
+        }
+        if !incWin {
+            MouseMove ox, oy, 0
+            Tip("The Incident File window didn't open. Nothing was filled in.", 4000, true)
+            Activity("Incident " r.name ": no new Incident File window within " wait " ms")
+            return
+        }
+        Sleep Integer(IniRead(SettingsFile, "ITrak", "IncidentSettle", "900"))
+    }
+    try WinActivate "ahk_id " incWin
+    if !WinWaitActive("ahk_id " incWin, , 3) {
+        Tip("Couldn't bring the Incident File to the front. Nothing was filled in.", 4000, true)
+        return
+    }
+    w0 := Integer(sp["W"]), h0 := Integer(sp["H"])
+    for k in IncidentFields {
+        if k != "Secondary" && vals[k] = ""
+            continue
+        if !ITrakSpot(incWin, Integer(sp[k "X"]), Integer(sp[k "Y"]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
+            Tip("The Incident File is too small for the " IncidentNames[k] " spot. Stopped.", 4000, true)
+            Activity("Incident " r.name ": stopped before " k " (spot outside the window)")
+            return
+        }
+        if !WinActive("ahk_id " incWin) {
+            Tip("iTrak lost the front. Stopped before " IncidentNames[k] ".", 3000, true)
+            Activity("Incident " r.name ": stopped before " k " (window lost the front)")
+            return
+        }
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        Sleep pause
+        if k = "Secondary"
+            break                       ; the cursor waits there for your supervisor
+        if k = "Brief" {
+            Paste(vals[k], true)
+            keys += StrLen(vals[k]) + 1
+        } else if k = "Custom3" {
+            EntryType vals[k]
+            keys += StrLen(vals[k]) + 1
+        } else {
+            EntryType vals[k]
+            Sleep 250                   ; let the list narrow down to the one option
+            SendInput "{Enter}"
+            keys += 5
+            if k = "Type"
+                Sleep 400               ; Specific's list follows the Incident Type
+        }
+        Sleep 150
+    }
+    MouseMove ox, oy, 0
+    Tip("Incident filled in: type your supervisor in Secondary Operator, set the dates, check it and Save.", 5000, true)
+    Activity("Incident " r.name ": filled in (" keys " keystrokes counted as saved)")
+    CountSaved("log", keys, "Incident: " r.name)
+    Journal("Incident: " r.name, "Incident Type: " vals["Type"] "`nSpecific: " vals["Specific"] "`nCategory: " vals["Category"]
+        . "`nRisk: " vals["Risk"] "`nCustom 3: " vals["Custom3"] "`nExecutive Brief: " vals["Brief"], keys)
+}
+
+TeachIncident() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachIncidentRun()
+    catch as err
+        MsgBox "Teach incident report spots stopped: " err.Message, "Teach incident report spots", "Icon!"
+    TeachBusy := false
+}
+
+TeachIncidentRun() {
+    global ITrakFile, IncidentFields
+    if !EntryWin() {
+        MsgBox "Open a daily log in iTrak first (the Daily Log Entry window with its Create Incident button), then run this again.", "Teach incident report spots", "Icon!"
+        return
+    }
+    if MsgBox("Two parts. First hover over the daily log's Create Incident button and press F8 (or Ctrl+Alt+Shift+A). Then you click Create Incident yourself, and in the empty Incident File you hover over each box Watchlog fills and press F8. Nothing is clicked or typed for you while teaching (Ctrl+Alt+Esc cancels).`n`nStart?", "Teach incident report spots", "YesNo Icon?") != "Yes"
+        return
+    total := IncidentFields.Length + 1
+    if !TeachWait("1 of " total "`nHover over Create Incident on the daily log and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+        return
+    CoordMode "Mouse", "Screen"
+    MouseGetPos , , &h
+    dl := EntryWins().Has(h) ? h : EntryWin()
+    if !dl || !ITrakPoint(dl, &cx0, &cy0) {
+        MsgBox "That spot isn't inside the Daily Log Entry window. Nothing saved. Try again.", "Teach incident report spots", "Icon!"
+        return
+    }
+    WinGetClientPos , , &dw, &dh, "ahk_id " dl
+    before := IncidentWins()
+    Tip("Now click Create Incident yourself. Waiting for the empty Incident File (2 minutes)...", 0, true)
+    inc := 0, deadline := A_TickCount + 120000
+    while !inc && A_TickCount < deadline {
+        for w in IncidentWins()
+            if !before.Has(w)
+                inc := w
+        if !inc
+            Sleep 200
+    }
+    Tip("")
+    if !inc {
+        MsgBox "No new Incident File window opened. Nothing saved. (If its title doesn't start with Incident File, set settings.ini [ITrak] IncidentWindow=.)", "Teach incident report spots", "Icon!"
+        return
+    }
+    Sleep 800
+    pts := Map()
+    for i, k in IncidentFields {
+        if !TeachWait((i + 1) " of " total "`nHover over the " IncidentNames[k] " box in the Incident File and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+            return
+        if !ITrakPoint(inc, &x, &y) {
+            MsgBox "That spot isn't inside the Incident File window. Nothing saved. Try again.", "Teach incident report spots", "Icon!"
+            return
+        }
+        pts[k] := [x, y]
+    }
+    WinGetClientPos , , &iw, &ih, "ahk_id " inc
+    try {
+        IniWrite cx0, ITrakFile, "Incident", "CreateX"
+        IniWrite cy0, ITrakFile, "Incident", "CreateY"
+        IniWrite dw, ITrakFile, "Incident", "DW"
+        IniWrite dh, ITrakFile, "Incident", "DH"
+        for k in IncidentFields {
+            IniWrite pts[k][1], ITrakFile, "Incident", k "X"
+            IniWrite pts[k][2], ITrakFile, "Incident", k "Y"
+        }
+        IniWrite iw, ITrakFile, "Incident", "W"
+        IniWrite ih, ITrakFile, "Incident", "H"
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach incident report spots", "Icon!"
+        return
+    }
+    Activity("iTrak: incident report spots taught (daily log " dw "x" dh ", Incident File " iw "x" ih ")")
+    MsgBox "Saved. With a daily log open, " HK("incident") " now opens and fills an incident report.`n`nYou can close this empty Incident File without saving. Keep the windows the same size they are now.", "Teach incident report spots"
+}
+
+
+; =====================================================================
+;  AUTOCORRECT IN EVERY PROGRAM  (v3.33.0)
+;  The words in autocorrect.txt are fixed as you type anywhere (iTrak in
+;  Citrix too), not only in the call pad and the log forms. The fix is
+;  typed (backspaces and the right word), never put on the clipboard.
+;  Watchlog's own windows keep their own fixing. On/off: tray (this PC);
+;  it also follows Settings > Autocorrect on/off. Pause stops it too.
+; =====================================================================
+AutoEverywhereHere(*) => !WinActive("ahk_pid " DllCall("GetCurrentProcessId"))
+
+AutoEverywhereSync() {
+    global AutoHot, AutoHotStamp
+    on := AutoEverywhereOn && Cfg["Autocorrect"]
+    if on
+        LoadAutocorrect()
+    stamp := on ? AutoStamp "|" AutoMap.Count : "off"
+    if stamp == AutoHotStamp
+        return
+    AutoHotStamp := stamp
+    HotIf AutoEverywhereHere
+    gone := []
+    for w, r in AutoHot
+        if !on || !AutoMap.Has(w)
+            gone.Push(w)
+    for w in gone {
+        try Hotstring(":TSE:" w, , "Off")
+        AutoHot.Delete(w)
+    }
+    if on {
+        for w, r in AutoMap {
+            if InStr(w, "``") || InStr(w, ":")
+                continue
+            if AutoHot.Has(w) && AutoHot[w] == r
+                continue
+            try {
+                Hotstring(":TSE:" w, r, "On")
+                AutoHot[w] := r
+            }
+        }
+    }
+    HotIf
+    Activity("Autocorrect in every program: " (on ? AutoHot.Count " words" : "off"))
+}
+
+ToggleAutoEverywhere(*) {
+    global AutoEverywhereOn
+    AutoEverywhereOn := !AutoEverywhereOn
+    try DirCreate DataDir
+    try IniWrite AutoEverywhereOn ? "1" : "0", LastUsedFile, "Autocorrect", "Everywhere"
+    AutoEverywhereSync()
+    BuildTrayMenu()
+    Tip("Autocorrect in every program " (AutoEverywhereOn ? "ON" : "OFF"), 1500, true)
+}
+
+; Settings.ini [Forms] QuickInsert: a form whose boxes are all filled in
+; already (no pick list waiting) inserts without showing (v3.33.0)
+ToggleQuickInsert(*) {
+    Cfg["QuickInsert"] := !Cfg["QuickInsert"]
+    try IniWrite(Cfg["QuickInsert"] ? "yes" : "no", SettingsFile, "Forms", "QuickInsert")
+    NoteOwnWrites()
+    BuildTrayMenu()
+    Tip("Skip forms that are already filled in: " (Cfg["QuickInsert"] ? "ON" : "OFF"), 1500, true)
+}
+
+; Taskbar previews that were already showing when the hook missed them (v3.33.0)
+PreviewPoll() {
+    if !PreviewHideOn
+        return
+    for cls in PreviewClasses() {
+        try {
+            for h in WinGetList("ahk_class " cls)
+                DllCall("ShowWindow", "ptr", h, "int", 0)
+        }
+    }
+}
+
+
+; =====================================================================
 ;  THE EXE: INSTALLING ON THIS PC  (v3.5.0)
 ;  Watchlog.exe copies itself to %LOCALAPPDATA%\Programs\Watchlog (no
 ;  administrator rights), adds a Start menu entry and the Start with
@@ -8530,6 +9298,8 @@ BuildTrayMenu() {
     MenuItem(itm, "Teach the click  (" HK("itrakteach") ")", (*) => TeachITrak(), 0xE7C9)
     MenuItem(itm, "Full-entry log  (" HK("entrypick") ")", (*) => ShowEntryPick(), 0xE8F1)
     MenuItem(itm, "Teach the daily log fields  (" HK("entryteach") ")", (*) => TeachEntryFields(), 0xE7C9)
+    MenuItem(itm, "Incident report  (" HK("incident") ")", (*) => ShowIncidentPick(), 0xE8F1)
+    MenuItem(itm, "Teach the incident report spots", (*) => TeachIncident(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 
@@ -8539,6 +9309,12 @@ BuildTrayMenu() {
     WinMenu.Add(CAPS_MENU, (*) => ToggleCapsGuard())
     if CapsGuard
         WinMenu.Check(CAPS_MENU)
+    WinMenu.Add(CLOCK_MENU, (*) => ToggleClock())
+    if ClockOn
+        WinMenu.Check(CLOCK_MENU)
+    WinMenu.Add(PREVIEW_MENU, (*) => TogglePreviewHide())
+    if PreviewHideOn
+        WinMenu.Check(PREVIEW_MENU)
     MenuItem(tm, "Windows", WinMenu, 0xE7F4)
     tm.Add()
 
@@ -8547,6 +9323,12 @@ BuildTrayMenu() {
     tm.Add("Dark look", (*) => SetDarkLook(!Cfg["Dark"]))
     if Cfg["Dark"]
         tm.Check("Dark look")
+    tm.Add("Autocorrect in every program", (*) => ToggleAutoEverywhere())
+    if AutoEverywhereOn
+        tm.Check("Autocorrect in every program")
+    tm.Add("Skip forms that are already filled in", (*) => ToggleQuickInsert())
+    if Cfg["QuickInsert"]
+        tm.Check("Skip forms that are already filled in")
     MenuItem(tm, "Settings", (*) => ShowSettings(), 0xE713)
     MenuItem(tm, "Tutorial", (*) => ShowTutorial(), 0xE7BE)
     MenuItem(tm, "About Watchlog", (*) => ShowAbout(), 0xE946)

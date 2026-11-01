@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 1 of 9 (lines 1-1134 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 1 of 10 (lines 1-1045 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ; Speed: AutoHotkey pauses 100 ms after every window switch by default,
@@ -33,14 +33,16 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.31.0"
-VERSION_DATE := "Oct 31, 2026"
+VERSION := "3.33.0"
+VERSION_DATE := "Nov 1, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
 COPYRIGHT := "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved."
 ; The exe installs itself here (no administrator rights needed)
 CAPS_MENU := "Caps Lock guard (red tag, no accidental Caps Lock)"
+CLOCK_MENU := "Clock at the bottom left of the taskbar"
+PREVIEW_MENU := "Hide taskbar window previews"
 HOME_MENU := "Watchlog home  (Ctrl+Alt+M)"
 INSTALL_DIR := EnvGet("LOCALAPPDATA") "\Programs\Watchlog"
 INSTALL_EXE := INSTALL_DIR "\Watchlog.exe"
@@ -76,6 +78,14 @@ CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, th
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
+ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
+ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
+PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
+PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
+IncidentFile := HomeDir "\incidents.txt"   ; incident reports (v3.33.0), kept beside templates.txt
+EntryRefs := Map()       ; daily log window -> the Reference Watchlog typed in it (Custom 3 of an incident)
+AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", "1") != "0"   ; autocorrect in every program, this PC (v3.33.0)
+AutoHot := Map(), AutoHotStamp := "-"
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -103,6 +113,7 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "entrypick", key: "^!f", label: "full-entry log (Break, Table Drop...)", fn: (*) => ShowEntryPick()}
     , {id: "entryteach", key: "^!+f", label: "teach the daily log fields", fn: (*) => TeachEntryFields()}
     , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
+    , {id: "incident", key: "^!+n", label: "incident report from the open daily log", fn: (*) => ShowIncidentPick()}
     , {id: "endnow", key: "^!+e", label: "End Time Now in the open daily log", fn: (*) => EntryEndNow()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
@@ -187,6 +198,11 @@ DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 BreakResume()
+ClockStart()
+PreviewStart()
+SetTimer PreviewPoll, 150
+AutoEverywhereSync()
+SetTimer AutoEverywhereSync, 5000
 StartWatching()
 CleanJournal()
 SetTimer CleanJournal, 6 * 3600000
@@ -433,6 +449,7 @@ LoadSettings() {
     ; Call pad: Numpad + opens it (Ctrl+Alt+N always does). Key=off frees the + key.
     Cfg["PadKey"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Key", "NumpadAdd"))), "^(off|no|0|false|none)$")
     ; Casino autocorrect in the call pad and the log forms
+    Cfg["QuickInsert"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Forms", "QuickInsert", "no"))), "^(yes|on|1|true)$") > 0
     Cfg["Autocorrect"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Autocorrect", "yes"))), "^(no|off|0|false)$")
     ; Beep with the login reminder pop-up (off unless asked for in Settings)
     Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
@@ -1026,110 +1043,4 @@ FirstRunSetup() {
 ;  to edit this file. If you do, save it and the script reloads.
 ;  No passwords are kept here: they're in Windows Credential Manager.
 ; =====================================================================
-
-[Templates]
-; The team's shared templates file (in SharePoint, synced by OneDrive).
-; Blank = templates.txt in this folder. Your own extra templates go in
-; my-templates.txt in this folder.
-Shared=
-
-[Journal]
-; Every log you insert is also saved in Documents\Shift Journal, one
-; file per shift. Ctrl+Alt+J shows the shift summary.
-; Save=full keeps the log text, Save=counts keeps only the time and
-; template name, Save=off turns it off.
-; KeepDays = days before old shift files are deleted (0 = keep them).
-Save=full
-KeepDays=30
-
-[Paths]
-LaunchWait=20
-CitrixTab=Citrix|apps.gcgaming.com
-; The two web pages Ctrl+Alt+L opens, in Microsoft Edge: iTrak facial rec
-; (blank = not opened) and the Citrix Receiver page (opened last)
-FaceUrl=https://itrakappprod.olgnetwork.ca/iTrak/login.aspx
-CitrixUrl=https://apps.gcgaming.com/Citrix/GCGCWeb/
-
-[StartOfShift]
-; Programs Ctrl+Alt+L opens first (up to Run9), then it opens the Citrix page in Edge.
-; A * means any version, so upgrades don't break these.
-Run1=C:\BallyTechnologies\AlertGridUI*\AlertGridUI\AlertGridUI.bat
-Run2=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
-Run3=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
-
-[EndOfShift]
-; Programs Ctrl+Alt+Shift+L closes (separate with commas)
-Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe
-
-; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
-; Add more as [App3], [App4] ... up to [App9].
-; Taken keys: Q O I H P X R L E J K W A M N
-; Built in already: T Teams, U Outlook, Y Spotify, G Edge. To change one,
-; add an [AppN] with the same Name and a new Key (Key=none turns it off).
-[App1]
-Name=SDS
-Key=S
-Path=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
-Window=SDS ahk_exe javaw.exe
-
-[App2]
-Name=CMP
-Key=C
-Path=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
-Window=ahk_exe CMPDesktop.exe
-
-; LOGINS are added in tray menu > Settings. They're saved below as
-; [Login1] ... [Login9]: Trigger, User, and optionally Window (only
-; works in that program) and Remind (minutes until a log-in-again
-; reminder).
-    )"
-    FileAppend text "`n", SettingsFile, "UTF-16"
-    FirstRun := true
-    Activity("First run on this PC: new settings.ini made in " HomeDir)
-}
-
-
-; =====================================================================
-;  TEMPLATES
-;  Read from the team's shared file when one is set in Settings (on
-;  SharePoint, synced by OneDrive), otherwise templates.txt in this
-;  folder. Then my-templates.txt, your own extras, on top. A trigger the
-;  team file already uses is skipped in my-templates.txt, so the team
-;  wording always wins.
-;  If the shared file can't be opened (OneDrive not running, not synced
-;  yet), the last good copy saved on this PC is used and it says so.
-; =====================================================================
-LoadTemplates() {
-    global Entries
-    problems := ""
-    ; Every trigger fires the moment it's typed, so no trigger may be the start
-    ; of another one (;count would fire before you finish typing ;counttables)
-    trigs := Map()
-    for l in LoginList
-        trigs[l.trig] := "login"
-    main := ReadTemplateSource()
-    if main.note != ""
-        problems .= main.note "`n`n"
-    mine := ""
-    if FileExist(MyTemplatesFile) {
-        try mine := FileRead(MyTemplatesFile, "UTF-8")
-        catch
-            problems .= "Couldn't open my-templates.txt, so your own templates aren't loaded.`n`n"
-    }
-    ; Shared lists first (team ones, then your own), so any template can use them
-    ReadLists(main.text, main.label, false, &problems)
-    ReadLists(mine, "my-templates.txt", true, &problems)
-    Tpl.count := AddTemplates(main.text, main.src = "local" ? "local" : "team", main.label, trigs, &problems)
-    Tpl.mine := AddTemplates(mine, "mine", "my-templates.txt", trigs, &problems)
-    Entries := []
-    ReadEntries(main.text, main.label, &problems, "main")
-    ReadEntries(mine, "my-templates.txt", &problems, "mine")
-    Activity("Templates: " TemplateSummary())
-    if main.text = "" && main.note = ""
-        problems .= "Can't find templates.txt. It needs to be in the same folder as this script:`n" HomeDir "`n`n"
-    if problems != "" {
-        Activity("Template problems: " StrReplace(Trim(problems, "`n"), "`n", " / "))
-        MsgBox "Some templates weren't loaded:`n`n" problems, "Watchlog", "Icon!"
-    }
-}
 

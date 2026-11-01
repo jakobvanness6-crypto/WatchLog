@@ -3,9 +3,15 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.31.0 (Oct 31, 2026): code and docs review fixes (see PROJECT-NOTES). Before that v3.29.0: break time tracker (;break log window watched until Save & Close, 60 min per shift, home/dashboard/tray tip, Ctrl+Alt+Shift+E End Time Now). Before that v3.28.0: safeguards batch 2 (repeat last log Ctrl+Alt+Shift+R, daily backups, restore, go back to previous version) on top of v3.27.3 Alert Grid step-5 timing, v3.27.2 load fix and v3.27.1 SDS sign-in fix (built, NOT run: the sandbox blocked running AutoHotkey).
+Current version: v3.33.0 (Nov 1, 2026): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch (built, NOT run). Before that v3.32.0: taskbar clock, hide taskbar previews.
 
 ## Waiting to be built
+
+### Incident reports: next steps (after v3.33.0). NOT built
+- Checklist button and Custom Forms tab: Jakob will show what goes in them ("ask me about it").
+- Closing Remarks: his supervisor fills it (Watchlog leaves it).
+- Phase 2: supplemental helper for reports where surveillance writes one (his example still to come). Medicals and self-exclusion incidents later.
+- Trespass - violation: Specific left empty for Jakob to pick; ask which Specific he uses.
 
 ### Info From: type the name instead of the department: option 1 BUILT in v3.30.2 (Oct 31). Option 2 (name box on the form) DROPPED (Jakob, Oct 31): he types a few letters into Look For and that's enough; option 2 would add privacy worry for no gain.
 - v3.30.1 works on his bay, but a department search (dealer) lists every dealer past and present, so he still scrolls. He'd rather type the name.
@@ -20,20 +26,27 @@ Current version: v3.31.0 (Oct 31, 2026): code and docs review fixes (see PROJECT
 ### Idea: paste instead of type in the daily log boxes (Jakob, Oct 31): DROPPED. Jakob tested: iTrak's drop-down boxes don't accept pastes. Keep typing them.
 Synopsis is already pasted; Location, Topic, Reference and the Info From Look For box are typed key by key (EntryType, 20 ms a key). Option to test on one bay: settings.ini [ITrak] PasteFields=reference,lookfor (and maybe location,topic). Risks: Location/Topic are search drop-downs that may not narrow on a paste; every paste goes through the Citrix clipboard (has stuck before). Waiting on Jakob's word.
 
-### Idea: autocorrect everywhere, including Citrix/iTrak (NOT built)
-Your autocorrect list working in every program, not just the call pad and form boxes. Gotcha to plan around: inside Citrix, Watchlog must not read or empty the clipboard to fix a word (the Citrix clipboard can stick); fix by typing (backspaces + the right word) instead, and test in iTrak first. On/off switch and a "skip these programs" list. Shorthand lines (step 1) shipped in v3.26.x, so this is next whenever Jakob wants it.
-
-
-
 - **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Those six were added later (templates.txt only, see the end of this file).
 - **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
 
 
-- Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
-- Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
-- Optional quick insert when every form box is already filled (off by default).
-- Autocorrect list could be shared from the team folder beside templates.txt.
+
+## Done in v3.33.0 (Nov 1) - from Jakob's build checklist
+- Incident reports on behalf of Security: Ctrl+Alt+Shift+N (no auto-start after ;refuse, Jakob's choice); incidents.txt (kept off GitHub) with Refusal - signs of intox (no patron count), General (brief = "Report opened on behalf of Security." only, Specific Interior/Exterior box), Trespass 24 hours (listed first = default), indefinite, violation ("given a reminder of their trespass status"). Category blank; Closing Remarks left for the supervisor; no-ID refusals get no incident. Teach: tray > iTrak > Teach the incident report spots (itrak.ini [Incident]).
+- 13 code words fill the whole daily log with Jakob's Location/Topic/Reference (;player ;refuse ;evict ;face ;aml ;abandon ;found ;maint ;close ;selfex ;inventory ;badge ;medical). ;firm and ;audit left as they are. Soft count lines stay as they are (already one log, a time in front of each line).
+- ;jack Paid box (all cash / by cheque); call pad jack line takes cash / cheque / chq; time paid 2130 already worked.
+- Autocorrect in every program (yes, no programs skipped, per person not shared): hotstrings, typed with SendEvent, not in Watchlog's own windows; tray toggle (this PC).
+- Skip forms that are already filled in: tray switch, settings.ini [Forms] QuickInsert (off by default).
+- Taskbar previews: Jakob said still showing but he hadn't installed v3.32.0 yet; added a 150 ms check that hides TaskListThumbnailWnd too.
+- Not doing: copy memory (Jakob: no); shared team autocorrect list (no, per person).
+- Built, NOT run.
+
+## Done in v3.32.0 (Nov 1)
+- Taskbar clock (Jakob: main monitor, seconds and date): bottom-left of the taskbar, 24 h HH:mm:ss over "ddd MMM d", click-through, follows taskbar light/dark, re-asserts on top every tick, hides for full-screen windows; tray > Windows toggle (this PC, last used.ini [Clock] Show); settings.ini [Clock] Seconds/Date/Monitor/OffsetX/OffsetY. Windows clock can be hidden in Settings on newer Windows 11.
+- Hide taskbar window previews: ExtendedUIHoverTime did nothing on his PC; Policies key locked by IT. Watchlog hides class TaskListThumbnailWnd on EVENT_OBJECT_SHOW (SetWinEventHook); other explorer pop-ups near the taskbar are logged once as "Taskbar pop-up seen: class ..."; settings.ini [Taskbar] PreviewClasses= adds more. Tray > Windows toggle (this PC, [Taskbar] HidePreviews).
+- Ctrl+Alt+I also shows the window under the mouse and both classes.
+- Built, NOT run.
 
 ## Done in v3.30.0 (Oct 31)
 - Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From button (v3.30.1; v3.30.0 wrongly taught the arrow), Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.

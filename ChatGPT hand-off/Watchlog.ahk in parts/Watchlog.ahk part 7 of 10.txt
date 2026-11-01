@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 7 of 9 (lines 7415-8494 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 7 of 10 (lines 7462-8215 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
 CopyLogins() {
     list := []
     for l in LoginList
@@ -660,422 +660,96 @@ ToggleCapsGuard(*) {
 
 
 ; =====================================================================
-;  THE EXE: INSTALLING ON THIS PC  (v3.5.0)
-;  Watchlog.exe copies itself to %LOCALAPPDATA%\Programs\Watchlog (no
-;  administrator rights), adds a Start menu entry and the Start with
-;  Windows shortcut, and registers itself under Settings > Apps so it
-;  can be removed like any program. Running a newer Watchlog.exe later
-;  offers to update the installed copy. Settings, templates and the
-;  journal stay where they are (Documents), so uninstalling never
-;  deletes anyone's work.
+;  TASKBAR CLOCK  -  bottom-left of the main monitor  (v3.32.0)
+;  Windows 11 can't move its own clock, so Watchlog shows one on the
+;  left end of the taskbar: 24-hour time with seconds, the date under it.
+;  Clicks go straight through it to the taskbar. It follows the taskbar's
+;  light/dark colour, puts itself back on top when the taskbar is clicked,
+;  and hides while a full-screen window covers that monitor.
+;  On/off: tray > Windows > Clock (this PC). settings.ini [Clock]:
+;  Seconds=yes  Date=yes  Monitor=main (or a number)  OffsetX=0  OffsetY=0
+;  (nudge it right/down in pixels, e.g. if it covers the Widgets button).
 ; =====================================================================
-#HotIf
-IsInstalledCopy() {
-    return A_IsCompiled && StrLower(A_ScriptFullPath) = StrLower(INSTALL_EXE)
-}
-
-StartupLink() => A_Startup "\Watchlog.lnk"
-MenuLink() => A_Programs "\Watchlog.lnk"
-
-; Returns true when this copy installed itself or handed over to the
-; installed one, and should exit
-CheckInstall() {
-    if IsInstalledCopy()
-        return false
-    if FileExist(INSTALL_EXE) {
-        have := RegRead(UNINSTALL_KEY, "DisplayVersion", "")
-        if have = "" || VerCompare(VERSION, have) > 0 {
-            if MsgBox("Watchlog " (have != "" ? "v" have " " : "") "is installed on this PC. Update it to v" VERSION "?", "Watchlog setup", "YesNo Iconi Default1") = "Yes"
-                return InstallSelf(false)
-        }
-        try Run '"' INSTALL_EXE '"'
-        return true
-    }
-    askedFile := DataDir "\install.ini"
-    if IniRead(askedFile, "Install", "Asked", "") = VERSION
-        return false
-    try IniWrite VERSION, askedFile, "Install", "Asked"
-    if MsgBox("Install Watchlog on this PC?`n`n"
-        . "It adds Watchlog to the Start menu, starts it when Windows starts, and can be removed in Settings > Apps. It doesn't need administrator rights.`n`n"
-        . "Your settings and templates go in:`n" HomeDir "`n`n"
-        . "No = just run it from where it is this time.", "Watchlog setup", "YesNo Iconi Default1") = "Yes"
-        return InstallSelf(true)
-    return false
-}
-
-InstallSelf(fresh) {
-    CloseOtherCopies()
-    try DirCreate INSTALL_DIR
-    copied := false
-    Loop 10 {
-        try {
-            FileCopy A_ScriptFullPath, INSTALL_EXE, 1
-            copied := true
-            break
-        }
-        Sleep 300
-    }
-    if !copied {
-        MsgBox "Watchlog couldn't install itself to:`n" INSTALL_EXE "`n`nIt will keep running from where it is.", "Watchlog setup", "Icon!"
-        return false
-    }
-    try {
-        RegWrite "Watchlog", "REG_SZ", UNINSTALL_KEY, "DisplayName"
-        RegWrite VERSION, "REG_SZ", UNINSTALL_KEY, "DisplayVersion"
-        RegWrite INSTALL_EXE, "REG_SZ", UNINSTALL_KEY, "DisplayIcon"
-        RegWrite INSTALL_DIR, "REG_SZ", UNINSTALL_KEY, "InstallLocation"
-        RegWrite '"' INSTALL_EXE '" /uninstall', "REG_SZ", UNINSTALL_KEY, "UninstallString"
-        RegWrite 1, "REG_DWORD", UNINSTALL_KEY, "NoModify"
-        RegWrite 1, "REG_DWORD", UNINSTALL_KEY, "NoRepair"
-        RegWrite Integer(FileGetSize(INSTALL_EXE) / 1024), "REG_DWORD", UNINSTALL_KEY, "EstimatedSize"
-    }
-    SetShortcut(StartupLink(), fresh || FileExist(StartupLink()) != "")
-    SetShortcut(MenuLink(), true)
-    ; (a fresh install writes no log line yet: the activity log existing would make the new copy think Watchlog ran here before)
-    if !fresh
-        Activity("Updated the installed copy to v" VERSION " in " INSTALL_DIR)
-    try Run '"' INSTALL_EXE '"'
-    return true
-}
-
-; Closes any other running Watchlog (an older exe being replaced, or the
-; script version this exe takes over from)
-CloseOtherCopies() {
-    hidden := A_DetectHiddenWindows
-    DetectHiddenWindows true
-    me := ProcessExist()
-    for hwnd in WinGetList("ahk_class AutoHotkey") {
-        try {
-            pid := WinGetPID("ahk_id " hwnd)
-            if pid = me
-                continue
-            if StrLower(WinGetProcessName("ahk_id " hwnd)) = "watchlog.exe" || InStr(WinGetTitle("ahk_id " hwnd), "\Watchlog.ahk") {
-                ProcessClose pid
-                ProcessWaitClose pid, 3
-            }
-        }
-    }
-    DetectHiddenWindows hidden
-}
-
-Uninstall() {
-    if MsgBox("Remove Watchlog from this PC?`n`nYour settings, templates and shift journal stay in:`n" HomeDir, "Watchlog uninstall", "YesNo Icon? Default2") != "Yes"
-        return false
-    if MsgBox("Also delete the passwords Watchlog saved on this PC (in Windows Credential Manager)?`n`n"
-        . "Yes = delete them`nNo = keep them, in case you install Watchlog again", "Watchlog uninstall", "YesNo Icon? Default2") = "Yes" {
-        Loop 9 {
-            u := Trim(IniRead(SettingsFile, "Login" A_Index, "User", ""))
-            if u != ""
-                try CredRemove(u)
-        }
-    }
-    CloseOtherCopies()
-    SetShortcut(StartupLink(), false)
-    SetShortcut(MenuLink(), false)
-    try RegDeleteKey UNINSTALL_KEY
-    MsgBox "Watchlog has been removed from this PC.", "Watchlog uninstall", "Iconi"
-    if IsInstalledCopy()
-        ; run from Temp: Windows won't delete a folder something is working in
-        Run A_ComSpec ' /c ping -n 3 127.0.0.1 >nul & rmdir /s /q "' INSTALL_DIR '"', A_Temp, "Hide"
-    else if DirExist(INSTALL_DIR)
-        try DirDelete INSTALL_DIR, true
-    return true
-}
-
-SetShortcut(lnk, want) {
-    try {
-        if !want {
-            if FileExist(lnk)
-                FileDelete lnk
-            return
-        }
-        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, , "Watchlog - log templates"
-    } catch as err {
-        MsgBox "Watchlog couldn't update the shortcut:`n" lnk "`n`n" err.Message, "Watchlog", "Icon!"
-    }
-}
-
-; Puts the files built into the exe in the Watchlog folder: templates.txt
-; and LaunchWork.bat only when they're missing (they may have been edited),
-; the guides every time (so they match the version)
-InstallBuiltIns() {
-    try DirCreate HomeDir
-    try {
-        if !FileExist(TemplatesFile)
-            FileInstall "templates.txt", TemplatesFile, 0
-        if !FileExist(HomeDir "\LaunchWork.bat")
-            FileInstall "LaunchWork.bat", HomeDir "\LaunchWork.bat", 0
-        FileInstall "README.txt", HomeDir "\README.txt", 1
-        FileInstall "QUICK START.txt", HomeDir "\QUICK START.txt", 1
-        FileInstall "LICENCE.txt", HomeDir "\LICENCE.txt", 1
-    } catch as e {
-        Activity("Couldn't put the built-in files in " HomeDir ": " e.Message)
-    }
-}
-
-; An exe in the team folder (next to the team templates) replaces this one.
-; A running exe can be renamed but not overwritten, so this one is moved
-; aside as the backup, the new one is copied into its place, and started.
-UpdateExeFrom(f, v) {
-    tmp := A_Temp "\Watchlog update check.exe"
-    ok := false
-    try {
-        FileCopy f, tmp, true
-        ok := RunWait('"' tmp '" /selftest', , "Hide") = 0
-    }
-    try FileDelete tmp
-    if !ok {
-        Activity("Update to v" v " stopped: the team folder's Watchlog.exe didn't start")
-        MsgBox "The new Watchlog.exe in the team folder didn't start, so this PC stays on v" VERSION ".`n`nTell whoever looks after the tool.", "Watchlog update", "Icon!"
+ClockStart() {
+    global ClockGui, ClockTime, ClockDate, ClockLast, ClockGeo, ClockDark
+    if !ClockOn {
+        ClockStop()
         return
     }
-    backup := DataDir "\Watchlog v" VERSION " (backup).exe"
-    moved := false
-    try {
-        if !DirExist(DataDir)
-            DirCreate DataDir
-        try FileDelete backup
-        FileMove A_ScriptFullPath, backup, 1
-        moved := true
-        FileCopy f, A_ScriptFullPath, 1
-    } catch as err {
-        if moved
-            try FileMove backup, A_ScriptFullPath, 1
-        Activity("Update to v" v " failed: " err.Message)
-        MsgBox "Couldn't update: " err.Message "`n`nThis PC stays on v" VERSION ".", "Watchlog update", "Icon!"
+    if IsObject(ClockGui)
         return
+    ClockLast := "", ClockGeo := "", ClockDark := -1
+    ; layered + click-through (WS_EX_LAYERED 0x80000 | WS_EX_TRANSPARENT 0x20), no taskbar button, never takes focus
+    ClockGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x80020 +E0x08000000", "Watchlog clock")
+    ClockGui.MarginX := 0, ClockGui.MarginY := 0
+    ClockGui.SetFont("s9", "Segoe UI")
+    ClockTime := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockDate := ClockGui.AddText("x0 y0 w10 h10 Center BackgroundTrans", "")
+    ClockPlace(true)
+    ClockTick()
+    SetTimer ClockTick, 250
+    Activity("Taskbar clock on")
+}
+
+ClockStop() {
+    global ClockGui
+    SetTimer ClockTick, 0
+    if IsObject(ClockGui) {
+        try ClockGui.Destroy()
+        ClockGui := ""
     }
-    if IsInstalledCopy()
-        try RegWrite v, "REG_SZ", UNINSTALL_KEY, "DisplayVersion"
-    Activity("Updated from v" VERSION " to v" v " from " f " (old copy kept: " backup ")")
-    Run '"' A_ScriptFullPath '"'
-    ExitApp
 }
 
+; settings.ini [Clock] Seconds= / Date=  (both on unless set to no)
+ClockOpt(key) => !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Clock", key, "yes"))), "^(no|off|0|false)$")
 
-; =====================================================================
-;  TUTORIAL  (first run on a new PC, and tray > Tutorial)
-;  A short guided tour with two practice boxes. Nothing typed here goes
-;  in the shift journal or the time saved numbers.
-; =====================================================================
-; Tray menu / home window > About Watchlog: version, owner and the licence
-LicenceText() {
-    return "WATCHLOG LICENCE`r`n`r`n"
-        . COPYRIGHT "`r`n`r`n"
-        . "Watchlog (the program and its guides) is not free or open software.`r`n`r`n"
-        . "1. You may use Watchlog only with the copyright holder's permission.`r`n`r`n"
-        . "2. You may not copy, share, sell, change, decompile, take apart or redistribute Watchlog, in whole or in part, or make anything from it, without the copyright holder's written permission.`r`n`r`n"
-        . "3. Permission can be withdrawn at any time. When it is, stop using Watchlog and delete your copies.`r`n`r`n"
-        . "4. Watchlog is provided `"as is`", without any warranty. The copyright holder is not liable for any loss or damage from using it. Always check an entry before you save it.`r`n`r`n"
-        . "Your own settings, logins and log entries are not part of Watchlog and aren't covered by this licence."
+; The monitor it sits on: [Clock] Monitor= a number, or the main one
+ClockMonitor() {
+    m := Trim(IniRead(SettingsFile, "Clock", "Monitor", "main"))
+    if IsInteger(m) && m >= 1 && m <= MonitorGetCount()
+        return Integer(m)
+    return MonitorGetPrimary()
 }
 
-ShowAbout() {
-    g := WGui(, "About Watchlog")
-    g.SetFont("s10", "Segoe UI")
-    g.MarginX := 20, g.MarginY := 16
-    g.SetFont("s15 bold")
-    g.AddText("w520", "Watchlog v" VERSION)
-    g.SetFont("s10 norm")
-    g.AddText("w520 y+2", VERSION_DATE "`n" COPYRIGHT)
-    g.AddEdit("w520 r14 y+12 ReadOnly Multi -WantReturn", LicenceText())
-    b := g.AddButton("xm y+14 w100 Default", "Close")
-    b.OnEvent("Click", (*) => g.Destroy())
-    g.OnEvent("Escape", (*) => g.Destroy())
-    g.Show()
-    b.Focus()
-}
-
-ShowTutorial(first := false) {
-    global TutorialWin
-    if IsObject(TutorialWin) {
-        try WinActivate "ahk_id " TutorialWin.Hwnd
+; Sizes and places the clock on the taskbar of its monitor. force = always
+; move it; otherwise only when the screen or taskbar changed.
+ClockPlace(force := false) {
+    global ClockGeo, ClockDark
+    if !IsObject(ClockGui)
         return
+    n := ClockMonitor()
+    MonitorGet n, &l, &t, &r, &b
+    MonitorGetWorkArea n, &wl, &wt, &wr, &wb
+    s := A_ScreenDPI / 96
+    tbH := b - wb                                ; the taskbar's height when it's at the bottom
+    if tbH < 24 * s || tbH > 200 * s
+        tbH := Round(48 * s)                      ; taskbar hidden or elsewhere: a normal taskbar's height
+    dx := 0, dy := 0
+    try dx := Integer(IniRead(SettingsFile, "Clock", "OffsetX", "0"))
+    try dy := Integer(IniRead(SettingsFile, "Clock", "OffsetY", "0"))
+    dark := ClockTaskbarDark()
+    geo := n "," l "," b "," tbH "," dx "," dy "," A_ScreenDPI "," ClockOpt("Date") "," ClockOpt("Seconds")
+    if !force && geo = ClockGeo && dark = ClockDark
+        return
+    ClockGeo := geo
+    if dark != ClockDark {
+        ClockDark := dark
+        ClockGui.BackColor := dark ? "1C1C1C" : "EEEEEE"
+        ClockTime.SetFont(dark ? "cFFFFFF" : "c000000")
+        ClockDate.SetFont(dark ? "cFFFFFF" : "c000000")
     }
-    steps := [
-        {head: "Welcome to Watchlog"
-            , body: "Watchlog types your standard log entries for you.`n`nYou type a short code that starts with a semicolon, like `;interior, and the whole entry appears. Codes that need details open a small form first.`n`nThis takes about two minutes. Nothing you do here is saved to your shift journal."
-            , practice: false, logins: false, start: false, check: "", done: ""}
-        , {head: "Your logins"
-            , body: "Watchlog can also type your usernames and passwords. Each login has its own code, like `;me, and can be locked to the program it belongs to, so it never types a password anywhere else.`n`nPasswords are kept in Windows Credential Manager on this PC, never in a file.`n`nAdd your logins now, or skip this and do it later: click the teal icon by the clock > Settings."
-            , practice: false, logins: true, start: false, check: "", done: ""}
-        , {head: "Try a quick entry"
-            , body: "Click in the box below and type:   `;interior`n`nThe whole line appears the moment you finish typing the code. There's no Enter to press."
-            , practice: true, logins: false, start: false, check: "interior door check", done: "That's a quick entry. Most codes work like that."}
-        , {head: "Try a form"
-            , body: "Some entries need details. Click in the box and type:   `;evict`n`nA form opens. Tab moves between the boxes, Enter inserts the entry, Esc cancels. The preview at the bottom shows how it will look."
-            , practice: true, logins: false, start: false, check: "Trespass", done: "That's a form. The log is ready to paste into iTrak."}
-        , {head: "Finding a code"
-            , body: "Can't remember a code? Press Ctrl+Alt+Space, type any word (like jackpot or audit) and pick the template from the list. Enter inserts it.`n`nTry it in the box below.`n`nCtrl+Alt+H shows every code on one page."
-            , practice: true, logins: false, start: false, check: "", done: ""}
-        , {head: "Handy keys, and you're set"
-            , body: "Ctrl+Alt+M   the Watchlog home window: everything as buttons`nCtrl+Alt+Space   find a template`nCtrl+Alt+H   cheat sheet of every code`nCtrl+Alt+L   start of shift (opens your work programs)`nCtrl+Alt+J   this shift's journal`n`nOr just click the teal Watchlog icon by the clock: it opens the home window. Right-click it for the menu."
-            , practice: false, logins: false, start: true, check: "", done: ""}
-    ]
-    st := {i: 1}
-    g := WGui(, "Watchlog tutorial")
-    g.SetFont("s10", "Segoe UI")
-    g.MarginX := 20, g.MarginY := 16
-    g.SetFont("s15 bold")
-    hd := g.AddText("w560 h34", "")
-    g.SetFont("s10 norm")
-    bd := g.AddText("w560 h150 y+6", "")
-    pr := g.AddEdit("w560 r6 Multi y+4")
-    stt := g.AddText("w560 h24 y+6 cGreen", "")
-    sw := g.AddCheckbox("w560 y+8", "Start Watchlog when Windows starts")
-    sw.Value := StartupShortcuts().Length ? 1 : 0
-    bBack := g.AddButton("xm y+14 w90", "Back")
-    bNext := g.AddButton("x+8 w110 Default", "Next")
-    bAdd := g.AddButton("x+8 w150", "Add logins...")
-    bClose := g.AddButton("x+8 w120", "Close")
-    g.SetFont("s8 c707070")
-    g.AddText("xm y+12 w560", COPYRIGHT " Used by permission only: tray menu > About Watchlog has the licence.")
-    g.SetFont("s10 c000000")
-    bBack.OnEvent("Click", (*) => Go(-1))
-    bNext.OnEvent("Click", (*) => Go(1))
-    bAdd.OnEvent("Click", (*) => ShowSettings())
-    bClose.OnEvent("Click", Done)
-    g.OnEvent("Close", Done)
-    g.OnEvent("Escape", Done)
-    pr.OnEvent("Change", Check)
-    TutorialWin := g
-    Render()
-    g.Show()
-
-    Render() {
-        s := steps[st.i]
-        hd.Text := s.head
-        bd.Text := s.body
-        stt.Text := ""
-        pr.Visible := s.practice
-        sw.Visible := s.start
-        bAdd.Visible := s.logins
-        bBack.Enabled := st.i > 1
-        bNext.Text := st.i = steps.Length ? "Finish" : "Next"
-        g.Title := "Watchlog tutorial  (" st.i " of " steps.Length ")"
-        if s.practice {
-            pr.Value := ""
-            pr.Focus()
-        } else
-            bNext.Focus()
+    w := Round(84 * s)
+    lineH := Round(17 * s)
+    if ClockOpt("Date") {
+        top := (tbH - 2 * lineH) // 2
+        ClockTime.Move(0, top, w, lineH)
+        ClockDate.Move(0, top + lineH, w, lineH)
+        ClockDate.Visible := true
+    } else {
+        ClockTime.Move(0, (tbH - lineH) // 2, w, lineH)
+        ClockDate.Visible := false
     }
-
-    Check(*) {
-        s := steps[st.i]
-        if s.check != "" && InStr(pr.Value, s.check)
-            stt.Text := "✓  " s.done
-    }
-
-    Go(d) {
-        if d > 0 && st.i = steps.Length {
-            Done()
-            return
-        }
-        if st.i + d < 1
-            return
-        st.i += d
-        Render()
-    }
-
-    Done(*) {
-        global TutorialWin
-        if sw.Visible
-            SetStartup(sw.Value)
-        TutorialWin := ""
-        try g.Destroy()
-        if first
-            Activity("Tutorial finished on this PC")
-    }
+    ClockGui.Show("NA x" (l + Round(6 * s) + dx) " y" (b - tbH + dy) " w" w " h" tbH)
+    try WinSetTransparent 255, "ahk_id " ClockGui.Hwnd
 }
-
-
-; =====================================================================
-;  ICONS  (v3.10.0)
-;  The small pictures on the tray menu and on the home window's buttons
-;  are drawn from Windows' own icon font (Segoe Fluent Icons on Windows
-;  11, Segoe MDL2 Assets on Windows 10), so there are no icon files to
-;  ship. On a PC with neither font the menus just have no pictures.
-; =====================================================================
-IconFont() {
-    static font := ""
-    if font = ""
-        font := FileExist(A_WinDir "\Fonts\SegoeIcons.ttf") ? "Segoe Fluent Icons"
-            : FileExist(A_WinDir "\Fonts\segmdl2.ttf") ? "Segoe MDL2 Assets" : "-"
-    return font = "-" ? "" : font
-}
-
-; An icon of one picture from the icon font, in a colour (0xRRGGBB), size
-; pixels square. 0 when the font isn't there. Each one is made once.
-GlyphIcon(code, color := 0x0E746E, size := 16) {
-    static made := Map()
-    key := code "|" color "|" size
-    if made.Has(key)
-        return made[key]
-    made[key] := 0
-    font := IconFont()
-    if font = ""
-        return 0
-    hdc := DllCall("CreateCompatibleDC", "Ptr", 0, "Ptr")
-    bi := Buffer(40, 0)
-    NumPut("UInt", 40, "Int", size, "Int", -size, "UShort", 1, "UShort", 32, bi)
-    bits := 0
-    hbm := DllCall("CreateDIBSection", "Ptr", hdc, "Ptr", bi, "UInt", 0, "Ptr*", &bits, "Ptr", 0, "UInt", 0, "Ptr")
-    if !hbm || !bits {
-        DllCall("DeleteDC", "Ptr", hdc)
-        return 0
-    }
-    oldBm := DllCall("SelectObject", "Ptr", hdc, "Ptr", hbm, "Ptr")
-    hf := DllCall("CreateFontW", "Int", -Round(size * 0.9), "Int", 0, "Int", 0, "Int", 0, "Int", 400
-        , "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 4, "UInt", 0, "Str", font, "Ptr")
-    oldF := DllCall("SelectObject", "Ptr", hdc, "Ptr", hf, "Ptr")
-    DllCall("SetTextColor", "Ptr", hdc, "UInt", 0xFFFFFF)
-    DllCall("SetBkMode", "Ptr", hdc, "Int", 1)
-    rc := Buffer(16, 0)
-    NumPut("Int", size, "Int", size, rc, 8)
-    ; centred, one line, & is not special
-    DllCall("DrawTextW", "Ptr", hdc, "Str", Chr(code), "Int", -1, "Ptr", rc, "UInt", 0x825)
-    DllCall("GdiFlush")
-    ; White on black becomes the colour, with the brightness as how solid it is
-    rgb := color & 0xFFFFFF
-    Loop size * size {
-        off := (A_Index - 1) * 4
-        p := NumGet(bits, off, "UInt")
-        a := Max(p & 0xFF, (p >> 8) & 0xFF, (p >> 16) & 0xFF)
-        NumPut("UInt", a ? (a << 24) | rgb : 0, bits, off)
-    }
-    DllCall("SelectObject", "Ptr", hdc, "Ptr", oldF)
-    DllCall("DeleteObject", "Ptr", hf)
-    DllCall("SelectObject", "Ptr", hdc, "Ptr", oldBm)
-    DllCall("DeleteDC", "Ptr", hdc)
-    maskBits := Buffer(((size + 15) // 16) * 2 * size, 0)
-    mask := DllCall("CreateBitmap", "Int", size, "Int", size, "UInt", 1, "UInt", 1, "Ptr", maskBits, "Ptr")
-    ii := Buffer(A_PtrSize = 8 ? 32 : 20, 0)                  ; ICONINFO
-    NumPut("Int", 1, ii, 0)
-    mo := A_PtrSize = 8 ? 16 : 12
-    NumPut("Ptr", mask, ii, mo)
-    NumPut("Ptr", hbm, ii, mo + A_PtrSize)
-    h := DllCall("CreateIconIndirect", "Ptr", ii, "Ptr")
-    DllCall("DeleteObject", "Ptr", mask)
-    DllCall("DeleteObject", "Ptr", hbm)
-    made[key] := h
-    return h
-}
-
-; Adds a menu item with a picture from the icon font
-MenuItem(m, name, fn, glyph := 0) {
-    m.Add(name, fn)
-    if glyph && (h := GlyphIcon(glyph, 0x0E746E, DllCall("GetSystemMetrics", "Int", 49)))
-        try m.SetIcon(name, "HICON:*" h)
-}
-
-; A big button with a picture on the left and one or two lines of text
-IconButton(g, opt, text, glyph, color, fn) {
-    b := g.AddButton(opt " +0x2000 +0x100", text)       ; several lines, left-aligned
-    color := Integer("0x" LookText(Format("{:06X}", color)))
-    if glyph && (h := GlyphIcon(glyph, color, 24))
-        SendMessage 0xF7, 1, h, b                       ; BM_SETIMAGE
-    b.OnEvent("Click", fn)
-    return b
-}
-
 

@@ -1,4 +1,21 @@
-; ===== Watchlog.ahk PART 3 of 9 (lines 2379-3772 of 11015). Delete this first line from each part, then join all 9 in order to get the full file. =====
+; ===== Watchlog.ahk PART 3 of 10 (lines 2391-3652 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; Moves to the next (dir = 1) or previous (dir = -1) box in the open form
+FormMove(dir) {
+    ctrls := CurForm.ctrls
+    focused := ControlGetFocus("ahk_id " CurForm.hwnd)
+    idx := 0
+    for i, c in ctrls {
+        if c.Hwnd = focused || DllCall("IsChild", "Ptr", c.Hwnd, "Ptr", focused)
+            idx := i
+    }
+    idx += dir
+    if idx < 1
+        idx := ctrls.Length
+    else if idx > ctrls.Length
+        idx := 1
+    ctrls[idx].Focus()
+}
+
 ; Templates fire as soon as the trigger is typed. A Space or Enter pressed
 ; out of habit in the next half second is ignored, so it can't add a stray
 ; space or submit a form before you've filled it in.
@@ -656,7 +673,7 @@ PadShortcut(text) {
         }
         hints["rows"] := rows, hints["go"] := ok && rows.Length > 0
     } else if code = "jack" {
-        machine := "", amount := "", window := "", time := "", afterWin := false
+        machine := "", amount := "", window := "", time := "", paid := "", afterWin := false
         k := 1
         while k <= rest.Length {
             w := rest[k]
@@ -670,6 +687,9 @@ PadShortcut(text) {
                 afterWin := true
             } else if afterWin && time = "" && RegExMatch(w, "^(\d{4}|\d{1,2}:\d\d)$") {
                 time := w
+            } else if paid = "" && RegExMatch(w, "i)^(cash|cheque|check|chq)$") {
+                ; how it was paid (v3.33.0): cash = all cash, cheque/chq = by cheque
+                paid := StrLower(w) = "cash" ? "all cash" : "by cheque"
             } else if amount = "" && RegExMatch(w, "^\$?[\d,]+(?:\.\d+)?k?$") {
                 amount := PadAmount(w)
             }
@@ -680,7 +700,9 @@ PadShortcut(text) {
             hints["machine"] := machine
             if time != ""
                 hints["time"] := time
-            hints["expect"] := 3 + (time != "" ? 1 : 0)
+            if paid != ""
+                hints["paid"] := paid
+            hints["expect"] := 3 + (time != "" ? 1 : 0) + (paid != "" ? 1 : 0)
             hints["go"] := true
         }
     } else if code = "bv" {
@@ -821,6 +843,8 @@ PadFill(fields, ctrls, labs, hints, marks) {
             val := hints.Get("account", "")
         else if RegExMatch(k, "^window") && IsObject(jack)
             val := jack.window
+        else if k = "paid"
+            val := hints.Get("paid", "")
         if val = ""
             continue
         if PadPut(f, ctrls[i], val) {
@@ -1235,161 +1259,5 @@ JournalStats(file, text := "") {
     }
     st.summary := "Shift summary (" st.first " - " (st.ended != "" ? st.ended : st.last) "): " st.total " logs. " parts "."
     return st
-}
-
-; (set up by RegisterHotkeys, see HotkeyDefs)
-
-ShowJournal() {
-    if Cfg["JournalSave"] = "off" {
-        MsgBox "The shift journal is turned off. Tray menu > Settings turns it back on.", "Shift journal"
-        return
-    }
-    latest := JournalFind()
-    if latest.file = "" {
-        if latest.error != ""
-            MsgBox "Couldn't open the shift journal folder.`n`n" latest.error
-                . "`n`nTake a screenshot of this and send it to Claude.", "Shift journal", "Icon!"
-        else {
-            seen := ""
-            Loop Files JournalDir() "\*.*"
-                seen .= (A_Index <= 5 ? "   " A_LoopFileName "`n" : "")
-            MsgBox "No logs saved yet.`n`nEvery log you insert is saved in:`n" JournalDir()
-                . (seen != "" ? "`n`nFiles in that folder:`n" seen "`nIf a log is in there, take a screenshot of this and send it to Claude." : ""), "Shift journal"
-        }
-        return
-    }
-    try st := JournalStats(latest.file)
-    catch as err {
-        MsgBox "Couldn't read the shift journal:`n" latest.file "`n`n" err.Message
-            . "`n`nTake a screenshot of this and send it to Claude.", "Shift journal", "Icon!"
-        return
-    }
-    if !st.total {
-        MsgBox "This shift's journal has no log lines in it yet:`n" latest.file
-            . "`n`nEach log starts with a line like  22:15  Audit  and Ctrl+Alt+J counts those."
-            . " If the file was open in Notepad while logs came in, saving Notepad can write over them.", "Shift journal", "Icon!"
-        return
-    }
-    file := latest.file
-    raw := FileRead(file, "UTF-8")
-    sp := LastPos(raw, "=== Shift started")
-    shiftText := sp > 0 ? SubStr(raw, sp) : raw      ; this shift's part of the file, as saved
-    dirty := false
-    sv := SavedShift()
-    summary := ""
-    g := WGui("+AlwaysOnTop", "Shift journal  -  v" VERSION)
-    g.BackColor := "F4F7F7"
-    g.MarginX := 16, g.MarginY := 12
-    g.SetFont("s15 bold c0F766E", "Segoe UI")
-    g.AddText("w640", "Shift journal")
-    g.SetFont("s10 norm c1F2933", "Segoe UI")
-    headT := g.AddText("w640 y+2", "")
-    g.SetFont("s9 bold c0F766E")
-    g.AddText("w640 y+10", "WHAT YOU LOGGED")
-    g.SetFont("s10 norm c1F2933", "Consolas")
-    counts := g.AddEdit("w640 r5 ReadOnly -WantReturn -TabStop VScroll BackgroundWhite")
-    g.SetFont("s9 bold c0F766E", "Segoe UI")
-    g.AddText("w640 y+10", "EVERY LOG THIS SHIFT   (edit anything, then Save changes: removed logs come off the counts. [k12] = keystrokes that log saved, leave it on its line)")
-    g.SetFont("s10 norm c1F2933", "Consolas")
-    ed := g.AddEdit("w640 r16 Multi WantReturn VScroll BackgroundWhite")
-    g.SetFont("s10 norm c1F2933", "Segoe UI")
-    saveB := g.AddButton("xm y+12 w120 Default Disabled", "Save changes")
-    revB := g.AddButton("x+6 w100 Disabled", "Undo edits")
-    g.AddButton("x+6 w112", "Copy summary").OnEvent("Click", CopySummary)
-    g.AddButton("x+6 w112", "Copy shift text").OnEvent("Click", CopyText)
-    g.AddButton("x+6 w110", "Time saved").OnEvent("Click", (*) => (CloseIt(), ShowTimeSaved()))
-    g.AddButton("x+6 w80", "Close").OnEvent("Click", (*) => CloseIt())
-    saveB.OnEvent("Click", Save)
-    revB.OnEvent("Click", Undo)
-    ed.OnEvent("Change", (*) => MarkDirty(true))
-    g.OnEvent("Escape", (*) => CloseIt())
-    g.OnEvent("Close", (*) => CloseIt())
-    Fill()
-    g.Show()
-    ; cursor at the end (newest logs), nothing selected so a stray key can't replace everything
-    ed.Focus()
-    n := StrLen(ed.Value)
-    SendMessage 0xB1, n, n, ed.Hwnd
-    SendMessage 0xB7, 0, 0, ed.Hwnd
-
-    ; Fills the window from the saved shift text
-    Fill() {
-        sv := SavedShift()
-        st := JournalStats(file)
-        h := "Shift started " st.started "`n" st.total " logs, " st.first " to " st.last
-            . (st.ended != "" ? "   (ended " st.ended ")" : latest.open ? "   (still going)" : "")
-        if sv.keys > 0
-            h .= "`nTime saved this shift: " SavedTime(sv.keys) " (" Commas(sv.keys) " keystrokes)"
-        headT.Text := h
-        counts.Value := st.list
-        ed.Value := StrReplace(shiftText, "`n", "`r`n")
-        summary := st.summary
-        MarkDirty(false)
-    }
-    MarkDirty(on) {
-        dirty := on
-        saveB.Enabled := on
-        revB.Enabled := on
-    }
-    Undo(*) {
-        ed.Value := StrReplace(shiftText, "`n", "`r`n")
-        MarkDirty(false)
-    }
-    CopySummary(*) {
-        if dirty
-            summary := JournalSummaryOf(StrReplace(ed.Value, "`r`n", "`n"))
-        A_Clipboard := summary
-        Tip("Summary copied. Paste it with Ctrl+V.")
-    }
-    CopyText(*) {
-        A_Clipboard := ed.Value
-        Tip("Shift text copied.")
-    }
-    ; Writes the edited text back. A log that came in while this window was
-    ; open is kept (it is added after your text); if the file changed in any
-    ; other way nothing is written.
-    Save(*) {
-        edited := StrReplace(ed.Value, "`r`n", "`n")
-        try {
-            cur := FileRead(file, "UTF-8")
-            cp := LastPos(cur, "=== Shift started")
-            curPrefix := cp > 0 ? SubStr(cur, 1, cp - 1) : ""
-            curShift := cp > 0 ? SubStr(cur, cp) : cur
-            tail := ""
-            if curShift == shiftText {
-            } else if SubStr(curShift, 1, StrLen(shiftText)) == shiftText {
-                tail := SubStr(curShift, StrLen(shiftText) + 1)
-            } else {
-                MsgBox "The journal file changed while this window was open (OneDrive or another program wrote to it), so your edits were not saved.`n`nUse Copy shift text to keep what you typed, close this window and open the journal again.", "Shift journal", "Icon!"
-                return
-            }
-            if edited != "" && SubStr(edited, -1) != "`n"
-                edited .= "`n"
-            f := FileOpen(file, "w", "UTF-8")
-            f.Write(curPrefix edited tail)
-            f.Close()
-            took := JournalApplyEdit(shiftText, edited, RegExMatch(file, "(\d{4}-\d\d-\d\d)\.txt$", &fd) ? fd[1] : FormatTime(, "yyyy-MM-dd"))
-            shiftText := edited tail
-        } catch as err {
-            MsgBox "Couldn't save the journal:`n" file "`n`n" err.Message, "Shift journal", "Icon!"
-            return
-        }
-        Activity("Shift journal edited and saved" (took.removed || took.added ? " (" took.removed " logs taken off the counts, " took.added " put on)" : ""))
-        Fill()
-        Tip("Journal saved" (took.removed || took.added ? ": " took.removed " taken off, " took.added " added to the counts" : ""))
-    }
-    CloseIt() {
-        if dirty {
-            r := MsgBox("Save your edits to the shift journal first?", "Shift journal", "YesNoCancel Icon?")
-            if r = "Cancel"
-                return
-            if r = "Yes" {
-                Save()
-                if dirty
-                    return
-            }
-        }
-        g.Destroy()
-    }
 }
 
