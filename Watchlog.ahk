@@ -8421,7 +8421,7 @@ LoadIncidents(&problem) {
             continue
         name := Trim(SubStr(line, 1, eq - 1)), right := Trim(SubStr(line, eq + 1))
         if name = "" || SplitTop(right).Length < 5 {
-            problem .= "incidents.txt: """ SubStr(line, 1, 40) "..."" needs 5 parts: Type | Specific | Category | Risk | Executive Brief`n"
+            problem .= 'incidents.txt: "' SubStr(line, 1, 40) '..." needs 5 parts: Type | Specific | Category | Risk | Executive Brief`n'
             continue
         }
         list.Push({name: name, text: right})
