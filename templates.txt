@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Oct 31, 2026 (2)
-# Program version: 3.32.0
+# Wording version: Nov 1, 2026
+# Program version: 3.33.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -95,15 +95,15 @@
 
 # ----- FORMS ---------------------------------------------------------
 
-;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid all cash at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot |
+;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid {Paid: all cash | by cheque} at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot |
 
 ;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed.
 
-;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results.
+;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results. >> | Medical |
 
-;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident.
+;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident. >> Security Desk - Main Lobby | Trespass |
 
-;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy})
+;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy}) >> Security Desk - Main Lobby | Facial Recognition Alert Rejected |
 
 
 # ----- START / END OF SHIFT (asks which bay, remembers the last one) -
@@ -118,10 +118,10 @@
 ;exterior (Exterior door check) = Security {Rank: pick | Officer | Supervisor} performed exterior door check >> Parking Lot | Call - Radio | NA
 ;parking (Parking lot patrol) = Security {Rank: pick | Officer | Supervisor} performed parking lot patrol >> Parking Lot | Call - Radio | NA
 
-;refuse (Refused entry) = Security Officer refused entry to {Patrons: one patron | 2 patrons | 3 patrons | 4 patrons | 5 patrons} due to {Reason: no ID | insufficient ID | expired ID | showing signs of intox} {Signs observed: prefix=( | suffix=) | blank=}.
-;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion.
+;refuse (Refused entry) = Security Officer refused entry to {Patrons: one patron | 2 patrons | 3 patrons | 4 patrons | 5 patrons} due to {Reason: no ID | insufficient ID | expired ID | showing signs of intox} {Signs observed: prefix=( | suffix=) | blank=}. >> Security Desk - Main Lobby | Call / Phone | NA
+;selfex (Self-exclusion) = Security Supervisor advised taking patron into PlaySmart to perform a self exclusion. >> Security Office | Self-Exclusion |
 
-;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank.
+;inventory (Inventory transfer) = Security Officer performed inventory transfer from Delta Podium to Main Bank. >> Cash Cage | Security Escort |
 ;account (Account under review) = Account #{Account #: blank=XXXXXX} reviewed, not banned player. Account cleared and Guest Services notified. >> Guest Services | Account under review | M6 (417)
 ;drop (Table drop) = Security Officers performed Table Drop >> Pit 2 | Table Drop | M3,6 (355,252,600,955,950,420,613,690)
 ;man (Garbage sweep) = Security Officer escorted EVS Attendant into Cage Mantrap for garbage sweep. >> Cage ManTrap | Security Escort | M6 (972,973)
@@ -160,23 +160,23 @@
 
 # ----- TABLES --------------------------------------------------------
 
-;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes.
+;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes. >> %pit% | Table Opening/Closing | NA
 ;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
 ;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
 ;cards (Card change) = Card change on {Table: @tables}. >> %pit% | Card Change | NA
 ;break (Break) = Break >> Surveillance | Duty | NA
 ;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat} >> %pit% | Table Fill |
 ;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat} >> ABM/NRT | ATM/NRT/CTR fill |
-;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=}
+;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=} >> %pit% | Player Update | NA
 
 
 # ----- SLOTS ---------------------------------------------------------
 
 ;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency Pull |
-;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money})
-;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found.
-;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious.
-;maint (Maintenance) = {Machines: caps | NRT2 and NRT4} Maintenance.
+;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money}) >> %slots% | Request for Review |
+;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found. >> %slots% | Lost & Found |
+;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious. >> %slots% | AML Alert |
+;maint (Maintenance) = {Machines: caps | NRT2 and NRT4} Maintenance. >> ABM/NRT | AJM/CTR Fill |
 ;firm (NRT firmware check) = {Department/Title: Operations Supervisor | blank=XXXXX} notified Surveillance that they will be conducting an NRT Firmware check at {Location/NRT#: caps | blank=NRTX}.\nDUB#{DUB #: blank=XXXXX} (Should have fixed shot taken)
 
 
@@ -191,4 +191,4 @@
 # ----- OTHER ---------------------------------------------------------
 
 ;destroy (Card destruction) = Security Officers entered Card Destruction Room for Card Destruction. >> Card Destruction Room | Card Destruction | M6 (750,751,749)
-;badge (Contractor pass) = Pass #17-0{Pass # (1-9): pick | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9} issued {Issued: to XXXXX employee | for interview}.
+;badge (Contractor pass) = Pass #17-0{Pass # (1-9): pick | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9} issued {Issued: to XXXXX employee | for interview}. >> Security Main entrance | Visitor Pass | NA

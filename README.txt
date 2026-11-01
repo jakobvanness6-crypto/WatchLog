@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.32.0  -  README
+  WATCHLOG  v3.33.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -69,6 +69,8 @@ Documents\AutoHotkey). Either way:
                       the team's shared copy is set up, that one is
                       used instead. See section 13.)
   my-templates.txt    Your own extra templates (optional, section 13).
+  incidents.txt       The incident reports for Ctrl+Alt+Shift+N, one per
+                      line (v3.33.0, section 19). Edit freely.
   settings.ini        Your personal settings: logins (no passwords),
                       start/end of shift programs, app hotkeys, and the
                       last values you used. Tray menu > Settings changes
@@ -238,6 +240,7 @@ couple of seconds. No need to press anything.
                     synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
                     asks which bay and keeps the answer for the shift (v3.20.3).
   Ctrl+Alt+Shift+E  Click End Time Now in the daily log in front (v3.29.0)
+  Ctrl+Alt+Shift+N  Incident report from the open daily log (v3.33.0, section 19)
   Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.28.0)
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
                     run this, hover over Location, Topic, Reference, Synopsis and End Time's Now button (5 spots) and press F8
@@ -728,7 +731,8 @@ and the less-used items sit in sub-menus):
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
                                 (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
                                 Teach the daily log fields (Ctrl+Alt+Shift+F),
-                                Share my setup (v3.19.0)
+                                Incident report (Ctrl+Alt+Shift+N), Teach the
+                                incident report spots (v3.33.0), Share my setup
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -740,6 +744,10 @@ and the less-used items sit in sub-menus):
   Customize Watchlog...         Shortcut keys, shift programs, lists,
                                 autocorrect, timing, full-entry logs (v3.21.0)
   Dark look                     Ticked = dark windows (v3.22.1)
+  Autocorrect in every program  Ticked = on (v3.33.0, this PC)
+  Skip forms that are already   Ticked = a form whose boxes are all filled
+  filled in                     in (no pick list) inserts without showing
+                                (v3.33.0, off unless ticked)
   Settings                      Section 14
   Tutorial                      The guided tour again
   About Watchlog                Version, copyright and the licence
@@ -1356,8 +1364,44 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.32, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.33, newest first)
 -----------------------------------------------------------------------
+INCIDENT REPORTS, MORE CODE WORDS FILL THE DAILY LOG, AUTOCORRECT EVERYWHERE  (v3.33.0)
+  - Incident reports opened on behalf of Security: with the daily log open, press
+    Ctrl+Alt+Shift+N, pick the report (type the first letters, Enter) and fill any boxes.
+    Watchlog clicks Create Incident, waits for the Incident File, types Incident Type,
+    Specific, Category and Risk (each + Enter), Custom 3 (the Reference Watchlog typed in that
+    daily log; asked when it doesn't know) and the Executive Brief, then clicks into Secondary
+    Operator and stops so you type your supervisor. Dates, Narrative, Checklist, Closing
+    Remarks and Save stay yours. If an Incident File is already in front, it's filled as it is.
+    First time on each PC: tray > iTrak > Teach the incident report spots (Create Incident on
+    the daily log, then 7 boxes in the Incident File, F8 on each).
+    The reports are lines in incidents.txt beside templates.txt:
+      Name = Incident Type | Specific | Category | Risk | Executive Brief
+    Shipped: Refusal - signs of intox, General (on behalf of Security), Trespass - 24 hours,
+    Trespass - indefinite, Trespass - violation. settings.ini [ITrak] IncidentWindow=,
+    IncidentWait=10000, IncidentSettle=900.
+  - Code words that now fill the whole daily log (Location | Topic | Reference):
+    ;player (pit of the table | Player Update | NA), ;refuse (Security Desk - Main Lobby |
+    Call / Phone | NA), ;evict (Security Desk - Main Lobby | Trespass), ;face (Security Desk -
+    Main Lobby | Facial Recognition Alert Rejected), ;aml (slots area | AML Alert), ;abandon
+    (slots area | Request for Review), ;found (slots area | Lost & Found), ;maint (ABM/NRT |
+    AJM/CTR Fill), ;close (pit | Table Opening/Closing | NA), ;selfex (Security Office |
+    Self-Exclusion), ;inventory (Cash Cage | Security Escort), ;badge (Security Main entrance |
+    Visitor Pass | NA), ;medical (Location left for you | Medical). Shift+Enter still pastes
+    just the wording.
+  - ;jack asks how it was paid (all cash / by cheque). On the call pad, cash or cheque (chq)
+    on the jack line fills it: jack c2102 11421.11 w3 cheque 2130
+  - Autocorrect in every program: your autocorrect.txt words are fixed as you type in any
+    program, iTrak in Citrix too. The fix is typed, never put on the clipboard. On/off: tray >
+    Autocorrect in every program (this PC); Settings > Autocorrect off turns it off too.
+  - Skip forms that are already filled in: tray switch, off unless ticked (settings.ini
+    [Forms] QuickInsert=yes). A form whose boxes are all filled in and has no pick list
+    waiting inserts without showing.
+  - Taskbar previews: also hidden by a check every 0.15 s, in case Windows reuses the preview
+    window without showing it again.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 TASKBAR CLOCK AND NO MORE TASKBAR PREVIEWS  (v3.32.0)
   - Clock: Windows 11 can't move its clock, so Watchlog shows one at the left end of the
     taskbar on your main monitor: 24-hour time with seconds, the date under it

@@ -13,7 +13,8 @@ cd "$W" && mkdir rel res && (cd rel && unzip -q "$P/Watchlog v$OLD.zip")
 python3 "$P/build/mk_resources.py" "$P/Watchlog.ico" "$NEW.0" res >/dev/null
 python3 "$P/build/rebuild-resources.py" rel/Watchlog.exe rel/new.exe "10:1=$P/Watchlog.ahk" "10:TEMPLATES.TXT=$P/templates.txt" "10:README.TXT=$P/README.txt" "10:QUICK START.TXT=$P/QUICK START.txt" "16:1=res/version.bin"
 mv rel/new.exe rel/Watchlog.exe; cp "$P/templates.txt" "$P/README.txt" "$P/QUICK START.txt" rel/
-(cd rel && zip -q "$P/Watchlog v$NEW.zip" templates.txt LICENCE.txt README.txt "QUICK START.txt" Watchlog.exe)
+cp "$P/incidents.txt" rel/ 2>/dev/null || true
+(cd rel && zip -q "$P/Watchlog v$NEW.zip" templates.txt $(ls incidents.txt 2>/dev/null) LICENCE.txt README.txt "QUICK START.txt" Watchlog.exe)
 mv "$P/Watchlog v$OLD.zip" "$P/archive/old-releases/"
 mv "$P/for IT (on request)/Watchlog v$OLD script for IT.zip" "$P/archive/old-releases/"
 mkdir it && cd it && unzip -q "$P/archive/old-releases/Watchlog v$OLD script for IT.zip"
