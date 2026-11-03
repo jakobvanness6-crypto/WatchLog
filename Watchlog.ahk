@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.34.0"
+VERSION := "3.34.1"
 VERSION_DATE := "Nov 3, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -8883,7 +8883,7 @@ TeachIncidentRun() {
 ;  You open the audit yourself and pick the employee on its Audit tab
 ;  (copying their number), then type ;audit. The form fills the Employee #
 ;  from the copy and picks Area Audited from the Employee type. Enter
-;  fills the Detail tab: Console # (the monitor), Area Audited, Audit End
+;  clicks the Detail tab (v3.34.1) and fills it: Console # (the monitor), Area Audited, Audit End
 ;  (the form's To time) and Audit Remarks (the wording), then clicks your
 ;  taught route to put yourself in Requested By. Audit Start (iTrak sets
 ;  it to Now), Review Method, Section and Save are left to you.
@@ -8891,8 +8891,8 @@ TeachIncidentRun() {
 ;  Teach the spots once per PC: tray > iTrak > Teach the audit spots.
 ;  Spots are kept in itrak.ini [Audit] (numbers only, this PC only).
 ; =====================================================================
-AuditFields := ["Console", "Area", "End", "Remarks"]
-AuditNames := Map("Console", "Console #", "Area", "Area Audited drop-down", "End", "Audit End time", "Remarks", "Audit Remarks")
+AuditFields := ["Detail", "Console", "Area", "End", "Remarks"]
+AuditNames := Map("Detail", "the Detail tab (top left)", "Console", "Console #", "Area", "Area Audited drop-down", "End", "Audit End time", "Remarks", "Audit Remarks")
 
 ; The open Audit windows (newest in front first)
 AuditWins() {
@@ -8983,7 +8983,7 @@ AuditFill(title, syn, area, console, endTime) {
         return true
     }
     Sleep 200
-    vals := Map("Console", console, "Area", area, "End", AuditEndText(endTime), "Remarks", syn)
+    vals := Map("Detail", "tab", "Console", console, "Area", area, "End", AuditEndText(endTime), "Remarks", syn)
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
@@ -9006,6 +9006,11 @@ AuditFill(title, syn, area, console, endTime) {
         Sleep 60
         Click
         Sleep pause
+        if k = "Detail" {
+            ; you're still on the Audit tab after picking the employee (v3.34.1)
+            Sleep Integer(IniRead(SettingsFile, "ITrak", "AuditTabWait", "500"))
+            continue
+        }
         if k = "Remarks" {
             Paste(vals[k], true)
             keys += StrLen(vals[k]) + 1
@@ -9101,7 +9106,7 @@ TeachAuditRun() {
         MsgBox "Open a new audit in iTrak first (its window title starts with Audit -), on the Detail tab, then run this again.", "Teach audit spots", "Icon!"
         return
     }
-    if MsgBox("Two parts, on a new audit's Detail tab.`n`n1. Hover over Console #, the Area Audited drop-down (the box, not Add), the time in Audit End, and Audit Remarks, pressing F8 over each. Nothing is clicked for you.`n`n2. Your route to put yourself in Requested By: before EACH click, hover over the spot and press F8 (Shift+F8 if it's a double-click), then do that click yourself. Press F9 when your name is in.`n`nCtrl+Alt+Esc cancels. Start?", "Teach audit spots", "YesNo Icon?") != "Yes"
+    if MsgBox("Two parts, on a new audit's Detail tab.`n`n1. Hover over the Detail tab (top left), Console #, the Area Audited drop-down (the box, not Add), the time in Audit End, and Audit Remarks, pressing F8 over each. Nothing is clicked for you.`n`n2. Your route to put yourself in Requested By: before EACH click, hover over the spot and press F8 (Shift+F8 if it's a double-click), then do that click yourself. Press F9 when your name is in.`n`nCtrl+Alt+Esc cancels. Start?", "Teach audit spots", "YesNo Icon?") != "Yes"
         return
     total := AuditFields.Length
     pts := Map(), win := 0

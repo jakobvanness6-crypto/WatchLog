@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.34.0  -  README
+  WATCHLOG  v3.34.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1377,8 +1377,10 @@ Something else broke
 ;AUDIT FILLS THE ITRAK AUDIT WINDOW  (v3.34.0)
   An audit is its own window in iTrak (Audit - GA...), not a daily log.
   - Once per PC: open a new audit, then tray menu > iTrak > Teach the audit spots.
-    Part 1: hover over Console #, the Area Audited drop-down (the box, not Add), the time
-    in Audit End, and Audit Remarks, and press F8 over each. Part 2, your route to put
+    Part 1: hover over the Detail tab (top left), Console #, the Area Audited drop-down
+    (the box, not Add), the time in Audit End, and Audit Remarks (the big box in the
+    middle of the Detail tab), and press F8 over each. (v3.34.1 added the Detail tab: you're
+    still on the Audit tab after picking the employee. Teach again if you taught v3.34.0.) Part 2, your route to put
     yourself in Requested By: before EACH click, hover over the spot and press F8
     (Shift+F8 if that click is a double-click), then do the click yourself. Press F9 once
     your name is in. Keep the Audit window the same size and place afterwards.
@@ -1388,7 +1390,7 @@ Something else broke
     General Manager = Operations Management, Cage Cashier = Cage, Main Banker = Main Bank,
     F&B = Food & Beverage, Count Team = Count Room, Slots = Slots, EVS = Housekeeping,
     Maintenance/Facilities = Maintenance). Change it if needed.
-  - Enter fills Console # (the monitor), Area Audited, Audit End (the form's To time,
+  - Enter clicks the Detail tab, then fills Console # (the monitor), Area Audited, Audit End (the form's To time,
     20 minutes after From) and Audit Remarks, then clicks your Requested By route.
     Audit Start (iTrak sets it), Review Method, Section and Save are left to you.
   - No Audit window open (or spots not taught)? The wording is pasted where you typed,

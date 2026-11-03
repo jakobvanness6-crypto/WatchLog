@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.34.0 (Nov 3, 2026): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
+Current version: v3.34.1 (Nov 3, 2026): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
 
@@ -36,6 +36,9 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done in v3.34.1 (Nov 3)
+- Teaching v3.34.0, Jakob couldn't place "Audit Remarks" (the big box on the Detail tab) and was on the Audit tab. Since picking the employee leaves him on the Audit tab, the Detail tab is now the first taught spot and is clicked first. Teach again. Built, NOT run.
 
 ## Done in v3.34.0 (Nov 3)
 - ;audit fills the iTrak Audit window: Console # (monitor), Area Audited (from Employee type, @areas list), Audit End (form's To), Audit Remarks, then the taught Requested By click route. Jakob opens the audit, picks the employee on the Audit tab (copies the #) and saves. Teach: tray > iTrak > Teach the audit spots.
