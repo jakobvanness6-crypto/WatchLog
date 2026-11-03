@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 7 of 10 (lines 7462-8215 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 7 of 10 (lines 7482-8235 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
 CopyLogins() {
     list := []
     for l in LoginList

@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.33.0"
-VERSION_DATE := "Nov 1, 2026"
+VERSION := "3.33.1"
+VERSION_DATE := "Nov 3, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -1736,6 +1736,10 @@ ParseField(spec, last := Map()) {
         } else if low = "thousands" {
             ; with money: 3.3 means 3,300 (a decimal point = thousands)
             f.thousands := true, hint := "  (e.g. 3.3 = 3,300)"
+        } else if low = "under10k" {
+            ; with money (v3.33.1): an amount under 10,000 is in thousands,
+            ; for supervisor jackpots (12 = 12,000, 12.5 = 12,500, 11421.11 stays)
+            f.under10k := true, hint := "  (e.g. 12 = 12,000)"
         } else if low = "money" {
             f.kind := "money", f.ph := "XX,XXX", hint := "  (e.g. 10000)"
         } else if low = "percent" {
@@ -2218,6 +2222,8 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
                 else if kind = "money" {
                     if f.HasOwnProp("thousands") && RegExMatch(StrReplace(v, "$"), "^\d*\.\d+$")
                         v := Format("{:d}", Round(StrReplace(v, "$") * 1000))
+                    if f.HasOwnProp("under10k")
+                        v := Under10k(v)
                     v := FixMoney(v)
                 }
                 else if kind = "percent"
@@ -2446,6 +2452,20 @@ FixTime(s) {
         s := SubStr(s, 1, 2) ":" SubStr(s, 3)
     }
     return s
+}
+
+; Supervisor jackpots are always 10,000 or more (v3.33.1): an amount
+; under 10,000 is read as thousands. 12 -> 12000, 12.5 -> 12500,
+; 11421.11 and 12k stay as they are. Anything that isn't a number stays.
+Under10k(s) {
+    t := StrReplace(StrReplace(Trim(s), "$"), ",")
+    if !RegExMatch(t, "^\d*\.?\d+$")
+        return s
+    v := t + 0
+    if v <= 0 || v >= 10000
+        return s
+    v *= 1000
+    return Abs(v - Round(v)) < 0.005 ? String(Integer(Round(v))) : Format("{:.2f}", v)
 }
 
 ; 10000 -> 10,000
@@ -2987,7 +3007,7 @@ PadParse(text) {
             if m[2] >= 1 && m[2] <= (nrt ? 4 : 5)
                 fills.Push({machine: (nrt ? "NRT" : "ATM") m[2], amount: PadMoney(m[3], m[4]), note: PadNote(m[5])})
         } else if RegExMatch(line, "i)^([A-Za-z]\d{3,5})\s+\$?(\d[\d,]*(?:\.\d+)?)(k?)\s+w(?:in(?:dow)?)?\.?\s*#?(\d+)\b", &m) {
-            jacks.Push({machine: StrUpper(m[1]), amount: PadMoney(m[2], m[3]), window: m[4]})
+            jacks.Push({machine: StrUpper(m[1]), amount: Under10k(PadMoney(m[2], m[3])), window: m[4]})
         }
     }
     return {fills: fills, jack: jacks.Length = 1 ? jacks[1] : ""}
@@ -3080,7 +3100,7 @@ PadShortcut(text) {
                 ; how it was paid (v3.33.0): cash = all cash, cheque/chq = by cheque
                 paid := StrLower(w) = "cash" ? "all cash" : "by cheque"
             } else if amount = "" && RegExMatch(w, "^\$?[\d,]+(?:\.\d+)?k?$") {
-                amount := PadAmount(w)
+                amount := Under10k(PadAmount(w))   ; 12 = 12,000 (v3.33.1)
             }
             k += 1
         }
@@ -10690,7 +10710,7 @@ BoxParse(spec) {
             b.caps := true
         else if low = "upper"
             b.upper := true
-        else if low = "tidy" || low = "several" || low = "saved"
+        else if low = "tidy" || low = "several" || low = "saved" || low = "under10k"
             b.keep.Push(opt)       ; bvs -> BVs, several (no tick box for them): kept as they are
         else if SubStr(opt, 1, 1) = "@" && b.list = ""
             b.list := SubStr(opt, 2)

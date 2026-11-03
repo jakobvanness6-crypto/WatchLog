@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 10 of 10 (lines 10523-11797 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 10 of 10 (lines 10543-11817 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
 ; "START / END OF SHIFT  (asks which bay)" -> "Start / end of shift"
 EdSectionName(s) {
     s := Trim(RegExReplace(s, "\s*\(.*$"))
@@ -169,7 +169,7 @@ BoxParse(spec) {
             b.caps := true
         else if low = "upper"
             b.upper := true
-        else if low = "tidy" || low = "several" || low = "saved"
+        else if low = "tidy" || low = "several" || low = "saved" || low = "under10k"
             b.keep.Push(opt)       ; bvs -> BVs, several (no tick box for them): kept as they are
         else if SubStr(opt, 1, 1) = "@" && b.list = ""
             b.list := SubStr(opt, 2)

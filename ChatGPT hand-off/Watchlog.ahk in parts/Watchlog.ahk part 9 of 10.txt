@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 9 of 10 (lines 9366-10522 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 9 of 10 (lines 9386-10542 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
 ; =====================================================================
 ;  CUSTOMIZE WATCHLOG  (v3.21.0)  -  tray menu > Customize Watchlog,
 ;  or the Customize button on the home window

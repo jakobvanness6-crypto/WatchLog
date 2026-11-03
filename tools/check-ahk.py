@@ -230,3 +230,13 @@ for i, line in enumerate(src, 1):
         j += 1
     if q and st in ('text := "', 'return "') or (q and st.endswith('"') and st.count('"') == 1):
         in_cont2 = True
+
+# E (v3.33.0): AutoHotkey v2 escapes a quote inside "..." as `" , not "" (v1 style).
+# Three quotes in a row is almost always that mistake (it broke v3.33.0's first build).
+print('\nE: v1-style "" quote escapes (use `" or single quotes):')
+for i, line in enumerate(open(sys.argv[1], encoding="utf-8").read().split("\n"), 1):
+    st = line.strip()
+    if st.startswith(';'):
+        continue
+    if '"""' in line:
+        print(i, '|', st[:110])

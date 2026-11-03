@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.33.0  -  README
+  WATCHLOG  v3.33.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -361,6 +361,10 @@ were typing.
                       In ;player, a decimal point means thousands:
                       3.3 becomes 3,300 and 1.5 becomes 1,500
                       (500 stays 500)
+                      In ;jack (v3.33.1), any amount under 10,000 means
+                      thousands, since supervisor jackpots are always
+                      10,000 or more: 12 becomes 12,000, 12.5 becomes
+                      12,500, 11421.11 stays 11,421.11
       percent boxes   67 becomes 67%
       machine boxes   letters come out as capitals: b1410 becomes
                       B1410, nrt2 and nrt4 becomes NRT2 and NRT4
@@ -1366,6 +1370,14 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.33, newest first)
 -----------------------------------------------------------------------
+JACKPOT AMOUNTS UNDER 10,000 MEAN THOUSANDS  (v3.33.1)
+  - Supervisor jackpots are always $10,000 or more, so in ;jack and in a jack line on
+    the call pad an amount under 10,000 is read as thousands: 12 = $12,000,
+    12.5 = $12,500, 11421.11 stays $11,421.11, 12k still means $12,000.
+  - It's the "under10k" option on the Amount box in templates.txt
+    ({Amount: money | under10k}); take it out to switch it off. It can go on any
+    money box.
+
 INCIDENT REPORTS, MORE CODE WORDS FILL THE DAILY LOG, AUTOCORRECT EVERYWHERE  (v3.33.0)
   - Incident reports opened on behalf of Security: with the daily log open, press
     Ctrl+Alt+Shift+N, pick the report (type the first letters, Enter) and fill any boxes.
@@ -1560,7 +1572,8 @@ SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
       open 201 202 203        tables opened, on one line (a number is enough: 201 = UT201)
       201 auto                tables auto-closed (auto can come first or last: 201 202 auto)
       jack c2102 11421.11 w3 cash 2130      jackpot: machine, amount, window, time paid (military
-                              time, optional; cash is the default wording)
+                              time, optional; cash is the default wording; v3.33.1: an amount
+                              under 10,000 means thousands, so jack c2102 12.5 w3 = $12,500)
       bv c2102 4471 full      emergency BV pull (full or def, for defective)
       mfill n3 190800 bvs     machine fill (v3.26.3), one fill per line for several; the older
                               n3 190800 bvs and c2102 11421.11 win 3 cash, with no code word,

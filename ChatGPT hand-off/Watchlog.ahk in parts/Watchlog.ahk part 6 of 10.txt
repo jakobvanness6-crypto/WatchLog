@@ -1,4 +1,18 @@
-; ===== Watchlog.ahk PART 6 of 10 (lines 5949-7461 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 6 of 10 (lines 5955-7481 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; Biggest .n first (insertion sort, the lists are short)
+SortByCount(items) {
+    Loop items.Length - 1 {
+        i := A_Index + 1
+        cur := items[i], j := i - 1
+        while j >= 1 && items[j].n < cur.n {
+            items[j + 1] := items[j]
+            j -= 1
+        }
+        items[j + 1] := cur
+    }
+    return items
+}
+
 ; Logs and alert clears from [DayItems] for days from..to (yyyy-MM-dd):
 ; {logs, alerts, days: Map(day -> {logs, alerts}), types: sorted [{name, n}]}
 DashRange(from, to) {

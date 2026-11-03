@@ -3,9 +3,14 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.33.0 (Nov 1, 2026): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch (built, NOT run). Before that v3.32.0: taskbar clock, hide taskbar previews.
+Current version: v3.33.1 (Nov 3, 2026): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
+
+### Test results v3.33.0 (Jakob, Nov 1) and follow-ups. NOT built
+- Works: clock, Ctrl+Alt+I, code words fill the whole log, incident teach + fill (stops in Secondary Operator as designed), call pad cheque, autocorrect everywhere.
+- Taskbar previews still show. Activity log saw Xaml_WindowedPopupClass and XamlExplorerHostIslandWindow (Windows 11 XAML taskbar). Suggested to Jakob: add Xaml_WindowedPopupClass to settings.ini [Taskbar] PreviewClasses= (no new version), test right-click menus and Start afterwards. Do NOT add XamlExplorerHostIslandWindow (it hosts Start, search and the flyouts).
+- Supervisor jackpot amounts under 10,000 read as thousands: BUILT in v3.33.1 (see below).
 
 ### Incident reports: next steps (after v3.33.0). NOT built
 - Checklist button and Custom Forms tab: Jakob will show what goes in them ("ask me about it").
@@ -31,6 +36,11 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done in v3.33.1 (Nov 3)
+- Supervisor jackpots are always $10,000 or more, so a jack amount under 10,000 is read as thousands: 12 = $12,000, 12.5 = $12,500, 11421.11 stays, 12k still $12,000. Works in the ;jack form and in jack lines on the call pad (jack c2102 12.5 w3 cash, and c2102 12 win 3 with no code word). New money box option `under10k`, set on the ;jack Amount box in templates.txt (take it out to switch it off).
+- Not changed: taskbar previews. Still the settings.ini suggestion (add Xaml_WindowedPopupClass to [Taskbar] PreviewClasses=, then test right-click menus and Start); not made a default because that class may also be used by other Windows 11 pop-ups.
+- Built, NOT run.
 
 ## Done in v3.33.0 (Nov 1) - from Jakob's build checklist
 - Incident reports on behalf of Security: Ctrl+Alt+Shift+N (no auto-start after ;refuse, Jakob's choice); incidents.txt (kept off GitHub) with Refusal - signs of intox (no patron count), General (brief = "Report opened on behalf of Security." only, Specific Interior/Exterior box), Trespass 24 hours (listed first = default), indefinite, violation ("given a reminder of their trespass status"). Category blank; Closing Remarks left for the supervisor; no-ID refusals get no incident. Teach: tray > iTrak > Teach the incident report spots (itrak.ini [Incident]).

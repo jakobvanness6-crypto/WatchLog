@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 2 of 10 (lines 1046-2390 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 2 of 10 (lines 1046-2396 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
 [Templates]
 ; The team's shared templates file (in SharePoint, synced by OneDrive).
 ; Blank = templates.txt in this folder. Your own extra templates go in
@@ -692,6 +692,10 @@ ParseField(spec, last := Map()) {
         } else if low = "thousands" {
             ; with money: 3.3 means 3,300 (a decimal point = thousands)
             f.thousands := true, hint := "  (e.g. 3.3 = 3,300)"
+        } else if low = "under10k" {
+            ; with money (v3.33.1): an amount under 10,000 is in thousands,
+            ; for supervisor jackpots (12 = 12,000, 12.5 = 12,500, 11421.11 stays)
+            f.under10k := true, hint := "  (e.g. 12 = 12,000)"
         } else if low = "money" {
             f.kind := "money", f.ph := "XX,XXX", hint := "  (e.g. 10000)"
         } else if low = "percent" {
@@ -1174,6 +1178,8 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
                 else if kind = "money" {
                     if f.HasOwnProp("thousands") && RegExMatch(StrReplace(v, "$"), "^\d*\.\d+$")
                         v := Format("{:d}", Round(StrReplace(v, "$") * 1000))
+                    if f.HasOwnProp("under10k")
+                        v := Under10k(v)
                     v := FixMoney(v)
                 }
                 else if kind = "percent"
