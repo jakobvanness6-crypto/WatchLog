@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.33.1  -  README
+  WATCHLOG  v3.33.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -730,6 +730,8 @@ and the less-used items sit in sub-menus):
   Shift count                   Exact tally of this shift, item by item
                                 (see SHIFT COUNT in section 10)
   Shift dashboard               Same as Ctrl+Alt+Shift+D (v3.16.0)
+  Change break time...          Set the break minutes used this shift by
+                                hand (v3.33.2). See BREAK TIME TRACKER.
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
@@ -1370,6 +1372,16 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.33, newest first)
 -----------------------------------------------------------------------
+SHRED-IT AUTOCORRECT, CHANGE THE BREAK TIME BY HAND  (v3.33.2)
+  - Autocorrect: shredit and shreddit become Shred-it. If you already have your own
+    autocorrect.txt, Watchlog adds the two lines to it once (under "# Added by Watchlog").
+    Put # in front of a line to switch it off, as usual.
+  - Break time: tray menu > Change break time... (or the Change... button beside the break
+    line on the shift dashboard). Type the minutes used so far, like 45, or the minutes
+    left, like 15 left. 0 starts the shift's break time fresh. If you're on break right
+    now, the open break keeps counting on from the number you typed.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 JACKPOT AMOUNTS UNDER 10,000 MEAN THOUSANDS  (v3.33.1)
   - Supervisor jackpots are always $10,000 or more, so in ;jack and in a jack line on
     the call pad an amount under 10,000 is read as thousands: 12 = $12,000,
@@ -1445,6 +1457,7 @@ BREAK TIME TRACKER  (v3.29.0)
   - The count starts over at Start of shift (Ctrl+Alt+L), or 14 hours after the first break.
   - settings.ini [Break] Minutes=60 sets the allowance. If you close a break log by mistake,
     only the first one counts.
+  - Count wrong? Tray menu > Change break time... (v3.33.2) sets the minutes used by hand.
   Built, NOT run (the sandbox can't run AutoHotkey).
 
 MORE SAFEGUARDS  (v3.28.0)

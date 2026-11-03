@@ -3,7 +3,7 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.33.1 (Nov 3, 2026): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
+Current version: v3.33.2 (Nov 3, 2026): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
 
@@ -36,6 +36,11 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done in v3.33.2 (Nov 3)
+- Autocorrect: shredit and shreddit become Shred-it (built-in list; added once to an existing autocorrect.txt).
+- Break counter editable: tray > Change break time..., or Change... on the shift dashboard. Minutes used (45) or left (15 left); an open break keeps counting on.
+- Built, NOT run.
 
 ## Done in v3.33.1 (Nov 3)
 - Supervisor jackpots are always $10,000 or more, so a jack amount under 10,000 is read as thousands: 12 = $12,000, 12.5 = $12,500, 11421.11 stays, 12k still $12,000. Works in the ;jack form and in jack lines on the call pad (jack c2102 12.5 w3 cash, and c2102 12 win 3 with no code word). New money box option `under10k`, set on the ;jack Amount box in templates.txt (take it out to switch it off).

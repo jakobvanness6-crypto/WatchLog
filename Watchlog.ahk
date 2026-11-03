@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.33.1"
+VERSION := "3.33.2"
 VERSION_DATE := "Nov 3, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -3323,6 +3323,7 @@ PadSetRow(fields, ctrls, labs, row, marks) {
 ; punctuation, never in the middle of a word.
 LoadAutocorrect() {
     global AutoMap, AutoStamp
+    AutoAddNewWords()
     stamp := ""
     try stamp := FileGetTime(AutoFile, "M")
     if stamp = AutoStamp
@@ -3466,7 +3467,43 @@ cashbox = cash box
 softcount = soft count
 mainbank = Main Bank
 shortpay = short pay
+
+# Names
+shredit = Shred-it
+shreddit = Shred-it
 )"
+}
+
+; Words added to the built-in list after people already had their own
+; autocorrect.txt are added to that file once per PC (v3.33.2). A word that
+; is already in the file, even switched off with #, is left as it is.
+AutoAddNewWords() {
+    static done := false
+    if done
+        return
+    done := true
+    if !FileExist(AutoFile)
+        return
+    flag := ""
+    try flag := IniRead(LastUsedFile, "Autocorrect", "NewWords", "")
+    if flag = "shredit"
+        return
+    try text := FileRead(AutoFile, "UTF-8")
+    catch
+        return
+    add := ""
+    for w in ["shredit", "shreddit"]
+        if !RegExMatch(text, "im)^[ \t]*#?[ \t]*" w "[ \t]*=")
+            add .= w " = Shred-it`n"
+    try {
+        if add != "" {
+            FileAppend (SubStr(text, -1) = "`n" ? "" : "`n") "`n# Added by Watchlog`n" add, AutoFile, "UTF-8"
+            Activity("Autocorrect: added Shred-it to autocorrect.txt")
+        }
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        IniWrite "shredit", LastUsedFile, "Autocorrect", "NewWords"
+    }
 }
 
 
@@ -5305,6 +5342,47 @@ BreakBegin(win) {
     SetIconTip()
 }
 
+; Change the break time used this shift by hand (v3.33.2): tray menu >
+; Change break time, or the Change button on the shift dashboard. Type the
+; minutes used (45) or the minutes left (15 left). If a break log is open
+; now, it keeps counting on from the new number.
+BreakEdit(*) {
+    allowed := BreakAllowed() // 60
+    before := BreakUsedSecs() // 60
+    openAt := ""
+    try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
+    ib := InputBox("Minutes of break used so far this shift (you get " allowed ")."
+        . "`nOr type the minutes left, like  15 left"
+        . (openAt != "" ? "`n`nYou're on break now: it keeps counting on from this number." : "")
+        . "`n`n0 starts the shift's break time fresh.", "Watchlog - Break time", "w400 h" (openAt != "" ? 230 : 200), String(before))
+    if ib.Result != "OK"
+        return false
+    v := StrLower(Trim(ib.Value))
+    if !RegExMatch(v, "^(\d{1,3})\s*(min|mins|minutes)?\s*(left)?$", &m) {
+        MsgBox "Type a number of minutes, like  45  (used) or  15 left.", "Watchlog - Break time", "Icon!"
+        return false
+    }
+    mins := Integer(m[1])
+    if m[3] != ""
+        mins := Max(allowed - mins, 0)
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        if IniRead(LastUsedFile, "Break", "Since", "") = ""
+            IniWrite A_Now, LastUsedFile, "Break", "Since"
+        IniWrite mins * 60, LastUsedFile, "Break", "Used"
+        if openAt != ""
+            IniWrite A_Now, LastUsedFile, "Break", "OpenSince"
+    } catch as e {
+        MsgBox "Couldn't save the break time:`n" e.Message, "Watchlog - Break time", "Icon!"
+        return false
+    }
+    Activity("Break time changed by hand: " before " -> " mins " min used (" BreakText() ")")
+    SetIconTip()
+    Tip(BreakText(), 3000)
+    return true
+}
+
 ; After a reload: keep watching a break log that is still open
 BreakResume() {
     openAt := ""
@@ -6084,7 +6162,8 @@ ShowDashboard(tab := 1) {
 
     tb.UseTab(1)
     y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
-    g.AddText("xm+12 y" y " w560 BackgroundTrans", BreakText())
+    g.AddText("xm+12 y" y " w470 BackgroundTrans", BreakText())
+    g.AddButton("xm+490 y" (y - 4) " w90 h26", "Change...").OnEvent("Click", (*) => (g.Opt("+OwnDialogs"), BreakEdit() && ShowDashboard()))
     y += 24
     g.AddText("xm+12 y" y " w560 BackgroundTrans", "Logs by type (" f.span ")")
     lv := g.AddListView("xm+12 y+6 w570 r11 -Multi NoSortHdr", ["Log type", "Times", ""])
@@ -9303,6 +9382,7 @@ BuildTrayMenu() {
     MenuItem(tm, "Time saved", (*) => ShowTimeSaved(), 0xE916)
     MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
     MenuItem(tm, "Shift dashboard  (" HK("dashboard") ")", (*) => ShowDashboard(), 0xE9D9)
+    MenuItem(tm, "Change break time...", (*) => BreakEdit(), 0xE916)
     tm.Add()
     MenuItem(tm, "Start of shift  (" HK("start") ")", (*) => StartOfShift(), 0xE768)
     MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
