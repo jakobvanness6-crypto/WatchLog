@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.34.2"
+VERSION := "3.34.3"
 VERSION_DATE := "Nov 3, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -9031,12 +9031,14 @@ AuditFill(title, syn, area, console, endTime) {
     ; Requested By: the taught route of clicks (they can land in pop-up windows)
     route := sp["route"]
     if route.Length {
+        ; v3.34.3: quicker again (Jakob: it works but was slow): 500 ms between
+        ; clicks, 200 ms more before a double-click.
         ; v3.34.2: slower, because Citrix missed the double-click on the name
         ; (the list may still be loading, and a fast double-click can be
         ; seen as one click). Each click waits AuditRoutePause after the one
         ; before; a double-click waits AuditDoubleWait more first.
-        rp := Integer(IniRead(SettingsFile, "ITrak", "AuditRoutePause", "1200"))
-        dw := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleWait", "800"))
+        rp := Integer(IniRead(SettingsFile, "ITrak", "AuditRoutePause", "500"))
+        dw := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleWait", "200"))
         gap := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleGap", "120"))
         WinGetClientPos &cx, &cy, , , "ahk_id " win
         for p in route {
