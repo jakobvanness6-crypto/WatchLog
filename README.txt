@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.33.1  -  README
+  WATCHLOG  v3.34.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -412,7 +412,8 @@ were typing.
 Forms (open a form):
   ;jack         Supervisor jackpot: amount, machine, window #, time paid
   ;audit        Employee audit: type, employee # (clip), from now to
-                now+20, location
+                now+20, location, area audited (v3.34.0: fills the
+                iTrak Audit window, see section 19)
   ;medical      Medical: employee/guest, location, what the review
                 showed, outcome (pick one)
   ;evict        Trespass: location, reason, length
@@ -730,13 +731,16 @@ and the less-used items sit in sub-menus):
   Shift count                   Exact tally of this shift, item by item
                                 (see SHIFT COUNT in section 10)
   Shift dashboard               Same as Ctrl+Alt+Shift+D (v3.16.0)
+  Change break time...          Set the break minutes used this shift by
+                                hand (v3.33.2). See BREAK TIME TRACKER.
   Start of shift                Same as Ctrl+Alt+L
   End of shift (close apps)     Same as Ctrl+Alt+Shift+L
   iTrak >                       New daily log (Ctrl+Alt+D), Teach the click
                                 (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
                                 Teach the daily log fields (Ctrl+Alt+Shift+F),
                                 Incident report (Ctrl+Alt+Shift+N), Teach the
-                                incident report spots (v3.33.0), Share my setup
+                                incident report spots (v3.33.0), Teach the
+                                audit spots (v3.34.0), Share my setup
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -1368,8 +1372,50 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.33, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.34, newest first)
 -----------------------------------------------------------------------
+;AUDIT FILLS THE ITRAK AUDIT WINDOW  (v3.34.0)
+  An audit is its own window in iTrak (Audit - GA...), not a daily log.
+  - Once per PC: open a new audit, then tray menu > iTrak > Teach the audit spots.
+    Part 1: hover over the Detail tab (top left), Console #, the Area Audited drop-down
+    (the box, not Add), the time in Audit End, and Audit Remarks (the big box in the
+    middle of the Detail tab), and press F8 over each. (v3.34.1 added the Detail tab: you're
+    still on the Audit tab after picking the employee. Teach again if you taught v3.34.0.) Part 2, your route to put
+    yourself in Requested By: before EACH click, hover over the spot and press F8
+    (Shift+F8 if that click is a double-click), then do the click yourself. Press F9 once
+    your name is in. Keep the Audit window the same size and place afterwards.
+  - Every audit: open it, pick the employee on its Audit tab and copy their number, then
+    type ;audit. The form fills the Employee # from the copy, and Area audited from the
+    Employee type (Dealer, Pit Supervisor/Manager = Pit 2, Security = Security, Ops and
+    General Manager = Operations Management, Cage Cashier = Cage, Main Banker = Main Bank,
+    F&B = Food & Beverage, Count Team = Count Room, Slots = Slots, EVS = Housekeeping,
+    Maintenance/Facilities = Maintenance). Change it if needed.
+  - Enter clicks the Detail tab, then fills Console # (the monitor), Area Audited, Audit End (the form's To time,
+    20 minutes after From) and Audit Remarks, then clicks your Requested By route.
+    Audit Start (iTrak sets it), Review Method, Section and Save are left to you.
+  - No Audit window open (or spots not taught)? The wording is pasted where you typed,
+    like before. Shift+Enter on the form always just pastes the wording.
+  - The Area choices are the @areas list in templates.txt. settings.ini [ITrak]:
+    AuditEndFormat=MMM dd yyyy hh:mm:ss tt (how the End time is typed), AuditRoutePause=500
+    (ms between the Requested By clicks), AuditDoubleWait=200 (extra wait before a
+    double-click, so the name list has loaded), AuditDoubleGap=120 (ms between the two
+    clicks of a double-click), AuditWindow=^Audit -  (the window title).
+  - v3.34.2: the Requested By double-click is slower and more deliberate (it was missed
+    on the name). No need to teach again. v3.34.3 made it quicker again (it worked but was
+    slow); if a click gets missed, raise AuditRoutePause in settings.ini.
+  - New templates.txt (wording Nov 3, 2026 (2)): copy it with the new Watchlog.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+SHRED-IT AUTOCORRECT, CHANGE THE BREAK TIME BY HAND  (v3.33.2)
+  - Autocorrect: shredit and shreddit become Shred-it. If you already have your own
+    autocorrect.txt, Watchlog adds the two lines to it once (under "# Added by Watchlog").
+    Put # in front of a line to switch it off, as usual.
+  - Break time: tray menu > Change break time... (or the Change... button beside the break
+    line on the shift dashboard). Type the minutes used so far, like 45, or the minutes
+    left, like 15 left. 0 starts the shift's break time fresh. If you're on break right
+    now, the open break keeps counting on from the number you typed.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 JACKPOT AMOUNTS UNDER 10,000 MEAN THOUSANDS  (v3.33.1)
   - Supervisor jackpots are always $10,000 or more, so in ;jack and in a jack line on
     the call pad an amount under 10,000 is read as thousands: 12 = $12,000,
@@ -1445,6 +1491,7 @@ BREAK TIME TRACKER  (v3.29.0)
   - The count starts over at Start of shift (Ctrl+Alt+L), or 14 hours after the first break.
   - settings.ini [Break] Minutes=60 sets the allowance. If you close a break log by mistake,
     only the first one counts.
+  - Count wrong? Tray menu > Change break time... (v3.33.2) sets the minutes used by hand.
   Built, NOT run (the sandbox can't run AutoHotkey).
 
 MORE SAFEGUARDS  (v3.28.0)
