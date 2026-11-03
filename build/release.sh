@@ -3,8 +3,7 @@
 # Run tools/bump-version.py NEW first. Needs the previous release zip
 # ("Watchlog vOLD.zip") in the project folder: its exe is reused and only the
 # script and text resources are swapped in (AutoHotkey can't run here).
-# Makes "Watchlog vNEW.zip", the IT script zip, rebuilds the docs and the
-# ChatGPT hand-off, and moves the old zips to archive/old-releases.
+# Makes "Watchlog vNEW.zip", the IT script zip, rebuilds the docs, and moves the old zips to archive/old-releases.
 set -e
 NEW=$1; OLD=$2
 P="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,5 +20,5 @@ mkdir it && cd it && unzip -q "$P/archive/old-releases/Watchlog v$OLD script for
 sed -i "s/Watchlog v$OLD/Watchlog v$NEW/g" "READ ME FIRST.txt"; cp "$P/Watchlog.ahk" "$P/settings.example.ini" .
 zip -qr "$P/for IT (on request)/Watchlog v$NEW script for IT.zip" .
 cd "$P/docs/source" && python3 build-docs.py 2>&1 | tail -1
-cd "$P" && python3 tools/make-chatgpt-handoff.py "$NEW" | tail -1 && rm -f "ChatGPT hand-off.zip" && zip -qr "ChatGPT hand-off.zip" "ChatGPT hand-off"
+# (ChatGPT hand-off no longer built: Jakob stopped using ChatGPT, Nov 3, 2026)
 rm -rf "$W"

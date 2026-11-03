@@ -13,8 +13,7 @@ those too and made the history wrong):
   docs/source/*.md     "it's on X now", "Version X is built", "I'm on version X"
   docs/Pending changes.md   "Current version: vX"
 PROJECT-NOTES.md "Current version" is a written summary: update it by hand.
-Then run build/release.sh NEW OLD (builds the zip, the IT zip, the docs and
-the ChatGPT hand-off).
+Then run build/release.sh NEW OLD (builds the zip, the IT zip and the docs).
 """
 import re, sys, datetime, os
 PF = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep
