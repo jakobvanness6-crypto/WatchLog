@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.33.2  -  README
+  WATCHLOG  v3.34.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -412,7 +412,8 @@ were typing.
 Forms (open a form):
   ;jack         Supervisor jackpot: amount, machine, window #, time paid
   ;audit        Employee audit: type, employee # (clip), from now to
-                now+20, location
+                now+20, location, area audited (v3.34.0: fills the
+                iTrak Audit window, see section 19)
   ;medical      Medical: employee/guest, location, what the review
                 showed, outcome (pick one)
   ;evict        Trespass: location, reason, length
@@ -738,7 +739,8 @@ and the less-used items sit in sub-menus):
                                 (Ctrl+Alt+Shift+I), Full-entry log (Ctrl+Alt+F),
                                 Teach the daily log fields (Ctrl+Alt+Shift+F),
                                 Incident report (Ctrl+Alt+Shift+N), Teach the
-                                incident report spots (v3.33.0), Share my setup
+                                incident report spots (v3.33.0), Teach the
+                                audit spots (v3.34.0), Share my setup
   Alert Grid >                  Clear all alerts (Ctrl+Alt+A), Teach the
                                 clicks (Ctrl+Alt+Shift+A), Share my setup
                                 with the team (v3.18.0)
@@ -1370,8 +1372,33 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.33, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.34, newest first)
 -----------------------------------------------------------------------
+;AUDIT FILLS THE ITRAK AUDIT WINDOW  (v3.34.0)
+  An audit is its own window in iTrak (Audit - GA...), not a daily log.
+  - Once per PC: open a new audit, then tray menu > iTrak > Teach the audit spots.
+    Part 1: hover over Console #, the Area Audited drop-down (the box, not Add), the time
+    in Audit End, and Audit Remarks, and press F8 over each. Part 2, your route to put
+    yourself in Requested By: before EACH click, hover over the spot and press F8
+    (Shift+F8 if that click is a double-click), then do the click yourself. Press F9 once
+    your name is in. Keep the Audit window the same size and place afterwards.
+  - Every audit: open it, pick the employee on its Audit tab and copy their number, then
+    type ;audit. The form fills the Employee # from the copy, and Area audited from the
+    Employee type (Dealer, Pit Supervisor/Manager = Pit 2, Security = Security, Ops and
+    General Manager = Operations Management, Cage Cashier = Cage, Main Banker = Main Bank,
+    F&B = Food & Beverage, Count Team = Count Room, Slots = Slots, EVS = Housekeeping,
+    Maintenance/Facilities = Maintenance). Change it if needed.
+  - Enter fills Console # (the monitor), Area Audited, Audit End (the form's To time,
+    20 minutes after From) and Audit Remarks, then clicks your Requested By route.
+    Audit Start (iTrak sets it), Review Method, Section and Save are left to you.
+  - No Audit window open (or spots not taught)? The wording is pasted where you typed,
+    like before. Shift+Enter on the form always just pastes the wording.
+  - The Area choices are the @areas list in templates.txt. settings.ini [ITrak]:
+    AuditEndFormat=MMM dd yyyy hh:mm:ss tt (how the End time is typed), AuditRoutePause=800
+    (ms between the Requested By clicks), AuditWindow=^Audit -  (the window title).
+  - New templates.txt (wording Nov 3, 2026 (2)): copy it with the new Watchlog.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 SHRED-IT AUTOCORRECT, CHANGE THE BREAK TIME BY HAND  (v3.33.2)
   - Autocorrect: shredit and shreddit become Shred-it. If you already have your own
     autocorrect.txt, Watchlog adds the two lines to it once (under "# Added by Watchlog").

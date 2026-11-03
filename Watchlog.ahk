@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.33.2"
+VERSION := "3.34.0"
 VERSION_DATE := "Nov 3, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -1503,6 +1503,9 @@ TemplateFill(out, title) {
         return false
     ; several lines (Add another): each ends with its own  >> ..., the last one is used
     syn := Trim(RegExReplace(out, " >> [^\r\n]*", ""))
+    ; ">> audit | Area | Console # | End time" fills the Audit window instead (v3.34.0)
+    if StrLower(Trim(parts[1])) = "audit"
+        return AuditFill(title, syn, Trim(parts[2]), Trim(parts[3]), parts.Length >= 4 ? Trim(parts[4]) : "")
     ; after the three boxes: "end" (click End Time Now). A leftover "from ..." part
     ; (the Info From search, removed in v3.31.0) is ignored so old templates still work.
     isEnd := false
@@ -1831,6 +1834,9 @@ ParseField(spec, last := Map()) {
                 hint := "  (from the copied text)"
             }
         }
+        ; a list with "if" options starts empty, so the "if" can fill it (v3.34.0)
+        if f.HasOwnProp("conds") && !f.HasOwnProp("choose")
+            f.choose := 0
         ; "next" opens the list on the item after the one used last time
         if f.HasOwnProp("nextStep") {
             lastVal := last.Has(key) ? last[key] : ""
@@ -1996,9 +2002,9 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         ; Lists open showing up to 12 choices at once
         rows := f.HasOwnProp("items") ? " r" Min(f.items.Length, 12) : ""
         if kind = "list"
-            c := g.AddDropDownList("w420 Choose" n rows, f.items)
+            c := g.AddDropDownList("w420" (n ? " Choose" n : "") rows, f.items)
         else if f.HasOwnProp("items")
-            c := g.AddComboBox("w420 Choose" n rows, f.items)
+            c := g.AddComboBox("w420" (n ? " Choose" n : "") rows, f.items)
         else
             c := g.AddEdit("w420", f.HasOwnProp("def") ? f.def : "")
         ctrls.Push(c)
@@ -2062,7 +2068,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
     }
     Changed()
     if fill
-        g.AddText("xm y+8 w420 c666666", "Enter fills the iTrak daily log. Shift+Enter pastes just the wording here.")
+        g.AddText("xm y+8 w420 c666666", "Enter fills it in iTrak. Shift+Enter pastes just the wording here.")
     ; Buttons along the bottom-right; Insert is the one Enter presses
     if repeat
         g.AddButton("xm+132 y+12 w180", "Add another (Ctrl+Enter)").OnEvent("Click", AddAnother)
@@ -2153,8 +2159,17 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
             c := ctrls[i]
             had := autoVals.Has(i) ? autoVals[i] : ""
             if c.Text = "" || c.Text = had {
-                if c.Text != want
-                    c.Value := want
+                if c.Text != want {
+                    ; a list box takes the text, not .Value (v3.34.0)
+                    if c.Type = "Edit"
+                        c.Value := want
+                    else if c.Type = "ComboBox"
+                        c.Text := want
+                    else if want = ""
+                        c.Choose(0)
+                    else
+                        try c.Choose(want)
+                }
                 autoVals[i] := want
             }
         }
@@ -8863,6 +8878,287 @@ TeachIncidentRun() {
 
 
 ; =====================================================================
+;  AUDITS  -  ;audit fills the iTrak Audit window  (v3.34.0)
+;  An audit isn't a daily log: it's its own window ("Audit - GA...").
+;  You open the audit yourself and pick the employee on its Audit tab
+;  (copying their number), then type ;audit. The form fills the Employee #
+;  from the copy and picks Area Audited from the Employee type. Enter
+;  fills the Detail tab: Console # (the monitor), Area Audited, Audit End
+;  (the form's To time) and Audit Remarks (the wording), then clicks your
+;  taught route to put yourself in Requested By. Audit Start (iTrak sets
+;  it to Now), Review Method, Section and Save are left to you.
+;  The templates.txt line ends with  >> audit | Area | Console # | End time
+;  Teach the spots once per PC: tray > iTrak > Teach the audit spots.
+;  Spots are kept in itrak.ini [Audit] (numbers only, this PC only).
+; =====================================================================
+AuditFields := ["Console", "Area", "End", "Remarks"]
+AuditNames := Map("Console", "Console #", "Area", "Area Audited drop-down", "End", "Audit End time", "Remarks", "Audit Remarks")
+
+; The open Audit windows (newest in front first)
+AuditWins() {
+    spec := Trim(IniRead(SettingsFile, "ITrak", "AuditWindow", "^Audit - "))
+    list := []
+    SetTitleMatchMode "RegEx"
+    try {
+        for h in WinGetList(spec) {
+            exe := ""
+            try exe := WinGetProcessName("ahk_id " h)
+            if StrLower(exe) = "wfica32.exe"
+                list.Push(h)
+        }
+    }
+    SetTitleMatchMode 2
+    return list
+}
+
+; The spots as a Map (with "route" = an array of {x, y, n}), or "" when not taught
+AuditLoad() {
+    global ITrakFile, AuditFields
+    c := Map()
+    try {
+        for k in ["W", "H"]
+            c[k] := Trim(IniRead(ITrakFile, "Audit", k, ""))
+        for k in AuditFields
+            for ax in ["X", "Y"]
+                c[k ax] := Trim(IniRead(ITrakFile, "Audit", k ax, ""))
+        route := Trim(IniRead(ITrakFile, "Audit", "Route", ""))
+    } catch
+        return ""
+    for k, v in c
+        if !IsInteger(v)
+            return ""
+    pts := []
+    for p in StrSplit(route, ";") {
+        a := StrSplit(p, ",")
+        if a.Length = 3 && IsInteger(a[1]) && IsInteger(a[2]) && IsInteger(a[3])
+            pts.Push({x: Integer(a[1]), y: Integer(a[2]), n: Integer(a[3])})
+    }
+    c["route"] := pts
+    return c
+}
+
+; "22:36" -> the Audit End text iTrak takes, like "Nov 02 2026 10:36:00 PM".
+; The day is today (or the next/previous day when the time is across midnight).
+; settings.ini [ITrak] AuditEndFormat= changes the layout.
+AuditEndText(hhmm) {
+    if !RegExMatch(hhmm, "^(\d{1,2}):(\d{2})$", &m)
+        return ""
+    ts := FormatTime(, "yyyyMMdd") Format("{:02}{:02}00", m[1], m[2])
+    d := DateDiff(ts, A_Now, "Hours")
+    if d < -12
+        ts := DateAdd(ts, 1, "Days")
+    else if d > 12
+        ts := DateAdd(ts, -1, "Days")
+    return FormatTime(ts, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+}
+
+; Fills the Audit window. False (so the wording is pasted where you were
+; instead) when no Audit window is open or the spots aren't taught.
+AuditFill(title, syn, area, console, endTime) {
+    global AuditFields
+    sp := AuditLoad()
+    if !sp {
+        Tip("The audit spots aren't taught on this PC yet (tray > iTrak > Teach the audit spots).`nThe wording was pasted instead.", 6000, true)
+        return false
+    }
+    act := WinExist("A")
+    wins := AuditWins()
+    win := 0
+    for h in wins
+        if h = act
+            win := h
+    if !win && wins.Length
+        win := wins[1]
+    if !win {
+        Tip("No Audit window is open, so the wording was pasted instead.`nOpen the audit first, then type `;audit.", 6000, true)
+        return false
+    }
+    ; let go of Shift/Ctrl/Alt first so a click isn't a Shift+click
+    held := A_TickCount + 400
+    while A_TickCount < held && (GetKeyState("Ctrl", "P") || GetKeyState("Alt", "P") || GetKeyState("Shift", "P"))
+        Sleep 10
+    try WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 3) {
+        Tip("Couldn't bring the Audit window to the front. Nothing was filled in.", 4000, true)
+        return true
+    }
+    Sleep 200
+    vals := Map("Console", console, "Area", area, "End", AuditEndText(endTime), "Remarks", syn)
+    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    w0 := Integer(sp["W"]), h0 := Integer(sp["H"])
+    keys := 0, done := []
+    for k in AuditFields {
+        if vals[k] = ""
+            continue
+        if !ITrakSpot(win, Integer(sp[k "X"]), Integer(sp[k "Y"]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
+            Tip("The Audit window is too small for the " AuditNames[k] " spot. Stopped.", 4000, true)
+            Activity("Audit: stopped before " k " (spot outside the window)")
+            return true
+        }
+        if !WinActive("ahk_id " win) {
+            Tip("iTrak lost the front. Stopped before " AuditNames[k] ".", 3000, true)
+            Activity("Audit: stopped before " k " (window lost the front)")
+            return true
+        }
+        MouseMove x, y, 0
+        Sleep 60
+        Click
+        Sleep pause
+        if k = "Remarks" {
+            Paste(vals[k], true)
+            keys += StrLen(vals[k]) + 1
+        } else if k = "Area" {
+            EntryType vals[k]
+            Sleep 250                   ; let the list narrow down to the one option
+            SendInput "{Enter}"
+            keys += 5
+        } else {
+            SendInput "^a"
+            Sleep 60
+            EntryType vals[k]
+            keys += StrLen(vals[k]) + 1
+        }
+        done.Push(k)
+        Sleep 150
+    }
+    ; Requested By: the taught route of clicks (they can land in pop-up windows)
+    route := sp["route"]
+    if route.Length {
+        rp := Integer(IniRead(SettingsFile, "ITrak", "AuditRoutePause", "800"))
+        WinGetClientPos &cx, &cy, , , "ahk_id " win
+        for p in route {
+            x := cx + p.x, y := cy + p.y
+            if !AlertOnScreen(x, y) {
+                Tip("Requested By click " A_Index " is off the screen. Stopped there.", 4000, true)
+                Activity("Audit: Requested By route stopped at click " A_Index " (off the screen)")
+                break
+            }
+            MouseMove x, y, 0
+            Sleep 60
+            if p.n = 2
+                Click 2
+            else
+                Click
+            keys += 2
+            Sleep rp
+        }
+    }
+    MouseMove ox, oy, 0
+    Tip("Audit filled in: check it, then Save.", 4000, true)
+    Activity("Audit filled in (" keys " keystrokes counted as saved; Requested By route " route.Length " clicks)")
+    CountSaved("log", keys, title)
+    Journal(title, "Console #: " console "`nArea Audited: " area "`nAudit End: " vals["End"] "`nAudit Remarks: " syn, keys)
+    return true
+}
+
+TeachAudit() {
+    global TeachBusy
+    if TeachBusy
+        return
+    TeachBusy := true
+    try TeachAuditRun()
+    catch as err
+        MsgBox "Teach audit spots stopped: " err.Message, "Teach audit spots", "Icon!"
+    TeachBusy := false
+}
+
+; Like TeachWait, for the Requested By route: F8 = one click here (1),
+; Shift+F8 = a double-click here (2), F9 = finished (3), Ctrl+Alt+Esc or
+; 3 minutes = cancel (0)
+TeachRouteWait(msg) {
+    Tip(msg, 0, true)
+    KeyWait "F8"
+    KeyWait "F9"
+    stop := A_TickCount + 180000
+    r := 0
+    while A_TickCount < stop {
+        if GetKeyState("F8", "P") {
+            r := GetKeyState("Shift", "P") ? 2 : 1
+            break
+        }
+        if GetKeyState("F9", "P") {
+            r := 3
+            break
+        }
+        if GetKeyState("Esc", "P") && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P")
+            break
+        Sleep 30
+    }
+    Tip("")
+    KeyWait "F8", "T2"
+    KeyWait "F9", "T2"
+    if !r
+        Tip("Teaching cancelled. Nothing saved.", 3000, true)
+    return r
+}
+
+TeachAuditRun() {
+    global ITrakFile, AuditFields
+    wins := AuditWins()
+    if !wins.Length {
+        MsgBox "Open a new audit in iTrak first (its window title starts with Audit -), on the Detail tab, then run this again.", "Teach audit spots", "Icon!"
+        return
+    }
+    if MsgBox("Two parts, on a new audit's Detail tab.`n`n1. Hover over Console #, the Area Audited drop-down (the box, not Add), the time in Audit End, and Audit Remarks, pressing F8 over each. Nothing is clicked for you.`n`n2. Your route to put yourself in Requested By: before EACH click, hover over the spot and press F8 (Shift+F8 if it's a double-click), then do that click yourself. Press F9 when your name is in.`n`nCtrl+Alt+Esc cancels. Start?", "Teach audit spots", "YesNo Icon?") != "Yes"
+        return
+    total := AuditFields.Length
+    pts := Map(), win := 0
+    for i, k in AuditFields {
+        if !TeachWait("Part 1:  " i " of " total "`nHover over " AuditNames[k] " in the Audit window and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)")
+            return
+        if !win {
+            CoordMode "Mouse", "Screen"
+            MouseGetPos , , &h
+            for w in AuditWins()
+                if w = h
+                    win := w
+            if !win
+                win := AuditWins().Length ? AuditWins()[1] : 0
+        }
+        if !win || !ITrakPoint(win, &x, &y) {
+            MsgBox "That spot isn't inside the Audit window. Nothing saved. Try again.", "Teach audit spots", "Icon!"
+            return
+        }
+        pts[k] := [x, y]
+    }
+    WinGetClientPos &cx, &cy, &cw, &ch, "ahk_id " win
+    route := ""
+    n := 0
+    loop {
+        r := TeachRouteWait("Part 2: Requested By, click " (n + 1) "`nHover over the next spot and press F8 (Shift+F8 = double-click), then click it yourself.`nPress F9 when your name is in Requested By.   (Ctrl+Alt+Esc cancels)")
+        if !r
+            return
+        if r = 3
+            break
+        CoordMode "Mouse", "Screen"
+        MouseGetPos &mx, &my
+        route .= (route != "" ? ";" : "") (mx - cx) "," (my - cy) "," r
+        n++
+        if n >= 15 {
+            Tip("That's 15 clicks, the most a route can have.", 3000, true)
+            break
+        }
+    }
+    try {
+        for k in AuditFields {
+            IniWrite pts[k][1], ITrakFile, "Audit", k "X"
+            IniWrite pts[k][2], ITrakFile, "Audit", k "Y"
+        }
+        IniWrite cw, ITrakFile, "Audit", "W"
+        IniWrite ch, ITrakFile, "Audit", "H"
+        IniWrite route, ITrakFile, "Audit", "Route"
+    } catch {
+        MsgBox "Couldn't save the spots to " ITrakFile, "Teach audit spots", "Icon!"
+        return
+    }
+    Activity("iTrak: audit spots taught (Audit window " cw "x" ch ", Requested By route " n " clicks)")
+    MsgBox "Saved (Requested By route: " n " click" (n = 1 ? "" : "s") ").`n`nNow open an audit, pick the employee on its Audit tab and copy their number, then type `;audit. Enter fills the Detail tab; you check it and Save.`n`nKeep the Audit window the same size and in the same place it is now (the Requested By clicks are measured from it).", "Teach audit spots"
+}
+
+
+; =====================================================================
 ;  AUTOCORRECT IN EVERY PROGRAM  (v3.33.0)
 ;  The words in autocorrect.txt are fixed as you type anywhere (iTrak in
 ;  Citrix too), not only in the call pad and the log forms. The fix is
@@ -9400,6 +9696,7 @@ BuildTrayMenu() {
     MenuItem(itm, "Teach the daily log fields  (" HK("entryteach") ")", (*) => TeachEntryFields(), 0xE7C9)
     MenuItem(itm, "Incident report  (" HK("incident") ")", (*) => ShowIncidentPick(), 0xE8F1)
     MenuItem(itm, "Teach the incident report spots", (*) => TeachIncident(), 0xE7C9)
+    MenuItem(itm, "Teach the audit spots", (*) => TeachAudit(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 

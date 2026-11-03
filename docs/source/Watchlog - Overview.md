@@ -30,7 +30,7 @@ Security has its own section further down. In short: passwords are kept in Windo
 
 ## What it does
 
-It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.33.2 now.
+It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.34.0 now.
 
 <!-- fig: image4.png 1.7 | The Watchlog icon sits by the clock. Right-clicking it opens this menu. -->
 
@@ -40,7 +40,7 @@ There are 36 templates so far. Every code starts with a semicolon so it never go
 
 | Area | Codes |
 | --- | --- |
-| Incidents and reviews | `;jack` jackpot · `;audit` employee audit · `;medical` · `;evict` trespass · `;face` facial recognition alert |
+| Incidents and reviews | `;jack` jackpot · `;audit` employee audit (fills iTrak's Audit window: monitor, area, end time, remarks and my name) · `;medical` · `;evict` trespass · `;face` facial recognition alert |
 | Start and end of shift | `;start` · `;end` (remembers which bay you were on last) · `;break` (also keeps count of the 60 minutes of break) |
 | Security routines | `;interior` · `;exterior` door checks · `;parking` patrol · `;refuse` refused entry (one or several patrons) · `;selfex` self-exclusion · `;inventory` · `;account` review · `;drop` table drop · `;man` garbage sweep |
 | Tables | `;open` · `;close` · `;auto` auto-close · `;cards` card change · `;fill` table fill · `;player` player log |
@@ -247,7 +247,7 @@ What IT would need to approve:
 
 ## Next steps
 
-Version 3.33.2 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.34.0 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.
