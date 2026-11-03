@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 8 of 10 (lines 8216-9365 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 8 of 10 (lines 8236-9385 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
 ; True when the taskbar is dark (Settings > Personalization > Colors > Windows mode)
 ClockTaskbarDark() {
     try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme") = 0

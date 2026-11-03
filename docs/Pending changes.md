@@ -3,9 +3,14 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.33.0 (Nov 1, 2026): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch (built, NOT run). Before that v3.32.0: taskbar clock, hide taskbar previews.
+Current version: v3.34.3 (Nov 3, 2026): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
+
+### Test results v3.33.0 (Jakob, Nov 1) and follow-ups. NOT built
+- Works: clock, Ctrl+Alt+I, code words fill the whole log, incident teach + fill (stops in Secondary Operator as designed), call pad cheque, autocorrect everywhere.
+- Taskbar previews still show. Activity log saw Xaml_WindowedPopupClass and XamlExplorerHostIslandWindow (Windows 11 XAML taskbar). Suggested to Jakob: add Xaml_WindowedPopupClass to settings.ini [Taskbar] PreviewClasses= (no new version), test right-click menus and Start afterwards. Do NOT add XamlExplorerHostIslandWindow (it hosts Start, search and the flyouts).
+- Supervisor jackpot amounts under 10,000 read as thousands: BUILT in v3.33.1 (see below).
 
 ### Incident reports: next steps (after v3.33.0). NOT built
 - Checklist button and Custom Forms tab: Jakob will show what goes in them ("ask me about it").
@@ -31,6 +36,40 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done in v3.34.3 (Nov 3)
+- Jakob: "everything works now" (;audit incl. Requested By), but the Requested By selection was unnecessarily slow. Route pause 1200 -> 500 ms, double-click wait 800 -> 200 ms. Built, NOT run.
+
+## Done in v3.34.2 (Nov 3)
+- Jakob's test: the Requested By route stopped on his name; the double-click (taught with Shift+F8) didn't select it. Double-click now waits for the list (AuditDoubleWait 800 ms), nudges the mouse, and clicks twice 120 ms apart; route pause 1200 ms. Built, NOT run.
+
+## Done in v3.34.1 (Nov 3)
+- Teaching v3.34.0, Jakob couldn't place "Audit Remarks" (the big box on the Detail tab) and was on the Audit tab. Since picking the employee leaves him on the Audit tab, the Detail tab is now the first taught spot and is clicked first. Teach again. Built, NOT run.
+
+## Done in v3.34.0 (Nov 3)
+- ;audit fills the iTrak Audit window: Console # (monitor), Area Audited (from Employee type, @areas list), Audit End (form's To), Audit Remarks, then the taught Requested By click route. Jakob opens the audit, picks the employee on the Audit tab (copies the #) and saves. Teach: tray > iTrak > Teach the audit spots.
+- Built, NOT run. Plan and Jakob's answers:
+  - Wants ;audit to fill the whole entry automatically.
+  - Jakob (Nov 3): an audit is NOT a daily log; it is its own iTrak log type (own window). So it needs its own taught click spots, like incident reports (Ctrl+Alt+Shift+N), not a `>>` line.
+  - Screenshot received (Nov 3): window "Audit - GA2026..." with tabs Detail / Audit / Savings and Losses / Media / Custom Forms / Audit Observations / Document Control. Detail tab: Audit #, Property (Belleville, greyed), Audit Start + Now, Audit End + Now (Duration shown), Area Audited (Add + drop-down, e.g. Slots), Review Method (Live), Section (Add + drop-down), Console #, Incident Number, Audit Remarks (big box), Status (Open), Requested By (button + name box), Select Second Auditor, buttons Best Practices / Print / Create Incident / Save / Edit / Close.
+  - Jakob's rules: Console # = the monitor (the form's Location box, e.g. M6). Area Audited = the department. Requested By = himself, picked like Info From. He selects the employee on the Audit tab by hand first (that's how he copies the employee #), so ;audit's Employee # keeps coming from the clipboard. Audit Remarks = the ;audit wording.
+  - Draft plan: teach spots once (like incident reports): Console #, Area Audited, Audit Remarks, Requested By (+ Audit Start/End Now if wanted). Area Audited picked from the Employee type (Dealer -> Tables, Slot Attendant/Technician -> Slots, Cage Cashier/Main Banker -> Cage, Security -> Security, F&B -> F&B, Count Team/Audit -> Audit, Operations -> OPS, EVS/Maintenance/Facilities -> Property): needs his OK.
+  - Area Audited options (Jakob, Nov 3): ATM, Bar, Buffet, Cage, Count Room, First aid room, Food & Beverage, Gaming Floor, Guest Services, Housekeeping, I.T., Main Bank, Maintenance, NRT, Operations Management, Pit 1, Pit 2, Pit 3, Racebook, Security, Security Podium, Slot Section D, Windward, Slots. That is the full list.
+  - Area Audited mapping CONFIRMED (Jakob, Nov 3): a pick list on the ;audit form, pre-picked from Employee type: Dealer / Pit Supervisor / Pit Manager -> Pit 2 (there is no Pit 1), Security -> Security, Ops Supervisor/Manager + General Manager -> Operations Management, Cage Cashier -> Cage (confirmed), Main Banker -> Main Bank, F&B -> Food & Beverage, Count Team -> Count Room, Slot Attendant/Technician -> Slots, EVS Attendant -> Housekeeping, Maintenance/Facilities -> Maintenance. Audit Supervisor/Auditor: no mapping needed (he never audits them).
+  - Answers (Jakob, Nov 3): Area Audited picked from Employee type: yes. Audit Start is set to Now by iTrak when the audit opens; Watchlog sets Audit End = that start + 20 min (how to enter it in the date-time box still to check). Review Method: leave as is (Live by default; he changes it himself for a review). Requested By: he'll TEACH a click route to his own name (a taught sequence of clicks, no name saved by Watchlog).
+  - Answers 2 (Jakob, Nov 3): the End time box can be typed into (Watchlog clicks the time part and types the form's To time = From + 20). Area is "Cage". Section always empty. Jakob opens the new audit himself; Save is left to the operator.
+  - PLAN COMPLETE. Teach (tray > iTrak): Console #, Area Audited, Audit End time, Audit Remarks, then his Requested By route (any number of F8 clicks, Esc to finish). Run: ;audit form (Employee type, Employee # from clipboard, From/To, Monitor) + new Area pick list -> Enter fills the open Audit window. Waiting on "build it".
+  - Earlier questions: Start/End times (click Now, or type the form's From/To?), Review Method always Live?, Section left empty?, Requested By: type his name (saved in settings.ini) or stop in the search for him?, does he open the new audit himself, Save left to him?, and the mapping above.
+
+## Done in v3.33.2 (Nov 3)
+- Autocorrect: shredit and shreddit become Shred-it (built-in list; added once to an existing autocorrect.txt).
+- Break counter editable: tray > Change break time..., or Change... on the shift dashboard. Minutes used (45) or left (15 left); an open break keeps counting on.
+- Built, NOT run.
+
+## Done in v3.33.1 (Nov 3)
+- Supervisor jackpots are always $10,000 or more, so a jack amount under 10,000 is read as thousands: 12 = $12,000, 12.5 = $12,500, 11421.11 stays, 12k still $12,000. Works in the ;jack form and in jack lines on the call pad (jack c2102 12.5 w3 cash, and c2102 12 win 3 with no code word). New money box option `under10k`, set on the ;jack Amount box in templates.txt (take it out to switch it off).
+- Not changed: taskbar previews. Still the settings.ini suggestion (add Xaml_WindowedPopupClass to [Taskbar] PreviewClasses=, then test right-click menus and Start); not made a default because that class may also be used by other Windows 11 pop-ups.
+- Built, NOT run.
 
 ## Done in v3.33.0 (Nov 1) - from Jakob's build checklist
 - Incident reports on behalf of Security: Ctrl+Alt+Shift+N (no auto-start after ;refuse, Jakob's choice); incidents.txt (kept off GitHub) with Refusal - signs of intox (no patron count), General (brief = "Report opened on behalf of Security." only, Specific Interior/Exterior box), Trespass 24 hours (listed first = default), indefinite, violation ("given a reminder of their trespass status"). Category blank; Closing Remarks left for the supervisor; no-ID refusals get no incident. Teach: tray > iTrak > Teach the incident report spots (itrak.ini [Incident]).

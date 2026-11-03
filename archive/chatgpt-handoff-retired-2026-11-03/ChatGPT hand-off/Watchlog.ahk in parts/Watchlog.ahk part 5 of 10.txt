@@ -1,4 +1,4 @@
-; ===== Watchlog.ahk PART 5 of 10 (lines 4745-5948 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 5 of 10 (lines 4765-5954 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
 ; =====================================================================
 ;  FULL-ENTRY DAILY LOGS  -  Ctrl+Alt+F picks one, Ctrl+Alt+Shift+F teaches  (v3.20.0)
 ;  For logs that never change (Break, Table Drop, Card Destruction...):
@@ -1187,19 +1187,5 @@ ShiftItemList() {
         items.Push(it)
     }
     return SortByCount(items)
-}
-
-; Biggest .n first (insertion sort, the lists are short)
-SortByCount(items) {
-    Loop items.Length - 1 {
-        i := A_Index + 1
-        cur := items[i], j := i - 1
-        while j >= 1 && items[j].n < cur.n {
-            items[j + 1] := items[j]
-            j -= 1
-        }
-        items[j + 1] := cur
-    }
-    return items
 }
 

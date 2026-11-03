@@ -1,4 +1,57 @@
-; ===== Watchlog.ahk PART 4 of 10 (lines 3653-4744 of 11797). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; ===== Watchlog.ahk PART 4 of 10 (lines 3620-4764 of 11817). Delete this first line from each part, then join all 10 in order to get the full file. =====
+; Where the last copy of needle starts in text (0 if it isn't there)
+LastPos(text, needle) {
+    pos := 0, p := 0
+    while p := InStr(text, needle, , p + 1)
+        pos := p
+    return pos
+}
+
+; Counts the logs in the last shift of a journal file
+JournalStats(file, text := "") {
+    if text = ""
+        text := FileRead(file, "UTF-8")
+    p := LastPos(text, "=== Shift started")
+    if p > 0
+        text := SubStr(text, p)
+    st := {started: "", ended: "", first: "", last: "", total: 0, list: "", summary: ""}
+    if RegExMatch(text, "=== Shift started (.+?)  \(", &m)
+        st.started := m[1]
+    if RegExMatch(text, "=== Shift ended (\d\d:\d\d)", &m)
+        st.ended := m[1]
+    names := [], counts := Map()
+    Loop Parse text, "`n", "`r" {
+        ; a log's first line: the time at the very start, two spaces, its name
+        if !RegExMatch(A_LoopField, "^(\d\d:\d\d) +(\S.*)$", &e)
+            continue
+        name := Trim(RegExReplace(Trim(e[2]), "\s*\[k-?\d+\]$"))
+        if !counts.Has(name) {
+            counts[name] := 0
+            names.Push(name)
+        }
+        counts[name] += 1
+        st.total += 1
+        if st.first = ""
+            st.first := e[1]
+        st.last := e[1]
+    }
+    ; most-used first (the list is short, so pick the biggest each time)
+    parts := ""
+    while names.Length {
+        top := 1
+        for i, nm in names {
+            if counts[nm] > counts[names[top]]
+                top := i
+        }
+        nm := names.RemoveAt(top)
+        n := counts[nm]
+        st.list .= Format("{:4}", n) "  " nm "`r`n"
+        parts .= (parts = "" ? "" : ", ") n " " nm
+    }
+    st.summary := "Shift summary (" st.first " - " (st.ended != "" ? st.ended : st.last) "): " st.total " logs. " parts "."
+    return st
+}
+
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 ShowJournal() {
