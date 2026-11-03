@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.34.1"
+VERSION := "3.34.2"
 VERSION_DATE := "Nov 3, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -9031,7 +9031,13 @@ AuditFill(title, syn, area, console, endTime) {
     ; Requested By: the taught route of clicks (they can land in pop-up windows)
     route := sp["route"]
     if route.Length {
-        rp := Integer(IniRead(SettingsFile, "ITrak", "AuditRoutePause", "800"))
+        ; v3.34.2: slower, because Citrix missed the double-click on the name
+        ; (the list may still be loading, and a fast double-click can be
+        ; seen as one click). Each click waits AuditRoutePause after the one
+        ; before; a double-click waits AuditDoubleWait more first.
+        rp := Integer(IniRead(SettingsFile, "ITrak", "AuditRoutePause", "1200"))
+        dw := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleWait", "800"))
+        gap := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleGap", "120"))
         WinGetClientPos &cx, &cy, , , "ahk_id " win
         for p in route {
             x := cx + p.x, y := cy + p.y
@@ -9041,11 +9047,26 @@ AuditFill(title, syn, area, console, endTime) {
                 break
             }
             MouseMove x, y, 0
-            Sleep 60
-            if p.n = 2
-                Click 2
-            else
-                Click
+            Sleep 150
+            if p.n = 2 {
+                Sleep dw
+                MouseMove x + 1, y, 0           ; a small move so Citrix sees the mouse over the row
+                Sleep 60
+                MouseMove x, y, 0
+                Sleep 60
+                loop 2 {
+                    Click "Down"
+                    Sleep 40
+                    Click "Up"
+                    if A_Index = 1
+                        Sleep gap
+                }
+            } else {
+                Click "Down"
+                Sleep 40
+                Click "Up"
+            }
+            Activity("Audit: Requested By click " A_Index " (" (p.n = 2 ? "double" : "single") ")")
             keys += 2
             Sleep rp
         }

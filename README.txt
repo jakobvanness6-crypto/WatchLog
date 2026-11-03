@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.34.1  -  README
+  WATCHLOG  v3.34.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1396,8 +1396,12 @@ Something else broke
   - No Audit window open (or spots not taught)? The wording is pasted where you typed,
     like before. Shift+Enter on the form always just pastes the wording.
   - The Area choices are the @areas list in templates.txt. settings.ini [ITrak]:
-    AuditEndFormat=MMM dd yyyy hh:mm:ss tt (how the End time is typed), AuditRoutePause=800
-    (ms between the Requested By clicks), AuditWindow=^Audit -  (the window title).
+    AuditEndFormat=MMM dd yyyy hh:mm:ss tt (how the End time is typed), AuditRoutePause=1200
+    (ms between the Requested By clicks), AuditDoubleWait=800 (extra wait before a
+    double-click, so the name list has loaded), AuditDoubleGap=120 (ms between the two
+    clicks of a double-click), AuditWindow=^Audit -  (the window title).
+  - v3.34.2: the Requested By double-click is slower and more deliberate (it was missed
+    on the name). No need to teach again.
   - New templates.txt (wording Nov 3, 2026 (2)): copy it with the new Watchlog.
   Built, NOT run (the sandbox can't run AutoHotkey).
 
