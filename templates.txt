@@ -14,7 +14,7 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Nov 5, 2026 (2)
+# Wording version: Nov 5, 2026 (3)
 # Program version: 3.35.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
@@ -107,7 +107,7 @@
 
 ;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident. >> Security Desk - Main Lobby | Trespass |
 
-;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy}) {repeat} >> Security Desk - Main Lobby | Facial Recognition Alert Rejected |
+;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy}) {repeat}\n >> Security Desk - Main Lobby | Facial Recognition Alert Rejected |
 
 
 # ----- START / END OF SHIFT (asks which bay, remembers the last one) -
