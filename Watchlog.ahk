@@ -8974,10 +8974,11 @@ AuditStamp(hhmm) {
 ; date-time box like this one takes each part (month, day, year, hour,
 ; minute, second, AM/PM) in its own little box and ignores letters such as
 ; "Nov", so the month stayed on its old value (October) every time.
-; Now each part is typed on its own: Home goes to the first part, Right
-; moves along one part, and only numbers (and A or P) are typed. Home is
-; pressed again before every part, so it works whether or not the box jumps
-; to the next part by itself after a full part is typed.
+; Now each part is typed on its own (Jakob, Nov 5: clicking the box
+; highlights the month alone; the arrow keys move between parts): Left x8
+; goes back to the month, Right moves along to the part, and only numbers
+; (and A or P) are typed. The Left presses come before every part, so it
+; works whether or not the box jumps to the next part by itself.
 ; settings.ini [ITrak] AuditTimeParts= the parts left to right (FormatTime
 ; codes, "t" = A or P). Set it to off to go back to the v3.34 way
 ; (Ctrl+A and AuditEndFormat typed in one go).
@@ -8993,7 +8994,7 @@ AuditTypeTime(ts) {
     }
     gap := Integer(IniRead(SettingsFile, "ITrak", "AuditTimePause", "80"))
     for i, code in StrSplit(RegExReplace(parts, "\s+", " "), " ") {
-        SendInput "{Home}"
+        SendInput "{Left 8}"            ; to the month, whichever part a click or auto-advance left us on
         Sleep gap
         if i > 1 {
             SendInput "{Right " (i - 1) "}"
