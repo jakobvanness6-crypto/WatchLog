@@ -1388,7 +1388,8 @@ AUDIT TIMES, PIT 2, NA ONCE  (v3.35.0)
     Watchlog's list.
   - NA twice: a full-entry log or code word now clears the Reference box before typing,
     so redoing a log in the same open form doesn't add a second NA.
-  - New templates.txt (wording Nov 5, 2026): copy it with the new Watchlog.
+  - ;face has an Add another button (Ctrl+Enter): several facial rec alerts go into one log, one per line.
+  - New templates.txt (wording Nov 5, 2026 (2)): copy it with the new Watchlog.
   Built, NOT run (the sandbox can't run AutoHotkey).
 
 ;AUDIT FILLS THE ITRAK AUDIT WINDOW  (v3.34.0)
