@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.34.3"
-VERSION_DATE := "Nov 3, 2026"
+VERSION := "3.35.0"
+VERSION_DATE := "Nov 5, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -1505,7 +1505,7 @@ TemplateFill(out, title) {
     syn := Trim(RegExReplace(out, " >> [^\r\n]*", ""))
     ; ">> audit | Area | Console # | End time" fills the Audit window instead (v3.34.0)
     if StrLower(Trim(parts[1])) = "audit"
-        return AuditFill(title, syn, Trim(parts[2]), Trim(parts[3]), parts.Length >= 4 ? Trim(parts[4]) : "")
+        return AuditFill(title, syn, Trim(parts[2]), Trim(parts[3]), parts.Length >= 4 ? Trim(parts[4]) : "", parts.Length >= 5 ? Trim(parts[5]) : "")
     ; after the three boxes: "end" (click End Time Now). A leftover "from ..." part
     ; (the Info From search, removed in v3.31.0) is ignored so old templates still work.
     isEnd := false
@@ -5081,6 +5081,10 @@ RunEntry(e, useOpen := false) {
             Paste(vals[k], true)
             keys += StrLen(vals[k]) + 1
         } else if k = "Reference" {
+            ; v3.35.0: clear the box first. Redoing a log in the same open form
+            ; left the old Reference (NA) in the box and the new NA was typed after it.
+            SendInput "^a"
+            Sleep 60
             EntryType vals[k]
             keys += StrLen(vals[k]) + 1
         } else {
@@ -8891,8 +8895,11 @@ TeachIncidentRun() {
 ;  Teach the spots once per PC: tray > iTrak > Teach the audit spots.
 ;  Spots are kept in itrak.ini [Audit] (numbers only, this PC only).
 ; =====================================================================
-AuditFields := ["Detail", "Console", "Area", "End", "Remarks"]
-AuditNames := Map("Detail", "the Detail tab (top left)", "Console", "Console #", "Area", "Area Audited drop-down", "End", "Audit End time", "Remarks", "Audit Remarks")
+; v3.35.0: Audit Start is typed too (the form's From), so Start to End is
+; exactly 20:00. "Start" is optional in itrak.ini: spots taught before
+; v3.35.0 still work (Start is skipped; tray > iTrak > Teach the audit Start spot).
+AuditFields := ["Detail", "Console", "Area", "Start", "End", "Remarks"]
+AuditNames := Map("Detail", "the Detail tab (top left)", "Console", "Console #", "Area", "Area Audited drop-down", "Start", "the time in Audit Start", "End", "the time in Audit End", "Remarks", "Audit Remarks")
 
 ; The open Audit windows (newest in front first)
 AuditWins() {
@@ -8919,8 +8926,12 @@ AuditLoad() {
         for k in ["W", "H"]
             c[k] := Trim(IniRead(ITrakFile, "Audit", k, ""))
         for k in AuditFields
-            for ax in ["X", "Y"]
-                c[k ax] := Trim(IniRead(ITrakFile, "Audit", k ax, ""))
+            for ax in ["X", "Y"] {
+                v := Trim(IniRead(ITrakFile, "Audit", k ax, ""))
+                if k = "Start" && v = ""
+                    continue            ; taught before v3.35.0: Start is skipped
+                c[k ax] := v
+            }
         route := Trim(IniRead(ITrakFile, "Audit", "Route", ""))
     } catch
         return ""
@@ -8941,6 +8952,12 @@ AuditLoad() {
 ; The day is today (or the next/previous day when the time is across midnight).
 ; settings.ini [ITrak] AuditEndFormat= changes the layout.
 AuditEndText(hhmm) {
+    ts := AuditStamp(hhmm)
+    return ts = "" ? "" : FormatTime(ts, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+}
+
+; "22:36" -> a full time stamp (today's date, seconds 00), or "" if not a time
+AuditStamp(hhmm) {
     if !RegExMatch(hhmm, "^(\d{1,2}):(\d{2})$", &m)
         return ""
     ts := FormatTime(, "yyyyMMdd") Format("{:02}{:02}00", m[1], m[2])
@@ -8949,12 +8966,48 @@ AuditEndText(hhmm) {
         ts := DateAdd(ts, 1, "Days")
     else if d > 12
         ts := DateAdd(ts, -1, "Days")
-    return FormatTime(ts, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+    return ts
+}
+
+; Types a time stamp into iTrak's Audit Start/End date-time box (v3.35.0).
+; v3.34.x selected all and typed "Nov 05 2026 10:36:00 PM" in one go. A
+; date-time box like this one takes each part (month, day, year, hour,
+; minute, second, AM/PM) in its own little box and ignores letters such as
+; "Nov", so the month stayed on its old value (October) every time.
+; Now each part is typed on its own: Home goes to the first part, Right
+; moves along one part, and only numbers (and A or P) are typed. Home is
+; pressed again before every part, so it works whether or not the box jumps
+; to the next part by itself after a full part is typed.
+; settings.ini [ITrak] AuditTimeParts= the parts left to right (FormatTime
+; codes, "t" = A or P). Set it to off to go back to the v3.34 way
+; (Ctrl+A and AuditEndFormat typed in one go).
+; Returns the text for the journal, like "Nov 05 2026 10:36:00 PM".
+AuditTypeTime(ts) {
+    shown := FormatTime(ts, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+    parts := Trim(IniRead(SettingsFile, "ITrak", "AuditTimeParts", "MM dd yyyy hh mm ss t"))
+    if parts = "" || StrLower(parts) = "off" {
+        SendInput "^a"
+        Sleep 60
+        EntryType shown
+        return shown
+    }
+    gap := Integer(IniRead(SettingsFile, "ITrak", "AuditTimePause", "80"))
+    for i, code in StrSplit(RegExReplace(parts, "\s+", " "), " ") {
+        SendInput "{Home}"
+        Sleep gap
+        if i > 1 {
+            SendInput "{Right " (i - 1) "}"
+            Sleep gap
+        }
+        EntryType FormatTime(ts, code)
+        Sleep gap
+    }
+    return shown
 }
 
 ; Fills the Audit window. False (so the wording is pasted where you were
 ; instead) when no Audit window is open or the spots aren't taught.
-AuditFill(title, syn, area, console, endTime) {
+AuditFill(title, syn, area, console, endTime, startTime := "") {
     global AuditFields
     sp := AuditLoad()
     if !sp {
@@ -8983,14 +9036,25 @@ AuditFill(title, syn, area, console, endTime) {
         return true
     }
     Sleep 200
-    vals := Map("Detail", "tab", "Console", console, "Area", area, "End", AuditEndText(endTime), "Remarks", syn)
+    ; Start and End: the form's From and To (seconds 00), so the Duration is
+    ; exactly 20:00 with the usual From now / To now+20 (v3.35.0). An older
+    ; templates.txt line without {From} types End only, from now.
+    endTs := AuditStamp(endTime)
+    startTs := AuditStamp(startTime)
+    vals := Map("Detail", "tab", "Console", console, "Area", area, "Start", startTs, "End", endTs, "Remarks", syn)
+    if startTs != "" && !sp.Has("StartX") {
+        vals["Start"] := ""
+        Tip("Audit Start isn't taught on this PC yet, so only End is typed.`nTray > iTrak > Teach the audit Start spot (one F8).", 6000, true)
+        Activity("Audit: Start not typed (spot not taught yet)")
+    }
+    shownTimes := Map()
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
     w0 := Integer(sp["W"]), h0 := Integer(sp["H"])
     keys := 0, done := []
     for k in AuditFields {
-        if vals[k] = ""
+        if vals[k] = "" || !sp.Has(k "X")
             continue
         if !ITrakSpot(win, Integer(sp[k "X"]), Integer(sp[k "Y"]), w0, h0, &x, &y) || !AlertOnScreen(x, y) {
             Tip("The Audit window is too small for the " AuditNames[k] " spot. Stopped.", 4000, true)
@@ -9015,10 +9079,19 @@ AuditFill(title, syn, area, console, endTime) {
             Paste(vals[k], true)
             keys += StrLen(vals[k]) + 1
         } else if k = "Area" {
+            ; v3.35.0: clear the box first, and wait longer before Enter.
+            ; Jakob got Pit 1 for Pit 2: iTrak's list still has Pit 1, and over
+            ; Citrix Enter came while the list was still on "Pit " (first match
+            ; Pit 1). [ITrak] AuditAreaWait= ms (was 250).
+            SendInput "^a"
+            Sleep 60
             EntryType vals[k]
-            Sleep 250                   ; let the list narrow down to the one option
+            Sleep Integer(IniRead(SettingsFile, "ITrak", "AuditAreaWait", "800"))
             SendInput "{Enter}"
             keys += 5
+        } else if k = "Start" || k = "End" {
+            shownTimes[k] := AuditTypeTime(vals[k])
+            keys += StrLen(shownTimes[k]) + 1
         } else {
             SendInput "^a"
             Sleep 60
@@ -9077,8 +9150,44 @@ AuditFill(title, syn, area, console, endTime) {
     Tip("Audit filled in: check it, then Save.", 4000, true)
     Activity("Audit filled in (" keys " keystrokes counted as saved; Requested By route " route.Length " clicks)")
     CountSaved("log", keys, title)
-    Journal(title, "Console #: " console "`nArea Audited: " area "`nAudit End: " vals["End"] "`nAudit Remarks: " syn, keys)
+    Journal(title, "Console #: " console "`nArea Audited: " area (shownTimes.Has("Start") ? "`nAudit Start: " shownTimes["Start"] : "") "`nAudit End: " (shownTimes.Has("End") ? shownTimes["End"] : "") "`nAudit Remarks: " syn, keys)
     return true
+}
+
+; One spot only: the time in Audit Start (v3.35.0), for a PC that taught the
+; audit spots before Start was typed. Keep the Audit window the size it was.
+TeachAuditStart() {
+    global TeachBusy, ITrakFile
+    if TeachBusy
+        return
+    TeachBusy := true
+    try {
+        sp := AuditLoad()
+        if !sp {
+            MsgBox "Teach the audit spots first (tray > iTrak > Teach the audit spots). That one includes Audit Start.", "Teach the audit Start spot", "Icon!"
+        } else if !AuditWins().Length {
+            MsgBox "Open a new audit in iTrak first (its window title starts with Audit -), on the Detail tab, then run this again.", "Teach the audit Start spot", "Icon!"
+        } else if TeachWait("Hover over the time in Audit Start and press F8   (do NOT click it)   (Ctrl+Alt+Esc cancels)") {
+            CoordMode "Mouse", "Screen"
+            MouseGetPos , , &h
+            win := 0
+            for w in AuditWins()
+                if w = h
+                    win := w
+            if !win
+                win := AuditWins()[1]
+            if !ITrakPoint(win, &x, &y) {
+                MsgBox "That spot isn't inside the Audit window. Nothing saved. Try again.", "Teach the audit Start spot", "Icon!"
+            } else {
+                IniWrite x, ITrakFile, "Audit", "StartX"
+                IniWrite y, ITrakFile, "Audit", "StartY"
+                Activity("iTrak: audit Start spot taught")
+                MsgBox "Saved. `;audit now types Audit Start (the form's From) as well as Audit End, so the Duration is exactly 20:00.", "Teach the audit Start spot"
+            }
+        }
+    } catch as err
+        MsgBox "Teach the audit Start spot stopped: " err.Message, "Teach the audit Start spot", "Icon!"
+    TeachBusy := false
 }
 
 TeachAudit() {
@@ -9129,7 +9238,7 @@ TeachAuditRun() {
         MsgBox "Open a new audit in iTrak first (its window title starts with Audit -), on the Detail tab, then run this again.", "Teach audit spots", "Icon!"
         return
     }
-    if MsgBox("Two parts, on a new audit's Detail tab.`n`n1. Hover over the Detail tab (top left), Console #, the Area Audited drop-down (the box, not Add), the time in Audit End, and Audit Remarks, pressing F8 over each. Nothing is clicked for you.`n`n2. Your route to put yourself in Requested By: before EACH click, hover over the spot and press F8 (Shift+F8 if it's a double-click), then do that click yourself. Press F9 when your name is in.`n`nCtrl+Alt+Esc cancels. Start?", "Teach audit spots", "YesNo Icon?") != "Yes"
+    if MsgBox("Two parts, on a new audit's Detail tab.`n`n1. Hover over the Detail tab (top left), Console #, the Area Audited drop-down (the box, not Add), the time in Audit Start, the time in Audit End, and Audit Remarks, pressing F8 over each. Nothing is clicked for you.`n`n2. Your route to put yourself in Requested By: before EACH click, hover over the spot and press F8 (Shift+F8 if it's a double-click), then do that click yourself. Press F9 when your name is in.`n`nCtrl+Alt+Esc cancels. Start?", "Teach audit spots", "YesNo Icon?") != "Yes"
         return
     total := AuditFields.Length
     pts := Map(), win := 0
@@ -9725,6 +9834,7 @@ BuildTrayMenu() {
     MenuItem(itm, "Incident report  (" HK("incident") ")", (*) => ShowIncidentPick(), 0xE8F1)
     MenuItem(itm, "Teach the incident report spots", (*) => TeachIncident(), 0xE7C9)
     MenuItem(itm, "Teach the audit spots", (*) => TeachAudit(), 0xE7C9)
+    MenuItem(itm, "Teach the audit Start spot", (*) => TeachAuditStart(), 0xE7C9)
     MenuItem(itm, "Share my setup with the team", (*) => ShareITrakSetup(), 0xE72D)
     MenuItem(tm, "iTrak", itm, 0xE8F1)
 
