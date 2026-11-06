@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Nov 5, 2026 (3)
-# Program version: 3.35.0
+# Wording version: Nov 6, 2026
+# Program version: 3.35.1
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -165,6 +165,7 @@
 # ----- TABLES --------------------------------------------------------
 
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes. >> %pit% | Table Opening/Closing | NA
+;oc (Open and close tables) = [{Opened: @tables | several | blank=} Opened.][ {Closed: @tables | several | blank=} Closed and Auto-Close started.] >> %pit% | Table Opening/Closing | NA
 ;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
 ;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
 ;cards (Card change) = Card change on {Table: @tables}. >> %pit% | Card Change | NA

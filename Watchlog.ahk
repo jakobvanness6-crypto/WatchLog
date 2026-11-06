@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.0"
-VERSION_DATE := "Nov 5, 2026"
+VERSION := "3.35.1"
+VERSION_DATE := "Nov 6, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -1855,6 +1855,23 @@ FillTemplate(text, fields, vals) {
     byKey := Map()
     for i, f in fields
         byKey[f.key] := vals[i]
+    ; [ ... ] groups (v3.35.1): a group whose boxes are all empty is left out
+    ; ("[{Opened} Opened.][ {Closed} Closed.]" with only Closed filled in).
+    ; The brackets themselves are never typed.
+    pos := 1
+    while p := RegExMatch(text, "\[([^\[\]]*)\]", &g, pos) {
+        keep := false, q := 1
+        while q := RegExMatch(g[1], "\{([^{}]+)\}", &fm, q) {
+            c := InStr(fm[1], ":")
+            k := Trim(c ? SubStr(fm[1], 1, c - 1) : fm[1])
+            if byKey.Has(k) && byKey[k] != ""
+                keep := true
+            q += fm.Len
+        }
+        inner := keep ? g[1] : ""
+        text := SubStr(text, 1, p - 1) . inner . SubStr(text, p + g.Len)
+        pos := p + StrLen(inner)
+    }
     out := "", pos := 1
     while p := RegExMatch(text, "\{([^{}]+)\}", &m, pos) {
         c := InStr(m[1], ":")
@@ -1866,7 +1883,7 @@ FillTemplate(text, fields, vals) {
         pos := p + m.Len
     }
     out .= SubStr(text, pos)
-    return FixArticles(out)
+    return FixArticles(Trim(out, " "))
 }
 
 ; ["BJ205", "BJ206", "RO204"] -> "BJ205, BJ206 and RO204"
@@ -2099,6 +2116,18 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
                 AddAnother()
         }
         padUsed := padRows.Length
+        Changed()
+    }
+    ; "open 202 closing 204" on the pad: both lists of the ;oc form (v3.35.1)
+    if hints.Has("opened") {
+        for i, list in multi {
+            k := StrLower(fields[i].key)
+            if k = "opened" || k = "closed" {
+                for t in hints[k]
+                    list.Push(t)
+                padUsed += hints[k].Length
+            }
+        }
         Changed()
     }
     ; a shorthand line that had everything: make the log without waiting for Enter (v3.26.0)
@@ -3049,8 +3078,10 @@ PadShortcut(text) {
     words := StrSplit(RegExReplace(line, "\s+", " "), " ")
     code := StrLower(words[1])
     rest := []
-    known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1, "mfill", 1)
+    known := Map("fill", 1, "open", 1, "auto", 1, "jack", 1, "bv", 1, "account", 1, "mfill", 1, "opening", 1)
     srcText := text
+    if code = "opening"
+        code := "open"
     if known.Has(code) {
         loop words.Length - 1
             rest.Push(words[A_Index + 1])
@@ -3086,6 +3117,11 @@ PadShortcut(text) {
                 rows.Push({table: t, amount: a})
         }
         hints["rows"] := rows, hints["go"] := ok && rows.Length > 0
+    } else if (code = "open" || code = "auto") && PadOpenClose(rest, code, &opened, &closed) {
+        ; "open 202 closing 204": one log for both (v3.35.1, the ;oc form)
+        trig := ";oc"
+        hints["opened"] := opened, hints["closed"] := closed
+        hints["go"] := true
     } else if code = "open" || code = "auto" {
         rows := [], ok := rest.Length > 0
         for w in rest {
@@ -3173,6 +3209,31 @@ PadAmount(tok, small := false) {
     if m[2] != "" || (small && v < 100)
         v *= 1000
     return v = Floor(v) ? String(Integer(v)) : Format("{:.2f}", v)
+}
+
+; "open 202 closing 204" / "open 202 204 auto" / "auto 204 open 202" (v3.35.1):
+; rest = the words after the code word. Both kinds present -> the tables to
+; open and to close, and true. Anything else (only one kind) -> false.
+PadOpenClose(rest, code, &opened, &closed) {
+    opened := [], closed := []
+    cur := code = "auto" ? "closed" : "opened"
+    sawOpen := cur = "opened", sawClose := cur = "closed"
+    for w in rest {
+        lw := StrLower(w)
+        if RegExMatch(lw, "^(open|opening|opened)$") {
+            cur := "opened", sawOpen := true
+            continue
+        }
+        if RegExMatch(lw, "^(auto|close|closing|closed)$") {
+            cur := "closed", sawClose := true
+            continue
+        }
+        t := PadTable(w)
+        if t = ""
+            return false
+        (cur = "opened" ? opened : closed).Push(t)
+    }
+    return sawOpen && sawClose && opened.Length > 0 && closed.Length > 0
 }
 
 ; A table typed as 205, bj205 or BJ205 -> the table in the @tables list ("" if none or two match)
