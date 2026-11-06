@@ -3,7 +3,20 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.34.3 (Nov 3, 2026): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
+## TEAM ROLLOUT SETUP (v4.0 direction, planned Nov 5, 2026; waiting on "build it")
+Jakob (Nov 5): chasing a promotion, so start the shared team version. Chosen order: rollout setup first, then the approval pack for the manager.
+What already exists (no new work): one shared templates.txt on SharePoint that reloads on every bay; exe self-update from the team folder; Alert Grid and iTrak spots shared through the team folder; my-templates.txt per person; Make a copy to share; backups and rollback; password safeguards (Credential Manager, per PC).
+Gaps to build (proposal):
+1. Team setup screen (first run, and tray > Advanced): one "Pick the team folder" button that sets the shared templates, the shared spots and the update check together, then shows a green/red checklist (folder reachable, templates readable, spots found for this screen scale, passwords saved).
+2. New-operator first run: ask the operator's name (display only, kept on this PC, never sent anywhere) and bay, then walk through the teach steps that are missing (Alert Grid, new log, daily log fields, audit) one after another instead of hunting through the tray menu.
+3. "Is everyone on the same version" check for a supervisor: version and wording check code are in the team folder as a small status line per PC (no names, no passwords), shown in tray > Security and status.
+4. Team-wide settings file (team-settings.ini beside templates.txt): defaults the supervisor sets once (login reminder minutes, prefix, which features are on); each PC's own settings.ini still wins.
+5. Short operator guide (one page) and a supervisor guide (how to change wording, how to roll out a new exe).
+Not included: code signing (needs IT/money, Jakob's step), reading data out of other programs, anything that logs on its own.
+Open questions for Jakob: how many bays and operators at first; who is the wording supervisor; is a SharePoint library already available; does the manager want a pilot with one other operator first.
+
+
+Current version: v3.35.1 (Nov 6, 2026): new ;oc code word, opening and closing tables in one log (built, NOT run). Before that v3.35.0 (Nov 5, 2026): ;audit types real Start and End dates (exactly 20:00 apart), Area Audited waits longer (Pit 2, never Pit 1), Reference cleared before typing so NA is not doubled (built, NOT run). Before that v3.34.3 (Nov 3): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
 

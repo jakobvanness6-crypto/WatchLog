@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Nov 3, 2026 (2)
-# Program version: 3.34.3
+# Wording version: Nov 6, 2026
+# Program version: 3.35.1
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -101,13 +101,13 @@
 
 ;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money | under10k} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid {Paid: all cash | by cheque} at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot |
 
-;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed. >> audit | {Area audited: @areas | if Dealer=Pit 2 | if Pit=Pit 2 | if Security=Security | if Operations=Operations Management | if General Manager=Operations Management | if Cage=Cage | if Main Bank=Main Bank | if F&B=Food & Beverage | if Count Team=Count Room | if Slot=Slots | if EVS=Housekeeping | if General Maintenance=Maintenance | if Facilities=Maintenance} | {Location} | {To}
+;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed. >> audit | {Area audited: @areas | if Dealer=Pit 2 | if Pit=Pit 2 | if Security=Security | if Operations=Operations Management | if General Manager=Operations Management | if Cage=Cage | if Main Bank=Main Bank | if F&B=Food & Beverage | if Count Team=Count Room | if Slot=Slots | if EVS=Housekeeping | if General Maintenance=Maintenance | if Facilities=Maintenance} | {Location} | {To} | {From}
 
 ;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results. >> | Medical |
 
 ;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident. >> Security Desk - Main Lobby | Trespass |
 
-;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy}) >> Security Desk - Main Lobby | Facial Recognition Alert Rejected |
+;face (Facial recognition) = Facial Recognition Alert #{Alert #: alertcopy}\n{Result: Rejected} ({Match: matchcopy}) {repeat}\n >> Security Desk - Main Lobby | Facial Recognition Alert Rejected |
 
 
 # ----- START / END OF SHIFT (asks which bay, remembers the last one) -
@@ -165,6 +165,7 @@
 # ----- TABLES --------------------------------------------------------
 
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes. >> %pit% | Table Opening/Closing | NA
+;oc (Open and close tables) = [{Opened: @tables | several | blank=} Opened.][ {Closed: @tables | several | blank=} Closed and Auto-Close started.] >> %pit% | Table Opening/Closing | NA
 ;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
 ;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
 ;cards (Card change) = Card change on {Table: @tables}. >> %pit% | Card Change | NA

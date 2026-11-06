@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.34.3  -  README
+  WATCHLOG  v3.35.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1372,8 +1372,37 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.34, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.35, newest first)
 -----------------------------------------------------------------------
+OPEN AND CLOSE TABLES IN ONE LOG  (v3.35.1)
+  - New code word ;oc: two boxes, Opened and Closed. Each takes several tables (Add
+    another / Ctrl+Enter adds one at a time). Fill in one or both: "UT202 Opened. UT204
+    Closed and Auto-Close started." A box left empty is left out of the wording.
+  - Call pad: "open 202 closing 204" (or "auto 204 open 202") + Ctrl+Enter makes that log
+    straight away. Several tables work: "open 202 203 closing 204". "opening" works
+    too. ;open and ;auto are unchanged for one kind only.
+  - For template writers: text in [square brackets] is left out when every box inside it is empty.
+  - New templates.txt (wording Nov 6, 2026): copy it with the new Watchlog.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+AUDIT TIMES, PIT 2, NA ONCE  (v3.35.0)
+  - ;audit now types Audit Start as well as Audit End: the form's From and To (seconds
+    00), so the Duration is exactly 20:00 with From now / To now+20. Each date part
+    (month, day, year, hour, minute, second, AM/PM) is typed on its own, because iTrak's
+    date box ignores letters like "Nov": that is why End always said October. Settings.ini
+    [ITrak] AuditTimeParts=MM dd yyyy hh mm ss t (the order of the parts; "off" = the old
+    one-go typing) and AuditTimePause=80 (ms between parts).
+  - Once: tray menu > iTrak > Teach the audit Start spot (one F8 over the time in Audit Start,
+    on an open audit). Until then only End is typed. New teaches ask for Start too.
+  - Area Audited: the box is cleared and ;audit waits longer before Enter (AuditAreaWait=800
+    ms) so "Pit 2" is picked, not the first "Pit" in iTrak's list. There is no Pit 1 in
+    Watchlog's list.
+  - NA twice: a full-entry log or code word now clears the Reference box before typing,
+    so redoing a log in the same open form doesn't add a second NA.
+  - ;face has an Add another button (Ctrl+Enter): several facial rec alerts go into one log, with a blank line between alerts.
+  - New templates.txt (wording Nov 5, 2026 (3)): copy it with the new Watchlog.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 ;AUDIT FILLS THE ITRAK AUDIT WINDOW  (v3.34.0)
   An audit is its own window in iTrak (Audit - GA...), not a daily log.
   - Once per PC: open a new audit, then tray menu > iTrak > Teach the audit spots.
