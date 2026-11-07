@@ -51,6 +51,7 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
 
 ## Done in v3.35.3 (Nov 7)
+- ;face (templates.txt, wording Nov 7, 2026): the daily log Reference is now the Alert # (it was always blank before; Jakob thought it had been taken out). With Add another, the last alert's # is used. Guess at what he wants in Reference: confirm with him.
 - Jakob: start of shift (Ctrl+Alt+L) still opened SDS where the Alert Grid goes. Best guess at the cause: the layout is put back right after the sign-in is typed, but SDS swaps its login screen for the main screen afterwards and Java places that window itself. New SdsKeepInSpot(): for [Layout] SdsWatchSeconds (default 120; 60 after the hourly SDS sign-in) a 1 s timer puts SDS back in its spot when a new SDS window appears, its title changes, or it overlaps the Alert Grid's spot by over 25%. Spot = [Layout] SdsSpot=x,y,w,h or the saved layout's SDS (format=2). Alert Grid's spot = saved layout, else the live window. Small SDS windows only moved, not resized. If the saved layout has SDS on the Alert Grid, a one-time message asks to re-save. Built, NOT run (Wine test blocked this session).
 
 ## Done in v3.34.3 (Nov 3)
