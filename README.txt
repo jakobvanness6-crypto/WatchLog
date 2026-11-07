@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.1  -  README
+  WATCHLOG  v3.35.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1374,6 +1374,19 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.35, newest first)
 -----------------------------------------------------------------------
+AUDIT: PIT #2 / #3 AND START TIME  (v3.35.2)
+  - Area Audited: iTrak's list writes the pits as "Pit #1", "Pit #2", "Pit #3". Watchlog
+    typed "Pit 2", which stopped matching at the 2 and left Pit #1. Now "Pit 2" on the form
+    is typed as "Pit #2" (and Pit 3 as "Pit #3"). Dealers and pit staff are pre-picked as
+    Pit 2: pick Pit 3 on the form when it's a Pit 3 table. If iTrak ever writes them
+    without the #, settings.ini [ITrak] AuditPitText=Pit {n}  (default Pit #{n}).
+  - Audit Start: on a PC that taught the audit spots before v3.35.0, Start has no spot yet
+    and was skipped (only a quick tip said so). Now ;audit asks at the end: Yes, hover over
+    the time in Audit Start and press F8, and Start is typed straight away, then on every
+    audit after. Already taught? Nothing changes.
+  - The Activity log now shows what was typed in Area Audited, Start and End.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 OPEN AND CLOSE TABLES IN ONE LOG  (v3.35.1)
   - New code word ;oc: two boxes, Opened and Closed. Each takes several tables (Add
     another / Ctrl+Enter adds one at a time). Fill in one or both: "UT202 Opened. UT204
