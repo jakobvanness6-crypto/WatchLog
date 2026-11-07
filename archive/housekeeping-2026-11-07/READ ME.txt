@@ -1,0 +1,4 @@
+Moved here on Nov 7, 2026 during housekeeping (nothing was deleted).
+
+old-test-checklists/   test checklists for v3.10.1, v3.11.0 and v3.13.1
+old-tools/             make-chatgpt-handoff.py (ChatGPT hand-off no longer built)
