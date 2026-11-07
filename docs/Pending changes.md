@@ -3,16 +3,315 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
-Current version: v3.17.0 (Oct 26, 2026).
+## TEAM ROLLOUT SETUP (v4.0 direction, planned Nov 5, 2026; waiting on "build it")
+Jakob (Nov 5): chasing a promotion, so start the shared team version. Chosen order: rollout setup first, then the approval pack for the manager.
+What already exists (no new work): one shared templates.txt on SharePoint that reloads on every bay; exe self-update from the team folder; Alert Grid and iTrak spots shared through the team folder; my-templates.txt per person; Make a copy to share; backups and rollback; password safeguards (Credential Manager, per PC).
+Gaps to build (proposal):
+1. Team setup screen (first run, and tray > Advanced): one "Pick the team folder" button that sets the shared templates, the shared spots and the update check together, then shows a green/red checklist (folder reachable, templates readable, spots found for this screen scale, passwords saved).
+2. New-operator first run: ask the operator's name (display only, kept on this PC, never sent anywhere) and bay, then walk through the teach steps that are missing (Alert Grid, new log, daily log fields, audit) one after another instead of hunting through the tray menu.
+3. "Is everyone on the same version" check for a supervisor: version and wording check code are in the team folder as a small status line per PC (no names, no passwords), shown in tray > Security and status.
+4. Team-wide settings file (team-settings.ini beside templates.txt): defaults the supervisor sets once (login reminder minutes, prefix, which features are on); each PC's own settings.ini still wins.
+5. Short operator guide (one page) and a supervisor guide (how to change wording, how to roll out a new exe).
+Not included: code signing (needs IT/money, Jakob's step), reading data out of other programs, anything that logs on its own.
+Open questions for Jakob: how many bays and operators at first; who is the wording supervisor; is a SharePoint library already available; does the manager want a pilot with one other operator first.
+
+
+Current version: v3.35.2 (Nov 7, 2026): ;audit types Pit #2 / Pit #3 the way iTrak's list has them (it got Pit #1) and asks to teach the Start spot if it's missing, then types Start (built, NOT run). Before that v3.35.1 (Nov 6, 2026): new ;oc code word, opening and closing tables in one log (built, NOT run). Before that v3.35.0 (Nov 5, 2026): ;audit types real Start and End dates (exactly 20:00 apart), Area Audited waits longer (Pit 2, never Pit 1), Reference cleared before typing so NA is not doubled (built, NOT run). Before that v3.34.3 (Nov 3): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
 
-- **Casino autocorrect in every program** (Jakob, Oct 26: "add it to the rest of the programs"). Today it only runs in the call pad and the log form boxes. Plan: an optional system-wide mode ([CallPad] Autocorrect=everywhere, plus a tick in Settings) that fixes a word when a space, Enter or punctuation follows it, in any window. Open points: it must stay out of password and login fields and out of Watchlog's own typing (logins, templates); in Citrix/iTrak a fix means Backspaces plus retyping, which can be slow or drop keys, so it needs its own test there; IT should hear about it (it watches typed words, stores nothing). Same autocorrect.txt list. Wait for the full test pass (docs checklist) before building.
-- Time paid shorthand on the jackpot line (for example a 4-digit time) and what he jots when it is not all cash (cheque? part cash?): asked, no answer yet.
-- Shorthand for other logs (which ones, with his real examples).
-- Copy memory for any program (machine, table, alert #, money from a Ctrl+C), only if the call pad is not enough.
-- Optional quick insert when every form box is already filled (off by default).
-- Autocorrect list could be shared from the team folder beside templates.txt.
+### Test results v3.33.0 (Jakob, Nov 1) and follow-ups. NOT built
+- Works: clock, Ctrl+Alt+I, code words fill the whole log, incident teach + fill (stops in Secondary Operator as designed), call pad cheque, autocorrect everywhere.
+- Taskbar previews still show. Activity log saw Xaml_WindowedPopupClass and XamlExplorerHostIslandWindow (Windows 11 XAML taskbar). Suggested to Jakob: add Xaml_WindowedPopupClass to settings.ini [Taskbar] PreviewClasses= (no new version), test right-click menus and Start afterwards. Do NOT add XamlExplorerHostIslandWindow (it hosts Start, search and the flyouts).
+- Supervisor jackpot amounts under 10,000 read as thousands: BUILT in v3.33.1 (see below).
+
+### Incident reports: next steps (after v3.33.0). NOT built
+- Checklist button and Custom Forms tab: Jakob will show what goes in them ("ask me about it").
+- Closing Remarks: his supervisor fills it (Watchlog leaves it).
+- Phase 2: supplemental helper for reports where surveillance writes one (his example still to come). Medicals and self-exclusion incidents later.
+- Trespass - violation: Specific left empty for Jakob to pick; ask which Specific he uses.
+
+### Info From: type the name instead of the department: option 1 BUILT in v3.30.2 (Oct 31). Option 2 (name box on the form) DROPPED (Jakob, Oct 31): he types a few letters into Look For and that's enough; option 2 would add privacy worry for no gain.
+- v3.30.1 works on his bay, but a department search (dealer) lists every dealer past and present, so he still scrolls. He'd rather type the name.
+- Option 1 (suggested): Watchlog clicks Info From > Personnel, clicks into Look For and STOPS; he types part of the name and presses Enter. Works for any department.
+- Option 2: an optional name box on the code word form (for example ;open asks Table and Dealer last name); Watchlog types it into Look For; blank = option 1.
+- Option 2 privacy (Jakob worried, Oct 31): proposed safeguards: name box never remembered (no last used), never in journal/activity log/backups, typed not pasted (no clipboard), blank = v3.30.2 behaviour. NO saved name lists or recent-names memory (iTrak's own arrow already shows recent names). Asked: Look For matches start of last name? which code words ask for a name (;open/;auto dealer; ;fill cage+security known at start?). Waiting on answers + "build it".
+- No names stored between logs. Asked: does Look For match the start of the LAST name? Option 1, 2 or both? Waiting on his answer and "build it".
+
+### Info From people search: REMOVED in v3.31.0 (Jakob, Oct 31)
+- Built in v3.30.0, fixed in v3.30.1 (it clicks the Info From button, not the arrow), changed in v3.30.2 (opens the search and stops in Look For). It worked, but Jakob types a few letters into iTrak's own Info From search anyway, so the automation was clutter. Everything was removed: the clicks, tray > iTrak > Teach Info From, `| from ...` on code word lines (ignored if an old templates.txt still has them), settings.ini [ITrak] PersonnelWindow= and InfoFromTypeDept=. Leftover itrak.ini [InfoFrom] numbers are harmless. Name box on the form: dropped too (privacy). Do not rebuild without his word.
+
+### Idea: paste instead of type in the daily log boxes (Jakob, Oct 31): DROPPED. Jakob tested: iTrak's drop-down boxes don't accept pastes. Keep typing them.
+Synopsis is already pasted; Location, Topic, Reference and the Info From Look For box are typed key by key (EntryType, 20 ms a key). Option to test on one bay: settings.ini [ITrak] PasteFields=reference,lookfor (and maybe location,topic). Risks: Location/Topic are search drop-downs that may not narrow on a paste; every paste goes through the Citrix clipboard (has stuck before). Waiting on Jakob's word.
+
+- **More full-entry logs** (Jakob, Oct 30): rule: only logs needing NO extra input; fixed-except-one-detail logs (tables, cards, maint...) keep their code word and are NOT in the list; no table closing. Added in templates.txt (no new version): Garbage Sweep (Cage ManTrap, Security Escort, M6 (972,973), synopsis as ;man, no End Time click). Interior / Exterior / Parking: approved, but officer vs supervisor varies; proposal: separate entries (Interior Supervisor, Interior Officer, Exterior Supervisor, ...), type the first letters + Enter. Those six were added later (templates.txt only, see the end of this file).
+- **Not doing** (Jakob, Oct 30): sharing the daily log field spots to Bay 2/3 (monitors differ, spots would break); safety stop (iTrak already will not overwrite an open log).
+
+
+- Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done in v3.34.3 (Nov 3)
+- Jakob: "everything works now" (;audit incl. Requested By), but the Requested By selection was unnecessarily slow. Route pause 1200 -> 500 ms, double-click wait 800 -> 200 ms. Built, NOT run.
+
+## Done in v3.34.2 (Nov 3)
+- Jakob's test: the Requested By route stopped on his name; the double-click (taught with Shift+F8) didn't select it. Double-click now waits for the list (AuditDoubleWait 800 ms), nudges the mouse, and clicks twice 120 ms apart; route pause 1200 ms. Built, NOT run.
+
+## Done in v3.34.1 (Nov 3)
+- Teaching v3.34.0, Jakob couldn't place "Audit Remarks" (the big box on the Detail tab) and was on the Audit tab. Since picking the employee leaves him on the Audit tab, the Detail tab is now the first taught spot and is clicked first. Teach again. Built, NOT run.
+
+## Done in v3.34.0 (Nov 3)
+- ;audit fills the iTrak Audit window: Console # (monitor), Area Audited (from Employee type, @areas list), Audit End (form's To), Audit Remarks, then the taught Requested By click route. Jakob opens the audit, picks the employee on the Audit tab (copies the #) and saves. Teach: tray > iTrak > Teach the audit spots.
+- Built, NOT run. Plan and Jakob's answers:
+  - Wants ;audit to fill the whole entry automatically.
+  - Jakob (Nov 3): an audit is NOT a daily log; it is its own iTrak log type (own window). So it needs its own taught click spots, like incident reports (Ctrl+Alt+Shift+N), not a `>>` line.
+  - Screenshot received (Nov 3): window "Audit - GA2026..." with tabs Detail / Audit / Savings and Losses / Media / Custom Forms / Audit Observations / Document Control. Detail tab: Audit #, Property (Belleville, greyed), Audit Start + Now, Audit End + Now (Duration shown), Area Audited (Add + drop-down, e.g. Slots), Review Method (Live), Section (Add + drop-down), Console #, Incident Number, Audit Remarks (big box), Status (Open), Requested By (button + name box), Select Second Auditor, buttons Best Practices / Print / Create Incident / Save / Edit / Close.
+  - Jakob's rules: Console # = the monitor (the form's Location box, e.g. M6). Area Audited = the department. Requested By = himself, picked like Info From. He selects the employee on the Audit tab by hand first (that's how he copies the employee #), so ;audit's Employee # keeps coming from the clipboard. Audit Remarks = the ;audit wording.
+  - Draft plan: teach spots once (like incident reports): Console #, Area Audited, Audit Remarks, Requested By (+ Audit Start/End Now if wanted). Area Audited picked from the Employee type (Dealer -> Tables, Slot Attendant/Technician -> Slots, Cage Cashier/Main Banker -> Cage, Security -> Security, F&B -> F&B, Count Team/Audit -> Audit, Operations -> OPS, EVS/Maintenance/Facilities -> Property): needs his OK.
+  - Area Audited options (Jakob, Nov 3): ATM, Bar, Buffet, Cage, Count Room, First aid room, Food & Beverage, Gaming Floor, Guest Services, Housekeeping, I.T., Main Bank, Maintenance, NRT, Operations Management, Pit 1, Pit 2, Pit 3, Racebook, Security, Security Podium, Slot Section D, Windward, Slots. That is the full list.
+  - Area Audited mapping CONFIRMED (Jakob, Nov 3): a pick list on the ;audit form, pre-picked from Employee type: Dealer / Pit Supervisor / Pit Manager -> Pit 2 (there is no Pit 1), Security -> Security, Ops Supervisor/Manager + General Manager -> Operations Management, Cage Cashier -> Cage (confirmed), Main Banker -> Main Bank, F&B -> Food & Beverage, Count Team -> Count Room, Slot Attendant/Technician -> Slots, EVS Attendant -> Housekeeping, Maintenance/Facilities -> Maintenance. Audit Supervisor/Auditor: no mapping needed (he never audits them).
+  - Answers (Jakob, Nov 3): Area Audited picked from Employee type: yes. Audit Start is set to Now by iTrak when the audit opens; Watchlog sets Audit End = that start + 20 min (how to enter it in the date-time box still to check). Review Method: leave as is (Live by default; he changes it himself for a review). Requested By: he'll TEACH a click route to his own name (a taught sequence of clicks, no name saved by Watchlog).
+  - Answers 2 (Jakob, Nov 3): the End time box can be typed into (Watchlog clicks the time part and types the form's To time = From + 20). Area is "Cage". Section always empty. Jakob opens the new audit himself; Save is left to the operator.
+  - PLAN COMPLETE. Teach (tray > iTrak): Console #, Area Audited, Audit End time, Audit Remarks, then his Requested By route (any number of F8 clicks, Esc to finish). Run: ;audit form (Employee type, Employee # from clipboard, From/To, Monitor) + new Area pick list -> Enter fills the open Audit window. Waiting on "build it".
+  - Earlier questions: Start/End times (click Now, or type the form's From/To?), Review Method always Live?, Section left empty?, Requested By: type his name (saved in settings.ini) or stop in the search for him?, does he open the new audit himself, Save left to him?, and the mapping above.
+
+## Done in v3.33.2 (Nov 3)
+- Autocorrect: shredit and shreddit become Shred-it (built-in list; added once to an existing autocorrect.txt).
+- Break counter editable: tray > Change break time..., or Change... on the shift dashboard. Minutes used (45) or left (15 left); an open break keeps counting on.
+- Built, NOT run.
+
+## Done in v3.33.1 (Nov 3)
+- Supervisor jackpots are always $10,000 or more, so a jack amount under 10,000 is read as thousands: 12 = $12,000, 12.5 = $12,500, 11421.11 stays, 12k still $12,000. Works in the ;jack form and in jack lines on the call pad (jack c2102 12.5 w3 cash, and c2102 12 win 3 with no code word). New money box option `under10k`, set on the ;jack Amount box in templates.txt (take it out to switch it off).
+- Not changed: taskbar previews. Still the settings.ini suggestion (add Xaml_WindowedPopupClass to [Taskbar] PreviewClasses=, then test right-click menus and Start); not made a default because that class may also be used by other Windows 11 pop-ups.
+- Built, NOT run.
+
+## Done in v3.33.0 (Nov 1) - from Jakob's build checklist
+- Incident reports on behalf of Security: Ctrl+Alt+Shift+N (no auto-start after ;refuse, Jakob's choice); incidents.txt (kept off GitHub) with Refusal - signs of intox (no patron count), General (brief = "Report opened on behalf of Security." only, Specific Interior/Exterior box), Trespass 24 hours (listed first = default), indefinite, violation ("given a reminder of their trespass status"). Category blank; Closing Remarks left for the supervisor; no-ID refusals get no incident. Teach: tray > iTrak > Teach the incident report spots (itrak.ini [Incident]).
+- 13 code words fill the whole daily log with Jakob's Location/Topic/Reference (;player ;refuse ;evict ;face ;aml ;abandon ;found ;maint ;close ;selfex ;inventory ;badge ;medical). ;firm and ;audit left as they are. Soft count lines stay as they are (already one log, a time in front of each line).
+- ;jack Paid box (all cash / by cheque); call pad jack line takes cash / cheque / chq; time paid 2130 already worked.
+- Autocorrect in every program (yes, no programs skipped, per person not shared): hotstrings, typed with SendEvent, not in Watchlog's own windows; tray toggle (this PC).
+- Skip forms that are already filled in: tray switch, settings.ini [Forms] QuickInsert (off by default).
+- Taskbar previews: Jakob said still showing but he hadn't installed v3.32.0 yet; added a 150 ms check that hides TaskListThumbnailWnd too.
+- Not doing: copy memory (Jakob: no); shared team autocorrect list (no, per person).
+- Built, NOT run.
+
+## Done in v3.32.0 (Nov 1)
+- Taskbar clock (Jakob: main monitor, seconds and date): bottom-left of the taskbar, 24 h HH:mm:ss over "ddd MMM d", click-through, follows taskbar light/dark, re-asserts on top every tick, hides for full-screen windows; tray > Windows toggle (this PC, last used.ini [Clock] Show); settings.ini [Clock] Seconds/Date/Monitor/OffsetX/OffsetY. Windows clock can be hidden in Settings on newer Windows 11.
+- Hide taskbar window previews: ExtendedUIHoverTime did nothing on his PC; Policies key locked by IT. Watchlog hides class TaskListThumbnailWnd on EVENT_OBJECT_SHOW (SetWinEventHook); other explorer pop-ups near the taskbar are logged once as "Taskbar pop-up seen: class ..."; settings.ini [Taskbar] PreviewClasses= adds more. Tray > Windows toggle (this PC, [Taskbar] HidePreviews).
+- Ctrl+Alt+I also shows the window under the mouse and both classes.
+- Built, NOT run.
+
+## Done in v3.30.0 (Oct 31)
+- Info From people search: code word lines end with `| from cage, security` (search text in order); after the daily log fills, Watchlog clicks the Info From button (v3.30.1; v3.30.0 wrongly taught the arrow), Personnel, types each into Look For + Enter, waits (3 min max) while Jakob picks and clicks Select/Cancel, then the next. Teach once: tray > iTrak > Teach Info From (itrak.ini [InfoFrom]). Set on ;fill ;mfill (cage, security), ;open ;auto (dealer), ;jack (OPS, slots, cage), ;bv (slots, security), ;account (marketing). Not done: department word in a shorthand line overriding the default; a hotkey to run a search on any open log.
+
+## Done in v3.29.2 (Oct 31)
+- ;cards logs the table's pit (%pit%, from @pit) instead of always Pit 2 (templates.txt, wording version Oct 31, 2026).
+- templates.txt that loads empty or with fewer than half the templates of last time (10+) is replaced, in memory, by the newest backup that looks right; the team file falls back to its saved copy the same way. Counts kept in last used.ini [Templates] LastCount / TeamCount.
+
+## Done in v3.29.1 (Oct 31)
+- Code and docs review: LoadTemplates declares `global Entries`; an app key can no longer take Ctrl+Alt+D or F (or a letter moved to in Customize); README history tags fixed (past bumps had rewritten them), README section 19 Newer features, settings.ini reference completed; Overview, IT Summary and Summary describe the iTrak daily log filling, break tracker and backups. tools/bump-version.py and build/release.sh added.
+
+## Done in v3.29.0 (Oct 31)
+- Break time tracker: ;break (or the Break full-entry log) starts the count, Save & Close on that daily log ends it; minutes left on the home window, dashboard and tray icon; 60 min a shift ([Break] Minutes=), reset at Start of shift. No reminders (Jakob). Ctrl+Alt+Shift+E clicks End Time Now in the daily log in front.
+
+## Done in v3.28.0 (Oct 30)
+- Failure safeguards, second batch (items 6, 8, 9 of the plan, and 7 as backups): Ctrl+Alt+Shift+R repeats the last full-entry log; daily backups of templates, settings, autocorrect and taught clicks (14 kept) with tray Restore; tray Go back to the previous version (the newer one isn't offered again until allowed). Jakob tested all of it: works.
+- NOT built from item 7: automatically falling back to the backup when templates.txt loads empty or much shorter than last time (Restore does it by hand).
+
+## Done in v3.27.3 (Oct 30)
+- Alert Grid step 5 (no more alerts) failed sometimes: the v3.27.0 front check gave up after 1 s while the box was closing. It now retries for 2 s and the no-more click waits at least 250 ms.
+
+## Done in v3.27.2 (Oct 30)
+- Fix: v3.27.0 and v3.27.1 wouldn't load ("This Func cannot be assigned a value: joined").
+
+## Done in v3.27.1 (Oct 30)
+- Fix: the hourly SDS sign-in stopped with "no saved login is locked to SDS". It now brings SDS back and retries, then falls back to the login whose Only in names SDS, and logs the logins' triggers and windows if it still can't.
+
+## Done in v3.27.0 (Oct 30)
+- Failure safeguards, first batch (items 1 to 5 and 10 of the plan below): passwords never typed into Notepad, mail, chat, Office, Watchlog's windows or the daily log when a login has no program set; refused logins show a message; form logs aren't pasted into the wrong window (they stay on the clipboard); Alert Grid stops if a pop-up takes the front; display scale warning at start-up; a form closed with Esc comes back for 10 minutes; plain error box.
+- The rest of the plan was built in v3.28.0. The original plan, for reference:
+
+#### Plan: failure safeguards (Oct 30, all built by v3.28.0)
+
+From a read-through of Watchlog.ahk v3.23.0. Already safe today: login locked to a window is re-checked just before typing; full-entry logs (Ctrl+Alt+F) re-check iTrak is in front before every click; the call pad saves itself so a crash can't lose a call; a team templates file that won't load falls back to the last good copy; self-update tests the new file first and keeps the old one; OneDrive conflict copies of settings.ini show in the Security window; errors go in the activity log.
+
+Ranked by how much harm the failure does. Speed cost is for a normal run where nothing goes wrong.
+
+1. **Passwords only typed into a safe window.** Today: a login with no window lock types name, Tab, password, Enter into whatever is in front (only the finder and Settings are blocked). If the iTrak daily log, the call pad, Notepad, Teams or Outlook has the keyboard, the password lands there in plain text. Safeguard: refuse to type when the front window is one of those, say why, and offer once to lock that login to its program. Speed cost: none (one check).
+2. **A form's log only pastes into the window you started in.** Today: after Enter on a form, Watchlog waits up to 2 seconds for that window to come back, then pastes anyway, even if it closed or a pop-up took the front. The log goes into the wrong window or nowhere. Safeguard: if it isn't back, don't paste; beep and show "The log is on the clipboard: click where it goes and press Ctrl+V". Speed cost: none.
+3. **Alert Grid clearing stops if Alert Grid loses the front partway.** Today: it checks only at the start, so a pop-up arriving mid-run gets the right-click, menu and Submit clicks. Safeguard: check before each click and stop with a tip. Speed cost: under 1 ms per click, so a dozen alerts a second stays the same.
+4. **Display scale changed since the clicks were taught.** Today: the scale is saved when iTrak spots are taught but never checked, so after a Windows scale change the clicks land in the wrong place without warning. Safeguard: compare at start-up (iTrak and Alert Grid) and warn once with how to fix it. Speed cost: none during the shift.
+5. **Esc on a form doesn't throw away what you typed.** Today: Esc or the X closes the form and the boxes are gone. Safeguard: keep a cancelled form for 10 minutes (memory only, not on disk); reopening the same template fills the boxes back in with a note, Esc again clears them. Speed cost: none.
+6. **Paste one of my last logs again.** Today: if a paste went missing you retype it, or dig in the shift journal. Safeguard: a pick list of this shift's last 5 logs (hotkey to choose), Enter pastes it again. Kept in memory only. Speed cost: none.
+7. **templates.txt goes blank or half-synced.** Today: only the team file has a fallback; the local templates.txt does not, so a half-synced OneDrive copy loses templates silently. Safeguard: keep a last good copy on this PC; if templates.txt loads empty or with far fewer templates than last time, use the copy and warn. Speed cost: none (at load only).
+8. **Settings get broken or overwritten.** Today: no backups of settings.ini, itrak.ini, alertgrid.ini or the window layout, and a OneDrive conflict copy is only mentioned in the Security window. Safeguard: one backup a day on this PC (keep 7), tray "Restore settings from a backup", and a tray message when a conflict copy appears. Speed cost: none.
+9. **A bad update.** Today: the old version is kept but going back is by hand. Safeguard: tray "Go back to v(previous)" when a backup exists. Speed cost: none.
+10. **An error mid-shift.** Today: AutoHotkey's raw error box with code appears and that action stops. Safeguard: a short plain message ("That didn't finish. Watchlog is still running.") with a Copy details button for reporting the line number. Speed cost: none.
+
+Not proposed: an auto-restart helper if Watchlog closes (needs a second program or a scheduled task, more for IT to approve).
+
+Questions for Jakob: which of these has actually happened to you? Anything else that has gone wrong on shift? Build all ten, or only some?
+
+
+## Done in v3.26.3 (Oct 30)
+- Fix: `mfill n3 190800 bvs` (and the old `n3 190800 bvs` with no code word, and `c2102 11421.11 win 3 cash` for a jackpot) pressed with Ctrl+Enter on the call pad now make the log directly instead of opening an empty form.
+
+## Done in v3.26.2 (Oct 30)
+- ;fill ;open ;auto ;jack ;bv ;mfill also fill the iTrak daily log (Location, Topic, Reference as Jakob gave them; Reference left empty for him on fill, jack, bv and mfill). Pit comes from the table (@pit list), Alpha/Bravo/Charlie Slots from the machine letter (@slots list), both editable in templates.txt: groundwork for more automation. Open: is D = Delta Slots? exact iTrak topic names; Auto-close Reference assumed NA.
+
+## Done in v3.26.1 (Oct 30)
+- Fix: Alert Grid clearing no longer skips the final clear-acknowledged click (step 5) after the acknowledged-alerts fallback of v3.24.1 (Jakob: it stopped finishing). v3.26.0 was never sent on its own; 3.26.1 includes its shorthand lines.
+
+## Done in v3.26.0 (Oct 30)
+- Shorthand lines on the call pad: first word a code word, then Ctrl+Enter makes the log with no form when the line is complete. `fill 205 5.5`, `open 201 202 203`, `201 auto`, `jack c2102 11421.11 w3 cash 2130`, `bv c2102 4471 full`, `account 123456`. Any other code word first opens its form with the pad filled in.
+- ;account is now a daily-log fill: Guest Services | Account under review | M6 (417), "Account #XXXXXX reviewed, not banned player. Account cleared and Guest Services notified."
+- Built from the plan "shorthand line to finished log" (kept below for reference). Not done: `;found` and `;aml` shorthand (Jakob said leave them). Still open: shorthand for more logs, optional short codes (f for fill) in Customize, typing a shorthand line outside the pad.
+
+<details><summary>Original plan: shorthand line to finished log</summary>
+
+#### Plan: shorthand line to finished log (Oct 30, built in v3.26.x for fill, open, auto, jack, bv, mfill, account)
+
+**The idea.** You write one short line the way you jot it on paper, and Watchlog turns it into the finished log using the template you already have. No form when the line has everything; the form only opens when something is missing, with what it found already filled in.
+
+**Where you type it.** On the call pad (Numpad +, as now). The first word is the code word of a template, with or without the `;`. Ctrl+Enter makes the log as it does today. Plain jottings with no code word in front keep working exactly as now (they still fill the next form).
+
+**What happens.**
+- Every box in that template has an answer from the line: the finished log goes straight into the window you were in (iTrak, Notepad...), counted in Time saved. No form.
+- Something is missing: the usual form opens, found boxes say "(from your call pad)", the cursor sits in the first empty one.
+- Boxes with a `blank=` that can stay empty (Note, Signs observed, Reason (only if up)...) do not count as missing.
+
+**How the words are read** (order does not matter for most):
+- Money: `5k`, `5000`, `5,000`, `$5000`, `11421.11` -> $5,000 / $11,421.11 (same as the pad does now).
+- Table: any table in your tables list, any case; the number alone works when it is unique (`205` -> BJ205).
+- Machine: a letter + 3 to 5 digits -> caps (`b1410` -> B1410); `n3` -> NRT3, `a1` -> ATM1.
+- Pick lists: the first letters of a choice (`def` -> Defective, `exp` -> expired ID, `up`/`dn` -> Up/Down, `24`/`ind` -> 24 hour/indefinite).
+- Numbers for # boxes (Alert #, Asset #, Player #, Window #) are taken in the order the template asks for them; `w3` or `win 3` always means the window.
+- Anything left over goes into the one free-text box, if the template has one (Note, What the review showed...).
+- Several items in a "several" or "Add another" template are all used (`open 201 202 203`, two fills in one line).
+
+**Examples with today's templates** (made-up values):
+
+| You type | You get |
+|---|---|
+| `fill 205 5k` | BJ205 $5,000 |
+| `fill 205 5k 303 10k` | BJ205 $5,000 / BJ303 $10,000 (two lines, as Add another does) |
+| `open 201 202 203` | UT201, FB202, UT203 Opened. (one line, as the several box does) |
+| `cards ry301` | Card change on RY301. |
+| `bv c2102 4471 full` | C2102 #4471 (Full) |
+| `found b1410 45.20` | Operations Supervisor advised printing off abandoned credits in the amount of $45.20 from B1410. Funds taken to Security as found. |
+| `aml 123 b1410` | AML Alert #123 populated at B1410 (time now). Review showed nothing suspicious. |
+| `maint n2 n4` | NRT2 and NRT4 Maintenance. |
+| `refuse 2 exp` | Security Officer refused entry to 2 patrons due to expired ID. |
+| `jack c2102 11421.11 w3 2130` | the full jackpot sentence, time paid 21:30 (time format to confirm) |
+| `player 123456 3 205 2k up 5k` | Player #123456 playing Spot 3, BJ205, In $2,000, Up $5,000. |
+| `medical guest kitchen` | form opens (What the review showed / Outcome still needed), Who and Location already filled |
+
+**Your own short codes (optional).** You can give any template a second, shorter code just for the pad, for example `f` for fill or `o` for open, in Customize. Safer than changing the real code words.
+
+**Questions for Jakob before building:**
+1. Five to ten real lines the way you jot them on the paper pad (fake numbers are fine), and what each should become.
+2. How do you write times (2130, 9:30p, 930)? 24-hour in the log?
+3. Should it also work outside the call pad, for example typing `;fill 205 5k` straight into iTrak and pressing a key? (Harder inside Citrix: see step 2.)
+
+</details>
+
+## Done in v3.25.1 (Oct 30)
+- Fix: v3.25.0 failed to start with Missing quote on line 6258 (a space then ; inside a string is a comment in AutoHotkey). The new prefix text in Settings now escapes it.
+
+## Done in v3.25.0 (Oct 30)
+- New setting: the character(s) typed in front of code words, logins and the stamps (;t ;dd ;dt) instead of ; (Settings > General, or settings.ini [Triggers] Prefix=). 1 to 3 symbols. Per PC; templates files keep the ;. Saves and reloads.
+- Not changed: the template editor still shows ; (it edits the files).
+
+## Done in v3.24.1 (Oct 30)
+- Alert Grid: when acknowledged alerts are in the list, the right-click menu won't open. Now, if the Acknowledge box doesn't show, Watchlog clicks the clear-acknowledged button first (and the no-more-alerts click), then clears the unacknowledged alerts as usual. Once per clear; costs nothing when there are no acknowledged alerts. Needs the clear button taught. Jakob to say what Alert Grid shows when the right-click is refused (a popup? its title).
+
+## Done in v3.24.0 (Oct 30)
+- Code words that fill the whole iTrak daily log: end a templates.txt line with ` >> Location | Topic | Reference` (add `| end` last to click End Time Now). Typing the code word (and answering its boxes) fills the open daily log, or opens a new one if none is open, from any window. Shift+Enter on the form, or Shift held when a no-box code word fires, pastes just the wording instead. First one: `;cards` (Card change) with GUESSED Location/Topic/Reference "Pit 2 | Card Change | NA": Jakob to correct.
+- Still open: more code words to convert (Jakob to say which), and a Customize screen box for it.
+
+## Done in v3.23.0 (Oct 30)
+- Edge-only start of shift: Ctrl+Alt+L opens iTrak facial rec and the Citrix page in one Edge window (FaceUrl, CitrixUrl). Removed Ctrl+Tab tab hunting, keep-on-top guard, Chrome profile lookup, ChromeAccount and LaunchWork.bat use; Ctrl+Alt+G is Edge. Each bay re-saves the window layout once. Built without running AutoHotkey (Wine run blocked).
+- Docs: all versions brought to 3.23.0 (Overview and IT Summary said 3.10.1), docx/pdf rebuilt, ChatGPT hand-off rebuilt.
+
+## Done in v3.22.2 (Oct 30)
+- Settings window: the tab area is taller (350 -> 400), so the "Beep when a log-in-again reminder pops up" tick on the Logins tab is no longer cut off by Save and Cancel (Jakob's screenshot, display scaling makes text taller than under Wine).
+
+## Done in v3.22.1 (Oct 30)
+- Jakob's first look at the dark theme: dark text on a dark background somewhere, so light is now the default (blue accent kept, teal gone) and dark is a switch: tray menu > Dark look, or Customize. Dark text on dark probably came from a colour I did not remap; if he turns dark on again and sees it, ask for a screenshot.
+
+## Done in v3.22.0 (Oct 30)
+- Dark look with a blue accent in every window (Jakob: "I like a dark colour scheme", blue or forest green, my pick: blue). Built as a WGui class that remaps the colours each window asks for; Customize > "Dark look" turns it off ([Look] Dark=no). Tabs show as a row of buttons.
+- Home window: three panels at the top (logs, logins, typing saved this shift).
+- Interior, Exterior and Parking Officer/Supervisor full-entry logs (six, in templates.txt, no End Time click).
+- Docs brought up to v3.22.0: README, QUICK START, the plain Overview, the IT Summary and the one-page Summary (Word and PDF). The "(with screenshots)" overview was NOT redone (needs new screenshots).
+- Not tested on a real Windows PC: only under Wine, which draws buttons and lists light. The dark buttons, list headers and scroll bars rely on Windows' own dark mode, so check them on the bay.
+
+## Done in v3.21.0 (Oct 30)
+- The Start full-entry log also clicks End Time's Now button (Jakob asked; goes out with this build).
+- Customize Watchlog (tray menu and a Customize button on the home window): screens for the full-entry daily logs (add, edit, copy, delete, try), the shortcut keys (21 of them can be changed; pause, reload, app keys and form keys stay), the programs opened and closed at the start and end of shift, the shared lists (opens the template editor on that tab), the autocorrect words, and the speed and timing values; logins, reminders, Caps Lock, journal and updates open Settings on the right tab.
+- The tray menu, home window and cheat sheet show the shortcut keys you picked.
+- Saving from these screens applies right away, with no automatic restart (the hotkey screen restarts Watchlog).
+- Not tested: pressing the shortcut keys (Wine can't fire hotkeys), so a changed key is checked only for being registered.
+
+## Done in v3.20.3 (Oct 30)
+- Start of shift full-entry log: "start" in the Ctrl+Alt+F list. Surveillance, Duty, NA, synopsis "Start of Shift Bay (bay) Operator". It always asks which bay (offering the last one) and keeps the answer for the shift; the End log and ;end then use it without asking. It leaves End Time alone (add `| end` to its line in templates.txt if you want the Now click too).
+
+## Done in v3.20.2 (Oct 30)
+- Confirmed on Jakob's PC: the End log fills in about 4 seconds, against about 15 s by hand (7 s was his best). Real timing for the manager pitch.
+- End of shift full-entry log: type "end" in the Ctrl+Alt+F list: Surveillance, Duty, NA, synopsis "End of Shift Bay (your bay) Operator", then End Time's Now button is clicked. New fifth teach step (End Time's Now button): run Ctrl+Alt+Shift+F again.
+- The bay entered at the start of shift is kept for the shift (14 hours): the ;end template and the End log no longer ask for it (new box option {Bay: saved}; asks as before if no bay was entered at the start).
+
+## Done in v3.20.1 (Oct 30)
+- Fix for the daily log teach step ("the click position wasn't in the iTrak window"): the daily log form is its own window titled "Daily Log Entry - N/A - \\Remote", so the field spots are now measured from that window, and the fill waits for the new form to open instead of a fixed pause.
+
+## Done in v3.20.0 (Oct 30)
+- Full-entry daily logs: Ctrl+Alt+F opens a pick list (type the first letters, Enter) of never-changing logs; Watchlog opens a new daily log in iTrak and fills Location, Topic, Reference and Synopsis with no questions. Break, Table Drop and Card Destruction are ready-made in templates.txt (lines `+Name = Location | Topic | Reference | Synopsis`). End Time and Save stay yours. Ctrl+Alt+Shift+F teaches the four field spots once per PC. Counted in Time saved and the journal ("Full log: Break"): 5 keystrokes per drop-down, full length of Reference and Synopsis plus 1 per click, 2 for the new-log click.
+- SDS login reminder: no "log in again" reminder for a login typed into SDS while "Sign back into SDS by itself" is ticked (it was only skipped when the login was locked to SDS with Window=). Untick the box to get the reminder back.
+- Home window: the whole Shift section is gone (shortcuts and the cheat sheet remain).
+- Not tried on a real iTrak/Citrix: Wine test with a fake iTrak window passed (pick list, clicks, typing, paste, counts).
+- Still open from this thread: more full-entry logs from Jakob (he is sending 3-5; 3 done), End Time Now click is NOT used, sharing the field spots with the team, other home window trimming.
+
+## Shipped without a version (templates.txt only)
+- Oct 30 (night): ;jack topic typed as Jackpot (the drop-down item is "Jackpot / Table Win" and needs spaces around the slash, so the short word is typed), ;bv topic Emergency Pull. The topic box is not case sensitive. Wording version Oct 30, 2026 (5).
+- Oct 30 (later): the eight code words that match a full-entry log now fill the daily log too: ;start and ;end (click End Time Now), ;interior, ;exterior, ;parking (Officer/Supervisor pick box, same Location/Topic as the + lines), ;drop, ;man, ;destroy. Ctrl+Alt+F and the + lines are unchanged. Wording version Oct 30, 2026 (2). Not tested on a bay.
+- Oct 30: `;break` code word fills a daily log (Surveillance | Duty | NA, synopsis Break), same as the Ctrl+Alt+F Break entry. Needs v3.24.0 or newer. Wording version Oct 30, 2026 (1). `;cards` confirmed working.
+- Oct 29: ;open and ;auto got {repeat} (one table per line); replaced the same day by v3.19.3's one-line list.
+
+## Done in v3.19.3 (Oct 29)
+- Start of shift no longer puts SDS where Alert Grid goes. Both are the same Java program (javaw.exe) and the layout matched them by front-to-back order, so after the start of shift sign-in left SDS in front it took Alert Grid's spot. Save window layout now notes which one each Java window is (Alert Grid, SDS or other, from the start of its title; the title isn't saved) and Put windows back matches on that. A layout saved before v3.19.3 still works the old way and asks once to be saved again (Ctrl+Alt+Shift+S).
+- Several tables on one line: ;open and ;auto take Add another (Ctrl+Enter) and paste "BJ205, BJ206 and RO204 Opened." New box option | several (README, template options). The table box starts empty; a table added twice is listed once.
+- Tested under Wine with fake SDS and Alert Grid windows (the old matching swapped them, the new one doesn't) and the forms. The real Bally windows only on a bay.
+
+## Done in v3.19.2 (Oct 29)
+- Alert Grid teach has a new step 6 (the casino added a click that says there are no more alerts, last in the sequence, after the clear-acknowledged button). Hover over the box's button and press F8. Saved as NoMoreX/NoMoreY (+ NoMoreBox, the box's title, when it's a separate box; measured from that box) in alertgrid.ini and included in Share my setup with the team. Old teaches work and skip the click until re-taught. Waits up to 0.8 s for the box, so no extra delay when it isn't there. Built without running AutoHotkey (not run under Wine).
+
+## Done in v3.19.1 (Oct 27)
+- Copyright and licence (step 1 of making Watchlog proprietary): "Copyright (c) 2026 Jakob Blair Vanness. All rights reserved." and a short licence (permission only, no copying/sharing/changing/redistributing, provided as is). New About Watchlog window (tray menu and home window); the line also shows under the tutorial, in the version box, at the bottom of the cheat sheet and in Security and status; Copyright field in the exe's file properties; block at the top of README, QUICK START, templates.txt and Watchlog.ahk; LICENCE.txt in the zip, built into the exe and in Make a copy to share.
+- Release zip has only Watchlog.exe and the text files. The script version is in "for IT (on request)" in the project files, for Jakob to send IT directly.
+- Built with build/rebuild-resources.py (Python, swaps the resources in the v3.19.0 exe) because running AutoHotkey under Wine was blocked this time: not run or tested under Wine.
+
+## Done in v3.19.0 (Oct 27)
+- Ctrl+Alt+D opens a new daily log in iTrak (a taught mouse click, or two if it takes a button and a menu line), Ctrl+Alt+Shift+I teaches it. Measured from inside the iTrak window, follows the nearest edge on resize, refuses when the window is too small or off screen, can be shared through the team folder (tray > iTrak). Settings > Alert Grid tab, tray, home tile, Security status and cheat sheet updated. Wine-tested with a fake iTrak (10 cases); the teach step and the real Citrix click can only be tried on a bay.
+
+## Done in v3.18.0 (Oct 26)
+- Alert Grid clear works wherever Alert Grid is and whatever its size: spots measured from inside the window (old teach files change over by themselves), the clear-acknowledged button follows its nearest edge on resize, the teach asks which menu line "Acknowledge as received" is (also in Settings > Alert Grid) and the arrow keys pick it when the menu opens upward near the bottom of the screen or a menu click misses, and it refuses (clicks nothing) when Alert Grid is too small or off the screen. Tray > Alert Grid > Share my setup with the team puts the numbers in alertgrid.ini in the team folder (per screen scaling) for PCs that haven't been taught. Not done: UI Automation / Java Access Bridge, picture search. Wine-tested with a fake Alert Grid (11 cases pass); the real Java menu and arrow keys only on a bay.
+
+## Done in v3.17.6 (Oct 26)
+- Alert Grid clear, option A (Jakob): no Caps Lock wait, modifier wait only while Ctrl/Alt/Shift are really down (max 250 ms), Ctrl+A held ~20 ms, 5 colour reads instead of ~20, SelectWait default 120 (Ctrl+A re-pressed halfway), lone alert 40 ms.
+
+## Done in v3.17.5 (Oct 26)
+- Alert Grid clear faster again (Jakob: still slower than before): key-release wait capped at 250 ms in total, SelectWait default 200, lone alert 50 ms, 5 ms polling, no extra pause after the list turns blue.
+
+## Done in v3.17.4 (Oct 26)
+- Alert Grid clear made quicker for busy lists (about a dozen alerts a second): shorter Ctrl+A hold, 15 ms polling, about 20 colour reads instead of 100.
+
+## Done in v3.17.3 (Oct 26)
+- Alert Grid clear with a single alert: the row is already blue from the click, so a plain column under it now means only a 100 ms wait.
+
+## Done in v3.17.2 (Oct 26)
+- Alert Grid clear with a single alert was slow (waited 800 ms for a colour change that never comes): wait is now 300 ms.
+
+## Done in v3.17.1 (Oct 26)
+- Alert Grid clear (Ctrl+Alt+A, Caps Lock) no longer clears just the top alert half the time: waits for Ctrl/Alt/Shift/Caps Lock to be let go, holds Ctrl+A like a real keypress, watches the list turn selected (presses Ctrl+A again if it didn't), then right-clicks. Wine-tested only with a fake list that ignores the first Ctrl+A.
 
 ## Done in v3.17.0 (Oct 26)
 - Edits in the shift journal count everywhere: each log carries a [k] tag with its exact keystrokes saved; removing, renaming or adding logs in Ctrl+Alt+J and pressing Save changes updates Shift count, this shift, Time saved and the dashboard. Old untagged logs use the type's average.
@@ -300,3 +599,10 @@ Added Oct 16 (templates.txt only): `;selfex` Self-exclusion and `;found` Abandon
 - Templates fire instantly; `;count` renamed `;countstep`; clashing triggers are refused with a message.
 - App hotkeys: Ctrl+Alt+T Teams, U Outlook, Y Spotify, G Chrome.
 - Ctrl+Alt+T find notes by tag removed.
+
+## Queued (Jakob 2026-10-30, build only when he says "build it")
+Six full-entry logs, none click End Time Now, Reference NA:
+- +Interior Officer / +Interior Supervisor: Back of House - Non Sensitive | Call - Radio | NA | Security Officer (or Supervisor) performed interior door check
+- +Exterior Officer / +Exterior Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed exterior door check
+- +Parking Officer / +Parking Supervisor: Parking Lot | Call - Radio | NA | Security Officer (or Supervisor) performed parking lot patrol
+(templates.txt only, no version bump.)
