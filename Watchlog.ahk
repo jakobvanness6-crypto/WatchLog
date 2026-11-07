@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.1"
-VERSION_DATE := "Nov 6, 2026"
+VERSION := "3.35.2"
+VERSION_DATE := "Nov 7, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -9104,9 +9104,13 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
     endTs := AuditStamp(endTime)
     startTs := AuditStamp(startTime)
     vals := Map("Detail", "tab", "Console", console, "Area", area, "Start", startTs, "End", endTs, "Remarks", syn)
+    ; v3.35.2: a PC taught before v3.35.0 has no Start spot. The 6-second tip
+    ; was easy to miss while the fill ran (Jakob, Nov 6: "doesn't set the
+    ; start time"), so it now asks at the end and types Start straight after.
+    startSkipped := false
     if startTs != "" && !sp.Has("StartX") {
         vals["Start"] := ""
-        Tip("Audit Start isn't taught on this PC yet, so only End is typed.`nTray > iTrak > Teach the audit Start spot (one F8).", 6000, true)
+        startSkipped := true
         Activity("Audit: Start not typed (spot not taught yet)")
     }
     shownTimes := Map()
@@ -9145,14 +9149,20 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
             ; Jakob got Pit 1 for Pit 2: iTrak's list still has Pit 1, and over
             ; Citrix Enter came while the list was still on "Pit " (first match
             ; Pit 1). [ITrak] AuditAreaWait= ms (was 250).
+            ; v3.35.2: iTrak's list says "Pit #2", not "Pit 2", so typing
+            ; "Pit 2" stopped matching at the 2 and left Pit #1 (Jakob, Nov 6).
+            ; AuditAreaText() types the name the way iTrak's list has it.
+            typed := AuditAreaText(vals[k])
             SendInput "^a"
             Sleep 60
-            EntryType vals[k]
+            EntryType typed
             Sleep Integer(IniRead(SettingsFile, "ITrak", "AuditAreaWait", "800"))
             SendInput "{Enter}"
+            Activity("Audit: Area Audited typed as " typed)
             keys += 5
         } else if k = "Start" || k = "End" {
             shownTimes[k] := AuditTypeTime(vals[k])
+            Activity("Audit: " k " typed (" shownTimes[k] ")")
             keys += StrLen(shownTimes[k]) + 1
         } else {
             SendInput "^a"
@@ -9209,6 +9219,10 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         }
     }
     MouseMove ox, oy, 0
+    if startSkipped && AuditAskStart(win, startTs) {
+        shownTimes["Start"] := FormatTime(startTs, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+        MouseMove ox, oy, 0
+    }
     Tip("Audit filled in: check it, then Save.", 4000, true)
     Activity("Audit filled in (" keys " keystrokes counted as saved; Requested By route " route.Length " clicks)")
     CountSaved("log", keys, title)
@@ -9216,13 +9230,53 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
     return true
 }
 
+; "Pit 2" -> "Pit #2", the way iTrak's Area Audited list writes it (v3.35.2).
+; settings.ini [ITrak] AuditPitText= the iTrak name ({n} = the pit number,
+; default "Pit #{n}"); set it to  Pit {n}  if iTrak ever drops the #.
+; Every other area is typed as it is.
+AuditAreaText(area) {
+    if !RegExMatch(area, "i)^Pit\s*#?\s*(\d+)$", &m)
+        return area
+    fmt := Trim(IniRead(SettingsFile, "ITrak", "AuditPitText", "Pit #{n}"))
+    return StrReplace(fmt = "" ? "Pit #{n}" : fmt, "{n}", m[1])
+}
+
+; Audit Start isn't taught (v3.35.2): asks once at the end of ;audit, teaches
+; the one spot, then types Start into the audit that's open. True if typed.
+AuditAskStart(win, startTs) {
+    if MsgBox("Audit Start was left as iTrak set it, because its spot isn't taught on this PC yet.`n`nTeach it now? Hover over the time in Audit Start and press F8 (one spot). Watchlog then types the Start time for this audit and every one after.", "Audit Start", "YesNo Icon?") != "Yes" {
+        Tip("Start not typed. Tray > iTrak > Teach the audit Start spot any time.", 5000, true)
+        return false
+    }
+    if !TeachAuditStart(true)
+        return false
+    sp := AuditLoad()
+    if !sp || !sp.Has("StartX") || !WinExist("ahk_id " win)
+        return false
+    try WinActivate "ahk_id " win
+    if !WinWaitActive("ahk_id " win, , 3)
+        return false
+    Sleep 200
+    if !ITrakSpot(win, Integer(sp["StartX"]), Integer(sp["StartY"]), Integer(sp["W"]), Integer(sp["H"]), &x, &y) || !AlertOnScreen(x, y)
+        return false
+    CoordMode "Mouse", "Screen"
+    MouseMove x, y, 0
+    Sleep 60
+    Click
+    Sleep Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    shown := AuditTypeTime(startTs)
+    Activity("Audit: Start typed after teaching (" shown ")")
+    return true
+}
+
 ; One spot only: the time in Audit Start (v3.35.0), for a PC that taught the
 ; audit spots before Start was typed. Keep the Audit window the size it was.
-TeachAuditStart() {
+TeachAuditStart(quiet := false) {
     global TeachBusy, ITrakFile
     if TeachBusy
-        return
+        return false
     TeachBusy := true
+    ok := false
     try {
         sp := AuditLoad()
         if !sp {
@@ -9244,12 +9298,15 @@ TeachAuditStart() {
                 IniWrite x, ITrakFile, "Audit", "StartX"
                 IniWrite y, ITrakFile, "Audit", "StartY"
                 Activity("iTrak: audit Start spot taught")
-                MsgBox "Saved. `;audit now types Audit Start (the form's From) as well as Audit End, so the Duration is exactly 20:00.", "Teach the audit Start spot"
+                ok := true
+                if !quiet
+                    MsgBox "Saved. `;audit now types Audit Start (the form's From) as well as Audit End, so the Duration is exactly 20:00.", "Teach the audit Start spot"
             }
         }
     } catch as err
         MsgBox "Teach the audit Start spot stopped: " err.Message, "Teach the audit Start spot", "Icon!"
     TeachBusy := false
+    return ok
 }
 
 TeachAudit() {
