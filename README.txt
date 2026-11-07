@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.2  -  README
+  WATCHLOG  v3.35.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -568,7 +568,11 @@ What happens, in order (about 20 seconds):
      no tabs are searched for. The addresses are FaceUrl and CitrixUrl
      in settings.ini (also in Settings); blank FaceUrl = not opened.
   5. It puts your saved window layout back, then brings the Edge window
-     with the Citrix page to the front.
+     with the Citrix page to the front. For 2 minutes after that
+     (v3.35.3) it keeps SDS in its saved spot: when SDS swaps its login
+     screen for the main screen, opens a new window, or lands on the
+     Alert Grid's spot, it is put back. If you drag SDS yourself it is
+     left alone. Same for 1 minute after the hourly SDS sign-in.
   6. If anything couldn't be found, a message lists it.
 
 Still manual: launching iTrak itself from the Citrix page (its launch
@@ -1130,6 +1134,10 @@ Save it and it reloads itself.
 
 [Layout]
   AfterStart=      no = Ctrl+Alt+L doesn't put the windows back (default yes)
+  SdsWatchSeconds= how long after Ctrl+Alt+L SDS is kept in its spot
+                   (default 120, 0 = off; v3.35.3)
+  SdsSpot=         x,y,w,h for SDS instead of the saved layout's SDS spot
+                   (blank = use the saved layout; v3.35.3)
 
 [Look]
   Dark=            yes = dark windows (default no; also tray > Dark look)
@@ -1233,6 +1241,15 @@ WINDOW LAYOUT (v3.7.0)
     layout also notes which one each window is (from the start of its
     title; the title itself isn't kept) and they can't swap spots. A
     layout saved before v3.19.3 asks once to be saved again.
+  - SDS after start of shift (v3.35.3): putting the layout back happens
+    before SDS has finished signing in, and SDS then opens its main screen
+    wherever Java likes (it landed on the Alert Grid's spot). So for 2
+    minutes Watchlog puts SDS back in its saved spot whenever it opens a
+    new window, changes screens, or sits over the Alert Grid's spot.
+    Needs a layout saved with BOTH SDS and Alert Grid open where you want
+    them. If the saved layout itself has SDS on the Alert Grid's spot, it
+    says so once: fix the windows and press Ctrl+Alt+Shift+S again.
+    The Activity log shows each move ("SDS spot: ...").
   - W is no longer free for an app hotkey ([AppN] Key=W is skipped).
 
 CAPS LOCK GUARD (v3.7.0)
@@ -1374,6 +1391,19 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.35, newest first)
 -----------------------------------------------------------------------
+START OF SHIFT: SDS STAYS OUT OF THE ALERT GRID'S SPOT  (v3.35.3)
+  - Ctrl+Alt+L put the windows back before SDS had finished signing in.
+    SDS then opened its main screen on the Alert Grid's spot. Now, for 2
+    minutes after Ctrl+Alt+L (and 1 minute after the hourly SDS sign-in),
+    SDS is put back in its saved spot whenever it opens a new window,
+    changes screens (login to Welcome) or sits over the Alert Grid's spot.
+    Dragging SDS yourself is left alone.
+  - Needs a saved layout with SDS and Alert Grid both open where you want
+    them (Ctrl+Alt+Shift+S). If the saved layout has SDS on the Alert
+    Grid's spot, it tells you once to fix it and save again.
+  - settings.ini [Layout] SdsWatchSeconds= (default 120, 0 = off) and
+    SdsSpot=x,y,w,h (blank = the saved layout's SDS spot).
+
 AUDIT: PIT #2 / #3 AND START TIME  (v3.35.2)
   - Area Audited: iTrak's list writes the pits as "Pit #1", "Pit #2", "Pit #3". Watchlog
     typed "Pit 2", which stopped matching at the 2 and left Pit #1. Now "Pit 2" on the form
@@ -1484,7 +1514,7 @@ INCIDENT REPORTS, MORE CODE WORDS FILL THE DAILY LOG, AUTOCORRECT EVERYWHERE  (v
   - Code words that now fill the whole daily log (Location | Topic | Reference):
     ;player (pit of the table | Player Update | NA), ;refuse (Security Desk - Main Lobby |
     Call / Phone | NA), ;evict (Security Desk - Main Lobby | Trespass), ;face (Security Desk -
-    Main Lobby | Facial Recognition Alert Rejected), ;aml (slots area | AML Alert), ;abandon
+    Main Lobby | Facial Recognition Alert Rejected | the alert #), ;aml (slots area | AML Alert), ;abandon
     (slots area | Request for Review), ;found (slots area | Lost & Found), ;maint (ABM/NRT |
     AJM/CTR Fill), ;close (pit | Table Opening/Closing | NA), ;selfex (Security Office |
     Self-Exclusion), ;inventory (Cash Cage | Security Escort), ;badge (Security Main entrance |

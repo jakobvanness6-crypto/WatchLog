@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.2"
+VERSION := "3.35.3"
 VERSION_DATE := "Nov 7, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -75,6 +75,7 @@ ALERT_KEYS := ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY", "OkX", 
 CallPadFile := DataDir "\call pad.txt"            ; the call pad text, this PC only, wiped at end of shift
 CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, this PC only
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
+SdsWatch := {until: 0, spot: "", placed: Map(), why: ""}   ; v3.35.3: SDS kept in its spot after Ctrl+Alt+L
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
 ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
@@ -436,6 +437,12 @@ LoadSettings() {
     pfx := Trim(IniRead(SettingsFile, "Triggers", "Prefix", ";"))
     Cfg["Prefix"] := pfx != "" && StrLen(pfx) <= 3 && !RegExMatch(pfx, "[\s:a-zA-Z0-9]") && !InStr(pfx, "``") ? pfx : ";"
     Cfg["LayoutAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Layout", "AfterStart", "yes"))), "^(no|off|0|false)$")
+    ; v3.35.3: after Ctrl+Alt+L (and the hourly SDS sign-in), SDS is kept in
+    ; its own spot for this many seconds, so it can't open over the Alert Grid
+    ; (0 = off). SdsSpot = x,y,w,h to use instead of the saved layout's SDS spot.
+    sw := Trim(IniRead(SettingsFile, "Layout", "SdsWatchSeconds", "120"))
+    Cfg["SdsWatchSecs"] := IsInteger(sw) && sw >= 0 ? Min(Integer(sw), 900) : 120
+    Cfg["SdsSpot"] := Trim(IniRead(SettingsFile, "Layout", "SdsSpot", ""))
     ; Ctrl+Alt+L signs into the Bally programs it just opened (after asking)
     Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
     ; The plain Caps Lock key (which does nothing with the guard on) clears the Alert Grid alerts
@@ -832,6 +839,7 @@ SdsResignDue() {
     Sleep 3000
     if prev && prev != sds && WinExist("ahk_id " prev)
         try WinActivate "ahk_id " prev
+    SdsKeepInSpot(Min(Cfg["SdsWatchSecs"], 60), "hourly sign-in")
 }
 
 
@@ -6651,8 +6659,10 @@ StartOfShift() {
     Tip("")
     if sites
         EdgeToFront(true)
-    if Cfg["LayoutAfterStart"]
+    if Cfg["LayoutAfterStart"] {
         RestoreLayout(true)
+        SdsKeepInSpot(Cfg["SdsWatchSecs"], "start of shift")
+    }
     if sites
         EdgeToFront(false)
     if missing != ""
@@ -8247,6 +8257,162 @@ RestoreLayout(auto := false) {
             . "Put SDS and Alert Grid where they belong, then press Ctrl+Alt+Shift+S to save your layout again. You only need to do this once.", "Watchlog", "Iconi"
     } else if !auto
         Tip("Put " moved " windows back.", 2500, true)
+}
+
+
+; =====================================================================
+;  KEEP SDS OUT OF THE ALERT GRID'S SPOT  (v3.35.3)
+;  Putting the layout back happens a few seconds after the start of shift
+;  sign-in, but SDS keeps changing after that: once signed in it swaps its
+;  login screen for the main screen (a new window, or the same one with a
+;  new title and size) and Java puts that wherever it likes, which on
+;  Jakob's bay was the Alert Grid's spot. So for a while after Ctrl+Alt+L
+;  (SdsWatchSeconds, default 120) Watchlog checks SDS once a second and
+;  puts it back in its spot when it
+;    - opens a new SDS window,
+;    - changes its title (login screen -> "SDS | Welcome, ..."), or
+;    - sits over the Alert Grid's spot.
+;  Dragging SDS somewhere else yourself is left alone (no new title).
+;  SDS's spot: [Layout] SdsSpot=x,y,w,h in settings.ini if set, else the
+;  SDS window in the saved layout (Ctrl+Alt+Shift+S). The Alert Grid's
+;  spot: the saved layout, else wherever the Alert Grid window is now.
+;  Small SDS windows (under half the spot's width or height, e.g. the
+;  login screen or a message) are only moved, not resized.
+; =====================================================================
+
+; The SDS spot to use, {x, y, w, h, max}, or "" if none is known
+SdsSpot() {
+    if RegExMatch(Cfg["SdsSpot"], "^\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$", &m)
+        return {x: Integer(m[1]), y: Integer(m[2]), w: Integer(m[3]), h: Integer(m[4]), max: 0, from: "settings.ini SdsSpot"}
+    return LayoutSpot("SDS")
+}
+
+; The first saved window of this kind (SDS, AlertGrid) in layout.ini, or ""
+LayoutSpot(kind) {
+    if !FileExist(LayoutFile) || IniRead(LayoutFile, "Layout", "format", "1") != "2"
+        return ""
+    loop Integer(IniRead(LayoutFile, "Layout", "count", "0")) {
+        sec := "W" A_Index
+        if IniRead(LayoutFile, sec, "exe", "") != "javaw.exe" || IniRead(LayoutFile, sec, "kind", "") != kind
+            continue
+        if IniRead(LayoutFile, sec, "nth", "1") != "1"
+            continue
+        return {x: Integer(IniRead(LayoutFile, sec, "x", "0")), y: Integer(IniRead(LayoutFile, sec, "y", "0"))
+            , w: Integer(IniRead(LayoutFile, sec, "w", "800")), h: Integer(IniRead(LayoutFile, sec, "h", "600"))
+            , max: Integer(IniRead(LayoutFile, sec, "max", "0")), from: "saved layout"}
+    }
+    return ""
+}
+
+; Where the Alert Grid goes: the saved layout, else its window now, or ""
+AlertGridSpot() {
+    if a := LayoutSpot("AlertGrid")
+        return a
+    try {
+        if hwnd := AlertGridWin() {
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+            return {x: x, y: y, w: w, h: h, max: 0, from: "Alert Grid window"}
+        }
+    }
+    return ""
+}
+
+; How much of the smaller of the two boxes the other one covers (0 to 1)
+SpotOverlap(a, b) {
+    w := Min(a.x + a.w, b.x + b.w) - Max(a.x, b.x)
+    h := Min(a.y + a.h, b.y + b.h) - Max(a.y, b.y)
+    if w <= 0 || h <= 0
+        return 0
+    small := Min(a.w * a.h, b.w * b.h)
+    return small > 0 ? (w * h) / small : 0
+}
+
+; Starts (or restarts) the watch: secs = how long, why = for the activity log
+SdsKeepInSpot(secs, why) {
+    if secs <= 0
+        return
+    spot := SdsSpot()
+    if !spot {
+        Activity("SDS spot: no SDS in the saved layout, so SDS isn't kept out of the Alert Grid's spot (open SDS and the Alert Grid where you want them, then Ctrl+Alt+Shift+S)")
+        return
+    }
+    ag := AlertGridSpot()
+    ; a layout saved while SDS sat on the Alert Grid would just keep it there
+    if ag && SpotOverlap(spot, ag) > 0.25 {
+        Activity("SDS spot: the " spot.from " has SDS over the Alert Grid's spot, nothing moved")
+        if IniRead(LayoutFile, "Layout", "sdsWarned", "0") != "1" {
+            try IniWrite 1, LayoutFile, "Layout", "sdsWarned"
+            MsgBox "Your saved window layout has SDS in the same spot as the Alert Grid, so Watchlog can't keep them apart.`n`n"
+                . "Put SDS and the Alert Grid where you want them, then press Ctrl+Alt+Shift+S to save your layout again.", "Watchlog", "Iconi"
+        }
+        return
+    }
+    SdsWatch.until := A_TickCount + secs * 1000
+    SdsWatch.spot := spot
+    SdsWatch.why := why
+    SdsWatch.placed := Map()
+    ; windows already in the spot (the layout was just put back) count as placed
+    for hwnd in SdsWindows()
+        try SdsWatch.placed[hwnd] := WinGetTitle("ahk_id " hwnd)
+    Activity("SDS spot: keeping SDS at " spot.x "," spot.y " (" spot.w "x" spot.h ", from the " spot.from ") for " secs " s after " why)
+    SetTimer SdsWatchTick, 1000
+}
+
+; Every SDS window on screen (javaw.exe, title starting with SDS)
+SdsWindows() {
+    list := []
+    for hwnd in WinGetList("ahk_exe javaw.exe") {
+        try {
+            if LayoutSkip(hwnd) || LayoutKind(hwnd, "javaw.exe") != "SDS"
+                continue
+            if WinGetMinMax("ahk_id " hwnd) = -1
+                continue
+            list.Push(hwnd)
+        }
+    }
+    return list
+}
+
+SdsWatchTick() {
+    if A_TickCount > SdsWatch.until {
+        SetTimer SdsWatchTick, 0
+        return
+    }
+    spot := SdsWatch.spot
+    ag := AlertGridSpot()
+    for hwnd in SdsWindows() {
+        try {
+            t := WinGetTitle("ahk_id " hwnd)
+            mm := WinGetMinMax("ahk_id " hwnd)
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+        } catch
+            continue
+        last := SdsWatch.placed.Has(hwnd) ? SdsWatch.placed[hwnd] : ""
+        reason := last = "" ? "new SDS window" : last != t ? "SDS changed screens" : ""
+        if reason = "" && ag && mm != 1 && SpotOverlap({x: x, y: y, w: w, h: h}, ag) > 0.25
+            reason := "SDS was over the Alert Grid's spot"
+        SdsWatch.placed[hwnd] := t
+        if reason = ""
+            continue
+        small := w < spot.w / 2 || h < spot.h / 2
+        if small {
+            ; a small window: just move it inside SDS's spot, same size
+            if Abs(x - spot.x) <= 8 && Abs(y - spot.y) <= 8
+                continue
+            try WinMove spot.x, spot.y, , , "ahk_id " hwnd
+        } else {
+            if mm = 0 && !spot.max && Abs(x - spot.x) <= 8 && Abs(y - spot.y) <= 8 && Abs(w - spot.w) <= 8 && Abs(h - spot.h) <= 8
+                continue
+            try {
+                if mm != 0
+                    WinRestore "ahk_id " hwnd
+                WinMove spot.x, spot.y, spot.w, spot.h, "ahk_id " hwnd
+                if spot.max
+                    WinMaximize "ahk_id " hwnd
+            }
+        }
+        Activity("SDS spot: moved SDS back to its spot (" reason ", " SdsWatch.why ")")
+    }
 }
 
 
