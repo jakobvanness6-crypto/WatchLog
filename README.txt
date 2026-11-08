@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.4  -  README
+  WATCHLOG  v3.35.5  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -665,6 +665,17 @@ TIME SAVED (tray > Time saved, or the Time saved button in Ctrl+Alt+J)
   length of what went in, minus what you typed (the shortcut, what you
   put in the boxes, one Tab or Enter per box). A box left blank saves
   nothing. Time is worked out at 40 words a minute (200 keystrokes).
+  Clicks too (v3.35.5): the clicks and menu picks Watchlog does for you
+  are counted apart, in a Clicks column, and each one adds half a
+  second (settings.ini [TimeSaved] SecondsPerClick=). Only the clicks
+  you would make by hand on the normal path: an Alert Grid clear is 5
+  to 7 (row, right-click, menu line, Submit, OK, clear button, no more
+  alerts box), a new iTrak daily log its taught clicks, a full-entry
+  log 1 per box plus Now, an incident 1 for Create Incident plus 1 per
+  box, ;audit 1 per box plus each Requested By click, an app switch 1.
+  Retries, waiting for windows and the mouse going back aren't counted.
+  Earlier days get a cautious estimate once, when v3.35.5 first starts
+  (see section 19).
   The window shows this shift, today, the last 7 and 30 days, and
   everything since the first day, with a Copy report button.
   Ctrl+Alt+J shows this shift's time saved at the top.
@@ -1394,6 +1405,34 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.35, newest first)
 -----------------------------------------------------------------------
+TIME SAVED COUNTS CLICKS AND MENU PICKS TOO  (v3.35.5)
+  - Time saved, Shift count and the dashboard now count the clicks and
+    menu picks Watchlog does for you, apart from keystrokes, in a new
+    Clicks column. Time saved = keystrokes at 40 words a minute, plus
+    half a second a click. Half a second is on purpose: about half the
+    usual research figure for pointing and clicking (about 1.2 s), so
+    the number stays cautious. Change it with settings.ini [TimeSaved]
+    SecondsPerClick=.
+  - Counted: Alert Grid clear all (5 to 7 clicks), iTrak new daily log,
+    each box in full-entry logs, incident reports and ;audit, End Time
+    Now, every Requested By click (a double-click counts as one), app
+    switches (one taskbar click). Not counted: retries, waiting for
+    windows, the mouse going back.
+  - The few clicks that used to be counted as made-up keystrokes (new
+    log, Now, Create Incident, Requested By, part of an Alert Grid
+    clear) are now only in Clicks, so nothing is counted twice.
+  - Copy report shows typing time and click time apart.
+  - Earlier days: the first time this version starts, it gives the days
+    already counted their clicks the best it can, from the per-item
+    counts kept since v3.16.0, at the low end of what each one clicks
+    now: Alert Grid clear 5, new daily log 1, app switch 1, full-entry
+    log 3, incident 6. ;audit and pasted logs get 0, because the old
+    counts can't tell them apart. The old made-up click keystrokes come
+    off at the same time. Days before v3.16.0 stay at 0 clicks. It runs
+    once (time saved.ini [Info] ClicksBackfilled=) and says what it did
+    in the Activity log.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 START WITH WINDOWS: NO MORE "DO YOU WANT TO RUN THIS FILE?"  (v3.35.4)
   - Windows asked "Do you want to run this file?" at every sign-in, and
     unticking "Always ask" never stuck. The cause: the Startup shortcut
