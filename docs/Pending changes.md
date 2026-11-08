@@ -16,9 +16,20 @@ Not included: code signing (needs IT/money, Jakob's step), reading data out of o
 Open questions for Jakob: how many bays and operators at first; who is the wording supervisor; is a SharePoint library already available; does the manager want a pilot with one other operator first.
 
 
-Current version: v3.35.3 (Nov 7, 2026): start of shift keeps SDS in its saved spot for 2 minutes, so it can't open over the Alert Grid (built, NOT run). Before that v3.35.2 (Nov 7, 2026): ;audit types Pit #2 / Pit #3 the way iTrak's list has them (it got Pit #1) and asks to teach the Start spot if it's missing, then types Start (built, NOT run). Before that v3.35.1 (Nov 6, 2026): new ;oc code word, opening and closing tables in one log (built, NOT run). Before that v3.35.0 (Nov 5, 2026): ;audit types real Start and End dates (exactly 20:00 apart), Area Audited waits longer (Pit 2, never Pit 1), Reference cleared before typing so NA is not doubled (built, NOT run). Before that v3.34.3 (Nov 3): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
+Current version: v3.35.4 (Nov 8, 2026): Start with Windows opens the installed copy, no more "Do you want to run this file?" at sign-in (built, NOT run). Before that v3.35.3 (Nov 7, 2026): start of shift keeps SDS in its saved spot for 2 minutes, so it can't open over the Alert Grid (built, NOT run). Before that v3.35.2 (Nov 7, 2026): ;audit types Pit #2 / Pit #3 the way iTrak's list has them (it got Pit #1) and asks to teach the Start spot if it's missing, then types Start (built, NOT run). Before that v3.35.1 (Nov 6, 2026): new ;oc code word, opening and closing tables in one log (built, NOT run). Before that v3.35.0 (Nov 5, 2026): ;audit types real Start and End dates (exactly 20:00 apart), Area Audited waits longer (Pit 2, never Pit 1), Reference cleared before typing so NA is not doubled (built, NOT run). Before that v3.34.3 (Nov 3): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
+
+## QUICK PICKER: upgrade the template finder (planned Nov 8, 2026; Jakob chose "Upgrade built-in finder"; waiting on "build it")
+Jakob wants a Flow Launcher-style picker. Ctrl+Alt+Space (ShowPicker / FindTemplates) already does search + live filter + Enter runs in the previous window. Planned additions, one version (v3.36.0):
+1. Pinned favourites at the top when the box is empty; Ctrl+P pins/unpins the selected row (marked with a star). Saved next to templates.txt on OneDrive so every bay shares them.
+2. Recent: last 10 templates run from anywhere (code word, finder, call pad), under the pins. Kept per PC, template names only, never the filled-in text.
+3. Smarter matching: initials ("cd" = Card Destruction) and a small boost for the ones used most.
+4. Full-entry daily logs (Ctrl+Alt+F list) in the same results.
+5. Optional compact look (box + list, no preview).
+Hotkey stays Ctrl+Alt+Space (avoid Alt+Space and Ctrl+Space); optional second one-hand numpad key if Jakob wants one.
+Safety: logins never listed; nothing typed into the search box; template runs only in the window he came from, same password rules as code words.
+
 
 ### Test results v3.33.0 (Jakob, Nov 1) and follow-ups. NOT built
 - Works: clock, Ctrl+Alt+I, code words fill the whole log, incident teach + fill (stops in Secondary Operator as designed), call pad cheque, autocorrect everywhere.
@@ -49,6 +60,13 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done in v3.35.4 (Nov 8)
+- Start with Windows: the "Do you want to run this file?" prompt at every sign-in came from Jakob's Startup shortcut opening a Watchlog.exe in OneDrive (he fixed it by hand Nov 8 and the prompt went away). Now the Startup shortcut always opens the installed copy (%LOCALAPPDATA%\Programs\Watchlog\Watchlog.exe) with /startup; Watchlog fixes a Watchlog.exe Startup shortcut pointing elsewhere each time it starts (logged).
+- Watchlog removes the "downloaded from the internet" mark (Zone.Identifier) from its own exe at every start and after install, update and go back a version.
+- tray > Advanced > Check start with Windows: where it runs from, where the shortcut points, OneDrive/network warning, one-click fix.
+- At sign-in (/startup, or Windows up under 3 min) the daily backup and team-folder update check wait 30 s.
+- Code signing not needed for this. Built, NOT run.
 
 ## Done in v3.35.3 (Nov 7)
 - ;face (templates.txt, wording Nov 7, 2026): the daily log Reference is now the Alert # (it was always blank before; Jakob thought it had been taken out). With Add another, the last alert's # is used. Guess at what he wants in Reference: confirm with him.

@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.3  -  README
+  WATCHLOG  v3.35.4  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -767,7 +767,8 @@ and the less-used items sit in sub-menus):
                                 (15), Make a copy to share (16), Edit
                                 templates / my templates / settings /
                                 the autocorrect list in Notepad, Open
-                                Watchlog folder, Choose my own update
+                                Watchlog folder, Check start with
+                                Windows (v3.35.4), Choose my own update
                                 folder, Back up my settings and templates
                                 now, Restore from a backup..., Go back to
                                 the previous version... (v3.28.0), Pause
@@ -1306,6 +1307,8 @@ YOUR OWN OTHER BAY PCs (script version)
   3. Double-click Watchlog.ahk. Then tray menu > Settings: tick
      "Start Watchlog when I sign in to Windows" and Save. (The
      Startup folder doesn't sync, so each PC needs this once.)
+     With the exe, the shortcut opens the installed copy on that PC,
+     never one in OneDrive (v3.35.4).
   4. Sign in to Edge with your work account once on that PC.
   5. The first time you use each login there, type its password once.
 
@@ -1391,6 +1394,28 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.35, newest first)
 -----------------------------------------------------------------------
+START WITH WINDOWS: NO MORE "DO YOU WANT TO RUN THIS FILE?"  (v3.35.4)
+  - Windows asked "Do you want to run this file?" at every sign-in, and
+    unticking "Always ask" never stuck. The cause: the Startup shortcut
+    opened a Watchlog.exe in OneDrive. Windows treats OneDrive (and
+    network folders) like the internet, so it asks every time.
+  - Now the Startup shortcut always opens the installed copy on this
+    PC's own drive (%LOCALAPPDATA%\Programs\Watchlog\Watchlog.exe).
+    Each time Watchlog starts it fixes a Watchlog.exe Startup shortcut
+    that points anywhere else, and says so in the Activity log.
+  - Watchlog also removes Windows' "downloaded from the internet" mark
+    from its own exe when it starts, and after it installs, updates or
+    goes back a version (that mark is the other thing that makes
+    Windows ask).
+  - Tray menu > Advanced > Check start with Windows: shows where
+    Watchlog runs from and where the Startup shortcut points, flags
+    OneDrive or network paths, and offers to fix the shortcut.
+  - Faster start at sign-in: the shortcut passes /startup, and then
+    the daily backup and the team-folder update check wait 30 seconds
+    (OneDrive is often still starting). Shortcuts work straight away.
+  - Code signing isn't needed for this.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 START OF SHIFT: SDS STAYS OUT OF THE ALERT GRID'S SPOT  (v3.35.3)
   - Ctrl+Alt+L put the windows back before SDS had finished signing in.
     SDS then opened its main screen on the Alert Grid's spot. Now, for 2

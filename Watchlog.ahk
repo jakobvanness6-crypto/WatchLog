@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.3"
-VERSION_DATE := "Nov 7, 2026"
+VERSION := "3.35.4"
+VERSION_DATE := "Nov 8, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -174,6 +174,11 @@ if A_IsCompiled {
     ; only one Watchlog at a time, even if an older copy or the script runs from elsewhere
     CloseOtherCopies()
     InstallBuiltIns()
+    ; v3.35.4: no "Do you want to run this file?" at the next sign-in
+    StartupFixLog := []
+    if ClearDownloadMark(A_ScriptFullPath)
+        StartupFixLog.Push("Removed the downloaded-file mark from " A_ScriptFullPath)
+    try FixStartupShortcut(true)
 }
 
 MoveFromOldName()
@@ -194,7 +199,12 @@ LoadTemplates()
 LoadApps()
 RegisterHotkeys()
 CheckScale()
-DailyBackup()
+; v3.35.4: right after sign-in OneDrive is still starting, so the backup and
+; the team-folder update check wait 30 s (hotkeys work straight away)
+if StartedAtSignIn()
+    SetTimer DailyBackup, -30000
+else
+    DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 BreakResume()
@@ -221,7 +231,14 @@ BuildCapsTag()
 SetTimer CheckCaps, 150
 
 ; A newer Watchlog in the team folder: offer it before anything else
-CheckForUpdate()
+; (30 s after a sign-in, see DailyBackup above)
+if StartedAtSignIn()
+    SetTimer CheckForUpdate, -30000
+else
+    CheckForUpdate()
+if IsSet(StartupFixLog)
+    for m in StartupFixLog
+        Activity(m)
 AnnounceVersion()
 ; First time on this PC: the setup window (it's the Settings window)
 if FirstRun
@@ -339,7 +356,7 @@ MoveFromOldName() {
             if SubStr(target, -18) = "\Log Templates.ahk" {
                 FileDelete A_LoopFileFullPath
                 if !FileExist(A_Startup "\Watchlog.lnk")
-                    FileCreateShortcut A_ScriptFullPath, A_Startup "\Watchlog.lnk", A_ScriptDir, , "Watchlog", FileExist(IconFile) ? IconFile : ""
+                    FileCreateShortcut StartupTarget(), A_Startup "\Watchlog.lnk", A_ScriptDir, "/startup", "Watchlog", FileExist(IconFile) ? IconFile : ""
                 moved.Push("Startup shortcut now starts Watchlog")
             }
         }
@@ -5728,6 +5745,7 @@ GoBackVersion() {
                 try FileMove keep, A_ScriptFullPath, 1
                 throw err
             }
+            ClearDownloadMark(A_ScriptFullPath)
         } else {
             FileCopy A_ScriptFullPath, keep, true
             FileCopy best, A_ScriptFullPath, true
@@ -7743,19 +7761,121 @@ StartupShortcuts() {
     Loop Files A_Startup "\*.lnk" {
         try {
             FileGetShortcut A_LoopFileFullPath, &target, , &args
-            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName)
+            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName) || RegExMatch(target, "i)\\Watchlog\.(exe|ahk)$")
                 found.Push(A_LoopFileFullPath)
         }
     }
     return found
 }
 
+; v3.35.4: what the Startup shortcut should open. The installed copy on
+; this PC's own drive when there is one: a shortcut into OneDrive (or a
+; network folder) makes Windows ask "Do you want to run this file?" at
+; every sign-in, and it can't remember the answer.
+StartupTarget() => (A_IsCompiled && FileExist(INSTALL_EXE)) ? INSTALL_EXE : A_ScriptFullPath
+
+; True for a path in OneDrive or on a network share
+IsCloudPath(path) {
+    if SubStr(path, 1, 2) = "\\"
+        return true
+    for v in ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"] {
+        d := EnvGet(v)
+        if d != "" && StrLower(SubStr(path, 1, StrLen(d) + 1)) = StrLower(d "\")
+            return true
+    }
+    return InStr(path, "\OneDrive") > 0
+}
+
+; Removes the "downloaded from the internet" mark Windows keeps beside a
+; file (its Zone.Identifier stream). Copying an exe out of a zip or from
+; OneDrive brings that mark along, and the mark is what makes Windows ask
+; before running it. Returns true when there was a mark to remove.
+ClearDownloadMark(path) {
+    if path = "" || !FileExist(path)
+        return false
+    return DllCall("DeleteFileW", "Str", path ":Zone.Identifier", "Int") != 0
+}
+
+; Makes the Startup shortcut open StartupTarget() with /startup (so Watchlog
+; knows Windows just started). quiet = only fix a Watchlog.exe shortcut,
+; never a script one someone pointed somewhere on purpose.
+FixStartupShortcut(quiet := true) {
+    fixed := 0
+    want := StartupTarget()
+    SplitPath want, , &wantDir
+    for lnk in StartupShortcuts() {
+        try {
+            FileGetShortcut lnk, &target, , &args
+            if StrLower(target) = StrLower(want) && Trim(args) = "/startup"
+                continue
+            if quiet && !(A_IsCompiled && RegExMatch(target, "i)\\Watchlog\.exe$"))
+                continue
+            FileCreateShortcut want, lnk, wantDir, "/startup", "Watchlog", FileExist(IconFile) ? IconFile : ""
+            Activity("Startup shortcut " lnk " now opens " want " (it opened " target ")")
+            fixed += 1
+        }
+    }
+    return fixed
+}
+
+; Started by the Startup shortcut, or Windows started under 3 minutes ago
+StartedAtSignIn() => (A_Args.Length && A_Args[1] = "/startup") || A_TickCount < 180000
+
+; tray > Advanced > Check start with Windows (v3.35.4)
+CheckStartWithWindows() {
+    have := StartupShortcuts()
+    me := A_ScriptFullPath
+    r := "Watchlog is running from:`n" me (IsCloudPath(me) ? "`n  (OneDrive or a network folder: Windows will ask before running it)" : "") "`n`n"
+    if A_IsCompiled
+        r .= "Installed copy on this PC: " (FileExist(INSTALL_EXE) ? INSTALL_EXE : "none") "`n`n"
+    bad := 0
+    if !have.Length {
+        r .= "Start with Windows: off (no Watchlog shortcut in the Startup folder).`n"
+    } else {
+        for lnk in have {
+            target := "", args := ""
+            try FileGetShortcut lnk, &target, , &args
+            SplitPath lnk, &name
+            r .= "Startup shortcut '" name "' opens:`n" target (args != "" ? "  " args : "") "`n"
+            if IsCloudPath(target) {
+                r .= "  PROBLEM: that's in OneDrive or a network folder, so Windows asks before running it at every sign-in.`n"
+                bad += 1
+            } else if !FileExist(target) {
+                r .= "  PROBLEM: that file isn't there.`n"
+                bad += 1
+            } else if StrLower(target) != StrLower(StartupTarget()) || Trim(args) != "/startup" {
+                r .= "  Not the installed copy (or missing /startup).`n"
+                bad += 1
+            } else {
+                r .= "  OK.`n"
+            }
+        }
+    }
+    if A_IsCompiled {
+        marked := DllCall("GetFileAttributesW", "Str", me ":Zone.Identifier", "Int") != -1
+        r .= "`nDownloaded-file mark on Watchlog.exe: " (marked ? "yes (Watchlog removes it each time it starts)" : "none") "`n"
+    }
+    Activity("Checked start with Windows: " (have.Length ? bad " problem(s)" : "off"))
+    if !have.Length || !bad {
+        MsgBox r, "Watchlog: start with Windows", "Iconi"
+        return
+    }
+    if MsgBox(r "`nFix it? The shortcut will open " StartupTarget() ".", "Watchlog: start with Windows", "YesNo Icon! Default1") = "Yes" {
+        FixStartupShortcut(false)
+        Tip("Startup shortcut fixed", 2000, true)
+    }
+}
+
 SetStartup(on) {
     have := StartupShortcuts()
-    if on && !have.Length {
+    if on && have.Length {
+        FixStartupShortcut(true)
+    } else if on {
         try {
-            FileCreateShortcut A_ScriptFullPath, A_Startup "\Watchlog.lnk", A_ScriptDir, , "Watchlog", FileExist(IconFile) ? IconFile : ""
-            Activity("Start with Windows turned on")
+            want := StartupTarget()
+            SplitPath want, , &wantDir
+            FileCreateShortcut want, A_Startup "\Watchlog.lnk", wantDir, "/startup", "Watchlog", FileExist(IconFile) ? IconFile : ""
+            Activity("Start with Windows turned on (" want ")")
         } catch as e {
             MsgBox "Couldn't add it to the Startup folder:`n" e.Message, "Watchlog", "Icon!"
         }
@@ -9713,6 +9833,8 @@ InstallSelf(fresh) {
         }
         Sleep 300
     }
+    if copied
+        ClearDownloadMark(INSTALL_EXE)
     if !copied {
         MsgBox "Watchlog couldn't install itself to:`n" INSTALL_EXE "`n`nIt will keep running from where it is.", "Watchlog setup", "Icon!"
         return false
@@ -9787,7 +9909,7 @@ SetShortcut(lnk, want) {
                 FileDelete lnk
             return
         }
-        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, , "Watchlog - log templates"
+        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, lnk = StartupLink() ? "/startup" : "", "Watchlog - log templates"
     } catch as err {
         MsgBox "Watchlog couldn't update the shortcut:`n" lnk "`n`n" err.Message, "Watchlog", "Icon!"
     }
@@ -9819,6 +9941,7 @@ UpdateExeFrom(f, v) {
     ok := false
     try {
         FileCopy f, tmp, true
+        ClearDownloadMark(tmp)
         ok := RunWait('"' tmp '" /selftest', , "Hide") = 0
     }
     try FileDelete tmp
@@ -9836,6 +9959,7 @@ UpdateExeFrom(f, v) {
         FileMove A_ScriptFullPath, backup, 1
         moved := true
         FileCopy f, A_ScriptFullPath, 1
+        ClearDownloadMark(A_ScriptFullPath)
     } catch as err {
         if moved
             try FileMove backup, A_ScriptFullPath, 1
@@ -10163,6 +10287,7 @@ BuildTrayMenu() {
     MenuItem(more, "Edit settings file", (*) => EditFile(SettingsFile), 0xE8A5)
     MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
     MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
+    MenuItem(more, "Check start with Windows", (*) => CheckStartWithWindows(), 0xE7E8)
     MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
     more.Add()
     MenuItem(more, "Back up my settings and templates now", (*) => BackupNow(), 0xE74E)
