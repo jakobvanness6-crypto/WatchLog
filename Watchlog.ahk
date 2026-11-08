@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.4"
+VERSION := "3.35.5"
 VERSION_DATE := "Nov 8, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -139,6 +139,7 @@ PadStart := ""           ; HH:mm the current call began
 PadStamp := 0            ; when the pad text last changed
 DashWin := ""             ; the open Shift dashboard window
 PadKeys := 0             ; keys typed on the pad for this call (for the time saved tally)
+NewLogClicks := 1        ; clicks the last iTrak new daily log took (for the time saved tally, v3.35.5)
 PadHistory := []         ; earlier calls this shift, newest first
 AutoMap := Map()         ; casino autocorrect: what you type -> what it becomes
 AutoMap.CaseSense := false
@@ -191,6 +192,7 @@ Loop Reg RegKey
 
 TrimActivity()
 TrimDayItems()
+BackfillClicks()
 Activity("Started v" VERSION " on " A_ComputerName " (Windows user " A_UserName ") from " A_ScriptDir)
 OnExit(LogExit)
 OnError(LogError)
@@ -3889,8 +3891,8 @@ ShowJournal() {
         st := JournalStats(file)
         h := "Shift started " st.started "`n" st.total " logs, " st.first " to " st.last
             . (st.ended != "" ? "   (ended " st.ended ")" : latest.open ? "   (still going)" : "")
-        if sv.keys > 0
-            h .= "`nTime saved this shift: " SavedTime(sv.keys) " (" Commas(sv.keys) " keystrokes)"
+        if sv.keys > 0 || sv.clicks > 0
+            h .= "`nTime saved this shift: " SavedTime(sv.keys, sv.clicks) " (" Commas(sv.keys) " keystrokes, " Commas(sv.clicks) " clicks)"
         headT.Text := h
         counts.Value := st.list
         ed.Value := StrReplace(shiftText, "`n", "`r`n")
@@ -4008,6 +4010,15 @@ LogKeys(l, day) {
     return it.n > 0 ? Round(it.keys / it.n) : 0
 }
 
+; What a log type clicked for you, on average (journal lines don't keep clicks)
+LogClicks(name, day) {
+    name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
+    it := ItemRow(IniRead(SavedFile, "DayItems", day "|" name, ""))
+    if it.n < 1
+        it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
+    return it.n > 0 ? Round(it.clicks / it.n) : 0
+}
+
 ; The edit made in the journal window goes through to every count: Shift count,
 ; this shift, Time saved (day, week, month, since the start) and the dashboard.
 ; A log taken out comes off with its own keystrokes; one added by hand goes on
@@ -4016,7 +4027,7 @@ JournalApplyEdit(oldText, newText, day) {
     oldL := JournalLogs(oldText), newL := JournalLogs(newText)
     gone := LogsMissingFrom(oldL, newL), came := LogsMissingFrom(newL, oldL)
     for l in gone
-        AdjustCount(l.name, -1, -LogKeys(l, day), day)
+        AdjustCount(l.name, -1, -LogKeys(l, day), day, -LogClicks(l.name, day))
     for l in came
         AdjustCount(l.name, 1, l.tagged ? l.keys : 0, day)
     return {removed: gone.Length, added: came.Length}
@@ -4024,33 +4035,33 @@ JournalApplyEdit(oldText, newText, day) {
 
 ; Adds dn logs and dkeys keystrokes (either can be negative, never below 0)
 ; to the item in every tally
-AdjustCount(name, dn, dkeys, day) {
+AdjustCount(name, dn, dkeys, day, dclicks := 0) {
     name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
     try {
-        inShift := CountBump("ShiftItems", name, dn, dkeys)
-        CountBump("DayItems", day "|" name, dn, dkeys)
+        inShift := CountBump("ShiftItems", name, dn, dkeys, dclicks)
+        CountBump("DayItems", day "|" name, dn, dkeys, dclicks)
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
-        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys)
-        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys), d.clicks := Max(0, d.clicks + dclicks)
+        IniWrite RowStr(d), SavedFile, "Days", day
         ; this shift's totals only when this shift's item tally had the log
         ; (or, for an added log, while the shift is still going)
         if dn < 0 ? inShift : !IniRead(SavedFile, "Shift", "Ended", 0) {
             sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
-            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys)
-            IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys), sh.clicks := Max(0, sh.clicks + dclicks)
+            IniWrite RowStr(sh), SavedFile, "Shift", "Counts"
         }
     }
 }
 
-; One "times,keystrokes" line: add dn / dkeys (clamped at 0, deleted at 0 times).
-; Returns whether the line had anything in it before.
-CountBump(section, key, dn, dkeys) {
+; One "times,keystrokes,clicks" line: add dn / dkeys / dclicks (clamped at 0,
+; deleted at 0 times). Returns whether the line had anything in it before.
+CountBump(section, key, dn, dkeys, dclicks := 0) {
     it := ItemRow(IniRead(SavedFile, section, key, ""))
-    n := Max(0, it.n + dn), k := Max(0, it.keys + dkeys)
+    n := Max(0, it.n + dn), k := Max(0, it.keys + dkeys), c := Max(0, it.clicks + dclicks)
     if n = 0 {
         try IniDelete SavedFile, section, key
     } else {
-        IniWrite n "," k, SavedFile, section, key
+        IniWrite n "," k "," c, SavedFile, section, key
     }
     return it.n > 0
 }
@@ -4627,7 +4638,11 @@ ClearAlerts() {
         Activity("Alert Grid: cleared all alerts" (keysUsed ? " (picked the menu line with the arrow keys)" : "")
             . (c["Src"] = "team" ? " (team setup)" : "")
             . (checked ? "" : " (list didn't change colour after Ctrl+A: only one alert, or Ctrl+A missed)"))
-        CountSaved("", 3, "Alert Grid clear")   ; keystrokes only: a clear isn't a log, a login or a stamp
+        ; a clear isn't a log, a login or a stamp. By hand it's Ctrl+A (2 keys)
+        ; and these clicks: the row, right-click, the menu line, Submit, OK, and
+        ; the clear-acknowledged button and "no more alerts" box when taught (v3.35.5)
+        ac := 5 + (IsInteger(c["ClearX"]) && IsInteger(c["ClearY"]) ? 1 : 0) + (IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) ? 1 : 0)
+        CountSaved("", 2, "Alert Grid clear", ac)
     } else {
         Activity("Alert Grid: clear all didn't finish" (line ? "" : " (no menu line set for the arrow keys: Settings > Alert Grid)"))
     }
@@ -4836,6 +4851,7 @@ ITrakSpot(hwnd, tx, ty, w0, h0, &x, &y) {
 }
 
 ITrakNewLog(count := true) {
+    global NewLogClicks
     c := ITrakLoad()
     if !c {
         MsgBox "iTrak's new daily log click hasn't been taught on this PC yet (and the team folder has none for this screen).`n`nPress Ctrl+Alt+Shift+I once and follow the steps.", "New iTrak daily log", "Icon!"
@@ -4895,8 +4911,9 @@ ITrakNewLog(count := true) {
     if count
         Tip("New daily log", 1000)
     Activity("iTrak: new daily log clicked (" n " click" (n = 1 ? "" : "s") ", window " cw "x" ch ")" (c["Src"] = "team" ? " (team setup)" : ""))
+    NewLogClicks := n       ; for the full-entry log's clicks saved (v3.35.5)
     if count
-        CountSaved("", 2, "iTrak new daily log")
+        CountSaved("", 0, "iTrak new daily log", n)
     return true
 }
 
@@ -5057,7 +5074,8 @@ SavedBay() {
 ; few letters, Enter, the click), the full length of the Reference and
 ; the Synopsis plus a click each, and the 2 for the new-log click.
 RunEntry(e, useOpen := false) {
-    global EntryFields, LastRun
+    global EntryFields, LastRun, NewLogClicks
+    clicks := 0         ; clicks saved (v3.35.5): new log, each box, End Time Now
     f := EntryLoad()
     if !f {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
@@ -5115,6 +5133,7 @@ RunEntry(e, useOpen := false) {
         before := EntryWins()
         if !ITrakNewLog(false)
             return
+        clicks += NewLogClicks
         ; wait (at most EntryWait ms) for the NEW Daily Log Entry window
         wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "8000"))
         deadline := A_TickCount + wait
@@ -5145,7 +5164,7 @@ RunEntry(e, useOpen := false) {
     LastRun := {e: e, syn: syn}
     EntryRefs[win] := e.ref        ; Custom 3 of an incident made from this log (v3.33.0)
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
-    keys := 2
+    keys := 0       ; (was 2 for the new log click: clicks are counted apart from v3.35.5)
     for k in EntryFields {
         if vals[k] = ""
             continue
@@ -5162,6 +5181,7 @@ RunEntry(e, useOpen := false) {
         MouseMove x, y, 0
         Sleep 60
         Click
+        clicks += 1
         Sleep pause
         if k = "Synopsis" {
             Paste(vals[k], true)
@@ -5191,7 +5211,7 @@ RunEntry(e, useOpen := false) {
             MouseMove x, y, 0
             Sleep 60
             Click
-            keys += 1
+            clicks += 1
             Sleep 120
         } else
             Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
@@ -5200,8 +5220,8 @@ RunEntry(e, useOpen := false) {
     if IsBreakLog(e)
         BreakBegin(win)
     Tip("Filled in: " e.name, 1500)
-    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
-    CountSaved("log", keys, "Full log: " e.name)
+    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved)")
+    CountSaved("log", keys, "Full log: " e.name, clicks)
     Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
 }
 
@@ -5869,12 +5889,17 @@ UpdateFrom(f, v) {
 ;  Every log, login and stamp adds the keystrokes it saved: the length
 ;  of what went in minus what you typed (the shortcut, what you put in
 ;  the boxes, one Tab or Enter per box). Time is worked out at 40 words
-;  a minute (200 keystrokes). Kept per day in time saved.ini in
+;  a minute (200 keystrokes). From v3.35.5 the clicks and menu picks
+;  Watchlog does for you are counted too, apart from keystrokes (Alert
+;  Grid clears, iTrak new log, the daily log / incident / audit boxes,
+;  Requested By route, app switches), at [TimeSaved] SecondsPerClick=
+;  (default 0.5) each. Only the clicks you'd make by hand: not retries,
+;  not waiting for windows, not the mouse going back. Kept per day in time saved.ini in
 ;  %LOCALAPPDATA%\Watchlog: numbers only, never log text or passwords.
 ;  A shift starts with the first count after End of shift or after 6
 ;  hours with nothing counted.
 ; =====================================================================
-CountSaved(kind, keys, name := "") {
+CountSaved(kind, keys, name := "", clicks := 0) {
     if IsObject(TutorialWin)
         return
     try {
@@ -5882,8 +5907,8 @@ CountSaved(kind, keys, name := "") {
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
         if kind != ""
             d.%kind% += 1
-        d.keys += keys
-        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        d.keys += keys, d.clicks += clicks
+        IniWrite RowStr(d), SavedFile, "Days", day
         if IniRead(SavedFile, "Info", "First", "") = ""
             IniWrite day, SavedFile, "Info", "First"
         ; this shift
@@ -5899,31 +5924,35 @@ CountSaved(kind, keys, name := "") {
             ; the shift count: how many times, and keystrokes saved, per item
             name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
             it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
-            IniWrite (it.n + 1) "," (it.keys + keys), SavedFile, "ShiftItems", name
+            IniWrite (it.n + 1) "," (it.keys + keys) "," (it.clicks + clicks), SavedFile, "ShiftItems", name
             di := ItemRow(IniRead(SavedFile, "DayItems", day "|" name, ""))
-            IniWrite (di.n + 1) "," (di.keys + keys), SavedFile, "DayItems", day "|" name
+            IniWrite (di.n + 1) "," (di.keys + keys) "," (di.clicks + clicks), SavedFile, "DayItems", day "|" name
         }
         if kind != ""
             sh.%kind% += 1
-        sh.keys += keys
-        IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+        sh.keys += keys, sh.clicks += clicks
+        IniWrite RowStr(sh), SavedFile, "Shift", "Counts"
         IniWrite A_Now, SavedFile, "Shift", "Last"
     }
 }
 
-; "times,keystrokes" -> an object
+; "times,keystrokes,clicks" -> an object (older lines have no clicks: 0)
 ItemRow(str) {
     p := StrSplit(str, ",")
     num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
-    return {n: num(1), keys: num(2)}
+    return {n: num(1), keys: num(2), clicks: num(3)}
 }
 
-; "logs,logins,stamps,keystrokes" -> an object
+; "logs,logins,stamps,keystrokes,clicks" -> an object (older lines have no
+; clicks: 0. Clicks are counted from v3.35.5 on, never guessed for before)
 SavedRow(str) {
     p := StrSplit(str, ",")
     num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
-    return {log: num(1), login: num(2), stamp: num(3), keys: num(4)}
+    return {log: num(1), login: num(2), stamp: num(3), keys: num(4), clicks: num(5)}
 }
+
+; an object -> "logs,logins,stamps,keystrokes,clicks"
+RowStr(d) => d.log "," d.login "," d.stamp "," d.keys "," d.clicks
 
 ; This shift's counts (all zero when the last shift has ended)
 SavedShift() {
@@ -5947,14 +5976,33 @@ SavedSince(from) {
         if from != "" && StrCompare(SubStr(line, 1, eq - 1), from) < 0
             continue
         d := SavedRow(SubStr(line, eq + 1))
-        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.days += 1
+        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.clicks += d.clicks, t.days += 1
     }
     return t
 }
 
-; Keystrokes -> "about 12 minutes" / "about 3.5 hours", at 200 a minute
-SavedTime(keys) {
-    mins := keys / 200
+; Seconds one click or menu pick that Watchlog does for you counts as in
+; Time saved (v3.35.5). settings.ini [TimeSaved] SecondsPerClick= (default
+; 0.5, Jakob's pick: about half the usual research figure of about 1.2 s to
+; point and click with the mouse, on purpose, so the number stays cautious)
+ClickSecs() {
+    v := Trim(IniRead(SettingsFile, "TimeSaved", "SecondsPerClick", "0.5"))
+    return IsNumber(v) && v >= 0 && v <= 10 ? v + 0 : 0.5
+}
+
+; "half a second" / "1 second" / "1.5 seconds", for the Time saved windows
+ClickSecsText() {
+    v := ClickSecs()
+    if v = 0.5
+        return "half a second"
+    t := RegExReplace(RegExReplace(Format("{:.2f}", v), "0+$"), "\.$")
+    return t " second" (v = 1 ? "" : "s")
+}
+
+; Keystrokes (and clicks) -> "about 12 minutes" / "about 3.5 hours":
+; keystrokes at 200 a minute (40 words a minute), clicks at ClickSecs() each
+SavedTime(keys, clicks := 0) {
+    mins := keys / 200 + clicks * ClickSecs() / 60
     if mins < 1
         return "under a minute"
     if mins < 60
@@ -6006,24 +6054,25 @@ ShowShiftCount() {
     start := last := ""
     try start := IniRead(SavedFile, "Shift", "Start", "")
     try last := IniRead(SavedFile, "Shift", "Last", "")
-    total := 0, keysTotal := 0
+    total := 0, keysTotal := 0, clicksTotal := 0
     for it in items
-        total += it.n, keysTotal += it.keys
+        total += it.n, keysTotal += it.keys, clicksTotal += it.clicks
     span := live && start != "" && last != "" ? "from " FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") : "nothing counted yet"
     g := WGui("+AlwaysOnTop", "Shift count  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     g.AddText("w520", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
-    lv := g.AddListView("w520 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved"])
+    lv := g.AddListView("w520 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved", "Clicks saved"])
     report := "Watchlog shift count on " A_ComputerName " (" span ")`r`n"
     for it in items {
-        lv.Add(, it.name, it.n, Commas(it.keys))
-        report .= it.name ": " it.n " (" Commas(it.keys) " keystrokes saved)`r`n"
+        lv.Add(, it.name, it.n, Commas(it.keys), Commas(it.clicks))
+        report .= it.name ": " it.n " (" Commas(it.keys) " keystrokes, " Commas(it.clicks) " clicks saved)`r`n"
     }
-    lv.ModifyCol(1, 260), lv.ModifyCol(2, 70), lv.ModifyCol(3, 130)
-    sum := total " things done, " Commas(keysTotal) " keystrokes saved, " SavedTime(keysTotal) " at 40 words a minute"
+    lv.ModifyCol(1, 220), lv.ModifyCol(2, 55), lv.ModifyCol(3, 120), lv.ModifyCol(4, 100)
+    sum := total " things done, " Commas(keysTotal) " keystrokes and " Commas(clicksTotal) " clicks saved, " SavedTime(keysTotal, clicksTotal)
+        . " (typing at 40 words a minute, " ClickSecsText() " a click)"
     report .= "TOTAL: " sum "`r`n"
-    g.AddText("xm w480", "Total: " sum)
+    g.AddText("xm w520", "Total: " sum)
     g.AddButton("xm y+12 w120", "Start a new count").OnEvent("Click", NewCount)
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
@@ -6058,17 +6107,21 @@ ShowTimeSaved() {
     g := WGui("+AlwaysOnTop", "Time saved  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
-    g.AddText("w560", "Keystrokes Watchlog saved you: what went in, minus what you typed. Time is worked out at 40 words a minute.")
-    lv := g.AddListView("w560 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Keystrokes saved", "Time saved"])
-    report := "Watchlog time saved on " A_ComputerName " (keystrokes saved, at 40 words a minute)`r`n"
+    cs := ClickSecsText()
+    g.AddText("w640", "Keystrokes Watchlog saved you (what went in, minus what you typed) and the clicks and menu picks it did for you. "
+        . "Time is keystrokes at 40 words a minute, plus " cs " for each click. Waiting for windows isn't counted. "
+        . "Clicks are counted from v3.35.5 on.")
+    lv := g.AddListView("w640 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Keystrokes", "Clicks", "Time saved"])
+    report := "Watchlog time saved on " A_ComputerName " (keystrokes at 40 words a minute, plus " cs " a click; clicks counted from v3.35.5 on)`r`n"
     for r in rows {
         t := r[2]
-        lv.Add(, r[1], t.log, t.login, t.stamp, Commas(t.keys), SavedTime(t.keys))
-        report .= r[1] ": " t.log " logs, " t.login " logins, " Commas(t.keys) " keystrokes, " SavedTime(t.keys)
+        lv.Add(, r[1], t.log, t.login, t.stamp, Commas(t.keys), Commas(t.clicks), SavedTime(t.keys, t.clicks))
+        report .= r[1] ": " t.log " logs, " t.login " logins, " Commas(t.keys) " keystrokes (" SavedTime(t.keys) "), "
+            . Commas(t.clicks) " clicks (" SavedTime(0, t.clicks) "), " SavedTime(t.keys, t.clicks) " in all"
             . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
     }
-    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 120), lv.ModifyCol(6, 120)
-    g.AddButton("xm+142 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 90), lv.ModifyCol(6, 70), lv.ModifyCol(7, 120)
+    g.AddButton("xm+222 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
     g.AddButton("x+8 yp w110", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
@@ -6105,6 +6158,90 @@ ItemKind(name) {
     if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new )")
         return "other"
     return "log"
+}
+
+; Once, the first time v3.35.5 or later starts: gives the days already
+; counted their clicks, the best it can (Jakob, Nov 8: "make this retroactive
+; the best you can"). Only the per-item lines ([DayItems] from v3.16.0 on,
+; and this shift's [ShiftItems]) say what was done, so days before v3.16.0
+; stay at 0 clicks. Cautious numbers per time, the low end of what each one
+; clicks now: Alert Grid clear 5, iTrak new daily log 1, app switch 1,
+; full-entry log 3, incident 6. ;audit and anything else get 0 (the log name
+; doesn't say whether it was filled in by clicks or pasted).
+; The clicks that used to be counted as made-up keystrokes come off the
+; keystrokes at the same time, so nothing is counted twice: Alert Grid clear
+; 1, new daily log 2, full-entry log 2, incident 2 (never below 0).
+; Lines that already have clicks (3 numbers) are left alone.
+BackfillClicks() {
+    try {
+        if IniRead(SavedFile, "Info", "ClicksBackfilled", "") != ""
+            return
+    } catch
+        return
+    est(name) {
+        if name = "Alert Grid clear"
+            return [5, 1]
+        if name = "iTrak new daily log"
+            return [1, 2]
+        if SubStr(name, 1, 10) = "Switch to "
+            return [1, 0]
+        if SubStr(name, 1, 10) = "Full log: "
+            return [3, 2]
+        if SubStr(name, 1, 10) = "Incident: "
+            return [6, 2]
+        return [0, 0]
+    }
+    days := Map(), totalClicks := 0
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if !bar || !eq || bar > eq
+                continue
+            val := SubStr(line, eq + 1)
+            if StrSplit(val, ",").Length >= 3
+                continue
+            day := SubStr(line, 1, bar - 1), name := SubStr(line, bar + 1, eq - bar - 1)
+            it := ItemRow(val), e := est(name)
+            c := it.n * e[1], k := Max(0, it.keys - it.n * e[2])
+            IniWrite it.n "," k "," c, SavedFile, "DayItems", day "|" name
+            if !days.Has(day)
+                days[day] := {clicks: 0, keysOff: 0}
+            days[day].clicks += c, days[day].keysOff += it.keys - k
+            totalClicks += c
+        }
+    }
+    for day, a in days {
+        try {
+            d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+            d.clicks += a.clicks, d.keys := Max(0, d.keys - a.keysOff)
+            IniWrite RowStr(d), SavedFile, "Days", day
+        }
+    }
+    ; this shift (if one is going): its own item lines
+    try {
+        sc := 0, so := 0
+        section := IniRead(SavedFile, "ShiftItems")
+        for line in StrSplit(section, "`n", "`r") {
+            if !(eq := InStr(line, "="))
+                continue
+            val := SubStr(line, eq + 1), name := SubStr(line, 1, eq - 1)
+            if StrSplit(val, ",").Length >= 3
+                continue
+            it := ItemRow(val), e := est(name)
+            c := it.n * e[1], k := Max(0, it.keys - it.n * e[2])
+            IniWrite it.n "," k "," c, SavedFile, "ShiftItems", name
+            sc += c, so += it.keys - k
+        }
+        if sc || so {
+            sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
+            sh.clicks += sc, sh.keys := Max(0, sh.keys - so)
+            IniWrite RowStr(sh), SavedFile, "Shift", "Counts"
+        }
+    }
+    try IniWrite FormatTime(, "yyyy-MM-dd"), SavedFile, "Info", "ClicksBackfilled"
+    if totalClicks
+        Activity("Time saved: gave " days.Count " earlier day(s) " Commas(totalClicks) " estimated clicks (cautious, from the per-item counts), and took the old made-up click keystrokes off")
 }
 
 ; Drops [DayItems] lines older than 400 days (once, when Watchlog starts)
@@ -6185,7 +6322,7 @@ DashRange(from, to) {
     return r
 }
 
-; Rows for the last `count` days, newest first: [{day, label, logs, alerts, keys}]
+; Rows for the last `count` days, newest first: [{day, label, logs, alerts, keys, clicks}]
 DashDays(count) {
     rng := DashRange(FormatTime(DateAdd(A_Now, -(count - 1), "Days"), "yyyy-MM-dd"), FormatTime(, "yyyy-MM-dd"))
     rows := []
@@ -6194,7 +6331,7 @@ DashDays(count) {
         day := FormatTime(t, "yyyy-MM-dd")
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
         al := rng.days.Has(day) ? rng.days[day].alerts : 0
-        rows.Push({day: day, label: FormatTime(t, "ddd MMM d"), logs: d.log, alerts: al, keys: d.keys})
+        rows.Push({day: day, label: FormatTime(t, "ddd MMM d"), logs: d.log, alerts: al, keys: d.keys, clicks: d.clicks})
     }
     return {rows: rows, range: rng}
 }
@@ -6205,9 +6342,9 @@ HtmlSafe(s) => StrReplace(StrReplace(StrReplace(s, "&", "&amp;"), "<", "&lt;"), 
 
 ; What the This shift tab shows: {logs, alerts, keys, span, items(log types)}
 ShiftFacts() {
-    f := {logs: 0, alerts: 0, keys: 0, span: "nothing counted yet", types: []}
+    f := {logs: 0, alerts: 0, keys: 0, clicks: 0, span: "nothing counted yet", types: []}
     sh := SavedShift()
-    f.logs := sh.log, f.keys := sh.keys
+    f.logs := sh.log, f.keys := sh.keys, f.clicks := sh.clicks
     start := last := ""
     try start := IniRead(SavedFile, "Shift", "Start", "")
     try last := IniRead(SavedFile, "Shift", "Last", "")
@@ -6227,7 +6364,7 @@ ShiftFacts() {
 
 DashSummaryText(f, withTime) {
     s := "Shift summary, " A_ComputerName ", " FormatTime(, "yyyy-MM-dd") " (" f.span ")`r`n"
-    s .= f.logs " logs, " f.alerts " Alert Grid clears" (withTime ? ", " SavedTime(f.keys) " of typing saved" : "") "`r`n"
+    s .= f.logs " logs, " f.alerts " Alert Grid clears" (withTime ? ", " SavedTime(f.keys, f.clicks) " saved (typing and clicks)" : "") "`r`n"
     for it in f.types
         s .= "  " Format("{:4}", it.n) "  " it.name "`r`n"
     return s
@@ -6247,7 +6384,7 @@ DashSheetHtml(f, withTime) {
         . "<div class='tile'><b>" f.logs "</b><span>logs</span></div>"
         . "<div class='tile'><b>" f.alerts "</b><span>Alert Grid clears</span></div>"
     if withTime
-        h .= "<div class='tile'><b>" StrReplace(StrReplace(SavedTime(f.keys), "about ", ""), "under a minute", "&lt;1 min") "</b><span>typing saved</span></div>"
+        h .= "<div class='tile'><b>" StrReplace(StrReplace(SavedTime(f.keys, f.clicks), "about ", ""), "under a minute", "&lt;1 min") "</b><span>time saved (typing and clicks)</span></div>"
     h .= "</div><table>"
     for it in f.types
         h .= "<tr><td>" HtmlSafe(it.name) "</td><td class='n'>" it.n "</td><td style='width:45%'><div class='bar' style='width:" Round(it.n / top * 100) "%'></div></td></tr>"
@@ -6267,7 +6404,7 @@ ShowDashboard(tab := 1) {
     tb := g.AddTab3("w600 h430", ["This shift", "Week", "Month"])
 
     tb.UseTab(1)
-    y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
+    y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys, f.clicks), "about ", ""), "time saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
     g.AddText("xm+12 y" y " w470 BackgroundTrans", BreakText())
     g.AddButton("xm+490 y" (y - 4) " w90 h26", "Change...").OnEvent("Click", (*) => (g.Opt("+OwnDialogs"), BreakEdit() && ShowDashboard()))
     y += 24
@@ -6281,17 +6418,17 @@ ShowDashboard(tab := 1) {
     for pair in [[2, wk, 7, "Last 7 days"], [3, mo, 30, "Last 30 days"]] {
         tb.UseTab(pair[1])
         d := pair[2]
-        logs := alerts := keys := used := best := 0
+        logs := alerts := keys := clicks := used := best := 0
         bestDay := ""
         for r in d.rows {
-            logs += r.logs, alerts += r.alerts, keys += r.keys
+            logs += r.logs, alerts += r.alerts, keys += r.keys, clicks += r.clicks
             if r.logs || r.alerts
                 used += 1
             if r.logs > best
                 best := r.logs, bestDay := r.label
         }
         avg := used ? Round(logs / used) : 0
-        y := Tiles(g, [[logs, "logs"], [alerts, "alert clears"], [SavedTime(keys) = "under a minute" ? "<1 min" : StrReplace(SavedTime(keys), "about ", ""), "typing saved"], [used ? avg : "-", "logs per day worked"]])
+        y := Tiles(g, [[logs, "logs"], [alerts, "alert clears"], [SavedTime(keys, clicks) = "under a minute" ? "<1 min" : StrReplace(SavedTime(keys, clicks), "about ", ""), "time saved"], [used ? avg : "-", "logs per day worked"]])
         if pair[1] = 3 {
             prevLogs := 0
             for day, v in prevRng.days
@@ -6300,12 +6437,12 @@ ShowDashboard(tab := 1) {
             note .= prevRng.logs || prevLogs ? "     Previous 30 days: " prevLogs " logs (counted by log type)" : ""
             g.AddText("xm+12 y" y " w570 BackgroundTrans", note)
         }
-        dl := g.AddListView("xm+12 " (pair[1] = 3 ? "y+6" : "y" y) " w570 r" (pair[1] = 2 ? 7 : 6) " -Multi NoSortHdr", ["Day", "Logs", "Alert clears", "Typing saved", ""])
+        dl := g.AddListView("xm+12 " (pair[1] = 3 ? "y+6" : "y" y) " w570 r" (pair[1] = 2 ? 7 : 6) " -Multi NoSortHdr", ["Day", "Logs", "Alert clears", "Time saved", ""])
         mx := 0
         for r in d.rows
             mx := Max(mx, r.logs)
         for r in d.rows
-            dl.Add(, r.label, r.logs, r.alerts, r.keys ? SavedTime(r.keys) : "", Bar(r.logs, mx, 16))
+            dl.Add(, r.label, r.logs, r.alerts, r.keys || r.clicks ? SavedTime(r.keys, r.clicks) : "", Bar(r.logs, mx, 16))
         dl.ModifyCol(1, 110), dl.ModifyCol(2, 55), dl.ModifyCol(3, 90), dl.ModifyCol(4, 110), dl.ModifyCol(5, 170)
         tl := g.AddListView("xm+12 y+8 w570 r" (pair[1] = 2 ? 5 : 4) " -Multi NoSortHdr", ["Top log types (" pair[4] ")", "Times"])
         for it in d.range.types {
@@ -6474,7 +6611,7 @@ MakeSwitchHandler(name, win, path) {
 ; Switches to the app, minimizes it if it's already in front, or opens it
 SwitchTo(name, match, runTarget := "") {
     SetTitleMatchMode 2
-    CountSaved("", 0, "Switch to " name)
+    CountSaved("", 0, "Switch to " name, 1)        ; one taskbar click saved (v3.35.5)
     if match != "" && WinExist(match) {
         if WinActive(match)
             WinMinimize
@@ -9067,7 +9204,7 @@ IncidentRun(r, out, ref, dl, incWin) {
     pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
-    keys := 0
+    keys := 0, clicks := 0      ; clicks saved (v3.35.5): Create Incident and each box
     if !incWin {
         try WinActivate "ahk_id " dl
         if !WinWaitActive("ahk_id " dl, , 3) {
@@ -9084,7 +9221,7 @@ IncidentRun(r, out, ref, dl, incWin) {
         MouseMove x, y, 0
         Sleep 60
         Click
-        keys += 2
+        clicks += 1
         wait := Integer(IniRead(SettingsFile, "ITrak", "IncidentWait", "10000"))
         deadline := A_TickCount + wait
         while !incWin && A_TickCount < deadline {
@@ -9124,6 +9261,7 @@ IncidentRun(r, out, ref, dl, incWin) {
         MouseMove x, y, 0
         Sleep 60
         Click
+        clicks += 1
         Sleep pause
         if k = "Secondary"
             break                       ; the cursor waits there for your supervisor
@@ -9145,8 +9283,8 @@ IncidentRun(r, out, ref, dl, incWin) {
     }
     MouseMove ox, oy, 0
     Tip("Incident filled in: type your supervisor in Secondary Operator, set the dates, check it and Save.", 5000, true)
-    Activity("Incident " r.name ": filled in (" keys " keystrokes counted as saved)")
-    CountSaved("log", keys, "Incident: " r.name)
+    Activity("Incident " r.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved)")
+    CountSaved("log", keys, "Incident: " r.name, clicks)
     Journal("Incident: " r.name, "Incident Type: " vals["Type"] "`nSpecific: " vals["Specific"] "`nCategory: " vals["Category"]
         . "`nRisk: " vals["Risk"] "`nCustom 3: " vals["Custom3"] "`nExecutive Brief: " vals["Brief"], keys)
 }
@@ -9404,7 +9542,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
     w0 := Integer(sp["W"]), h0 := Integer(sp["H"])
-    keys := 0, done := []
+    keys := 0, clicks := 0, done := []      ; clicks saved (v3.35.5): each box and Requested By click
     for k in AuditFields {
         if vals[k] = "" || !sp.Has(k "X")
             continue
@@ -9421,6 +9559,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         MouseMove x, y, 0
         Sleep 60
         Click
+        clicks += 1
         Sleep pause
         if k = "Detail" {
             ; you're still on the Audit tab after picking the employee (v3.34.1)
@@ -9500,7 +9639,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
                 Click "Up"
             }
             Activity("Audit: Requested By click " A_Index " (" (p.n = 2 ? "double" : "single") ")")
-            keys += 2
+            clicks += 1     ; a double-click counts as one (was 2 keystrokes before v3.35.5)
             Sleep rp
         }
     }
@@ -9510,8 +9649,8 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         MouseMove ox, oy, 0
     }
     Tip("Audit filled in: check it, then Save.", 4000, true)
-    Activity("Audit filled in (" keys " keystrokes counted as saved; Requested By route " route.Length " clicks)")
-    CountSaved("log", keys, title)
+    Activity("Audit filled in (" keys " keystrokes and " clicks " clicks counted as saved; Requested By route " route.Length " clicks)")
+    CountSaved("log", keys, title, clicks)
     Journal(title, "Console #: " console "`nArea Audited: " area (shownTimes.Has("Start") ? "`nAudit Start: " shownTimes["Start"] : "") "`nAudit End: " (shownTimes.Has("End") ? shownTimes["End"] : "") "`nAudit Remarks: " syn, keys)
     return true
 }
@@ -11221,7 +11360,7 @@ ShowHome() {
     cardW := (fullW - 2 * 12) // 3
     Card(1, sh0.log, "logs this shift")
     Card(2, sh0.login, sh0.login = 1 ? "login this shift" : "logins this shift")
-    Card(3, SavedTime(sh0.keys), "typing saved this shift")
+    Card(3, SavedTime(sh0.keys, sh0.clicks), "time saved this shift")
 
     Group("Logs", 0x0E746E, [
         ["Call pad", "Numpad +", 0xE717, () => ShowCallPad(), true]
@@ -11269,7 +11408,7 @@ ShowHome() {
     Status(BreakLeftSecs() < 0 ? "C62828" : "0E746E", BreakText())
     sh := SavedShift()
     Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")
-        . ", " SavedTime(sh.keys) " saved")
+        . ", " SavedTime(sh.keys, sh.clicks) " saved")
 
     g.SetFont("s10 c303030")
     capsCB := g.AddCheckbox("xm y+12" (CapsGuard ? " Checked" : ""), "Caps Lock guard")
