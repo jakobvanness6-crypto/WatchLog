@@ -1578,7 +1578,7 @@ INCIDENT REPORTS, MORE CODE WORDS FILL THE DAILY LOG, AUTOCORRECT EVERYWHERE  (v
   - Code words that now fill the whole daily log (Location | Topic | Reference):
     ;player (pit of the table | Player Update | NA), ;refuse (Security Desk - Main Lobby |
     Call / Phone | NA), ;evict (Security Desk - Main Lobby | Trespass), ;face (Security Desk -
-    Main Lobby | Facial Recognition Alert Rejected | the alert #), ;aml (slots area | AML Alert), ;abandon
+    Main Lobby | Facial Recognition Alert Rejected | NA), ;aml (slots area | AML Alert), ;abandon
     (slots area | Request for Review), ;found (slots area | Lost & Found), ;maint (ABM/NRT |
     AJM/CTR Fill), ;close (pit | Table Opening/Closing | NA), ;selfex (Security Office |
     Self-Exclusion), ;inventory (Cash Cage | Security Escort), ;badge (Security Main entrance |

@@ -61,6 +61,9 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
 
+## Done Nov 9, 2026 (templates.txt only, wording Nov 9, 2026, program stays v3.35.5)
+- ;face: the daily log Reference is now NA (Jakob: "fill it with NA, not the alert #"). This replaces the Nov 7 guess below. Built, NOT run.
+
 ## Done in v3.35.5 (Nov 8)
 - Time saved counts the clicks and menu picks Watchlog does, apart from keystrokes, at 0.5 s a click (Jakob's pick; settings.ini [TimeSaved] SecondsPerClick=). Clicks column in Time saved and Shift count; dashboard and home show time saved with clicks. Old fake click keystrokes moved to Clicks.
 - Retroactive (Jakob): once, earlier days get cautious click estimates from the per-item counts (Alert Grid clear 5, new log 1, app switch 1, full-entry log 3, incident 6, ;audit 0), and the old fake click keystrokes come off. Days before v3.16.0 stay 0.
