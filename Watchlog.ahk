@@ -7176,7 +7176,7 @@ EditFile(path) {
 ;  v3.36.0 (quick picker): with the box empty, your pinned ones come first
 ;  (Ctrl+P pins or unpins the picked row, a star marks them), then the
 ;  last 10 you ran from anywhere (code word, finder, call pad, Ctrl+Alt+F),
-;  then everything else. The ones you use most get a small boost when you
+;  then the full-entry daily logs, then the code word templates. The ones you use most get a small boost when you
 ;  type. Full-entry daily logs (the Ctrl+Alt+F list) are in the same list.
 ;  A Compact tick hides the preview.
 ;  Pins: "picker pins.txt" beside templates.txt (OneDrive shares it with
@@ -7475,8 +7475,8 @@ PickFromKey(key) {
 ; Every word typed has to be in the shortcut, the name, its first letters
 ; or the wording. Shortcut matches come first, then first letters, then
 ; name matches, then wording matches; the ones run most get a small boost.
-; Nothing typed: pinned, then recent, then everything in templates.txt
-; order, then the full-entry logs.
+; Nothing typed: pinned, then recent, then the full-entry logs, then the
+; templates in templates.txt order. Equal scores: full-entry logs first.
 PickerFind(query, uses := "") {
     if !IsObject(uses)
         uses := Map()
@@ -7485,11 +7485,12 @@ PickerFind(query, uses := "") {
     for w in StrSplit(RegExReplace(StrLower(query), "[^a-z0-9#]+", " "), " ")
         if w != ""
             words.Push(w)
+    ; full-entry daily logs first, then the code word templates (Jakob, Nov 11)
     all := []
-    for i, t in TemplateList
-        all.Push({kind: "t", i: i})
     for e in Entries
         all.Push({kind: "e", e: e})
+    for i, t in TemplateList
+        all.Push({kind: "t", i: i})
     rows := []
     if !words.Length {
         shown := Map()
@@ -7537,7 +7538,7 @@ PickerFind(query, uses := "") {
         it.tag := ""
         ; a small boost for the ones used most (at most 6), and for pins
         score += Min(uses.Has(key) ? uses[key] : 0, 30) // 5 + (it.pinned ? 3 : 0)
-        ; Higher scores go first; equal scores keep their templates.txt order
+        ; Higher scores go first; equal scores keep the list order (full logs first)
         pos := sorted.Length + 1
         while pos > 1 && sorted[pos - 1].score < score
             pos--

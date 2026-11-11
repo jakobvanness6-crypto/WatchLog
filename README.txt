@@ -330,7 +330,8 @@ CAN'T REMEMBER A TRIGGER?  Ctrl+Alt+Space  (or tray menu > Find a template)
     first          your pinned ones, marked with a star
     then           the last 10 you ran, from anywhere (code word, this
                    finder, the call pad, Ctrl+Alt+F), marked "Recent"
-    then           everything else
+    then           the full-entry daily logs (Break, Table Drop ...)
+    then           the code word templates
     Up / Down      choose a template (PgUp / PgDn jump 10)
     Enter          insert it where you were typing, exactly as if you'd
                    typed its trigger (a form opens if it has blanks).
@@ -1429,7 +1430,9 @@ Something else broke
 QUICK PICKER: PINS, RECENT, FIRST LETTERS  (v3.36.0)
   - The template finder (Ctrl+Alt+Space) is now a quick picker. With
     the box empty it shows your pinned ones first (star), then the last
-    10 you ran from anywhere ("Recent"), then everything else.
+    10 you ran from anywhere ("Recent"), then the full-entry daily
+    logs, then the code word templates. When two match equally well
+    while you type, the full-entry log comes first.
   - Ctrl+P pins or unpins the one picked. Pins are in "picker pins.txt"
     beside templates.txt (shared with your other bays by OneDrive).
   - First letters work: cd = Card Destruction, td = Table Drop. The
