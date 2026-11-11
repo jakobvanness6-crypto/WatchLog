@@ -30,7 +30,7 @@ Security has its own section further down. In short: passwords are kept in Windo
 
 ## What it does
 
-It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.35.5 now.
+It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.36.0 now.
 
 <!-- fig: image4.png 1.7 | The Watchlog icon sits by the clock. Right-clicking it opens this menu. -->
 
@@ -48,7 +48,7 @@ There are 36 templates so far. Every code starts with a semicolon so it never go
 | Soft count | `;countstep` step by step · `;counttables` · `;countslots` · `;countpull` |
 | Other | `;destroy` card destruction · `;badge` contractor pass or interview pass |
 
-If you can't remember a code, Ctrl+Alt+Space opens a search. Type a word like trespass or ambulance, look at the wording, and press Enter. Ctrl+Alt+H brings up a cheat sheet with every code on it.
+If you can't remember a code, Ctrl+Alt+Space opens a search. Type a word like trespass or ambulance, or the first letters of a name, look at the wording, and press Enter. The ones I pin and the last ten I used show at the top before I type anything, and the full daily logs are in the same list. Ctrl+Alt+H brings up a cheat sheet with every code on it.
 
 <!-- fig: image5.png 3.5, image6.png 2.4 | Ctrl+Alt+Space finds a template by any word, and Ctrl+Alt+H shows every code. I covered my login names on the cheat sheet. -->
 
@@ -247,7 +247,7 @@ What IT would need to approve:
 
 ## Next steps
 
-Version 3.35.5 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.36.0 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.

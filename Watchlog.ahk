@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.5"
-VERSION_DATE := "Nov 8, 2026"
+VERSION := "3.36.0"
+VERSION_DATE := "Nov 11, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -66,6 +66,7 @@ RegKey := "HKCU\Software\Watchlog"
 ActivityFile := DataDir "\activity.log"
 TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
+PickerFile := DataDir "\picker.ini"         ; the finder's recent list and how often (names only), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
 AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
 ITrakFile := DataDir "\itrak.ini"           ; where the iTrak new-daily-log click goes (numbers only), this PC only
@@ -82,6 +83,7 @@ ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar cloc
 ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
 PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
 PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
+PinsFile := HomeDir "\picker pins.txt"     ; pinned templates in the finder (v3.36.0), beside templates.txt
 IncidentFile := HomeDir "\incidents.txt"   ; incident reports (v3.33.0), kept beside templates.txt
 EntryRefs := Map()       ; daily log window -> the Reference Watchlog typed in it (Custom 3 of an incident)
 AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", "1") != "0"   ; autocorrect in every program, this PC (v3.33.0)
@@ -1607,6 +1609,13 @@ RunTemplate(text, title, repeat := false, trig := "", fill := false) {
     ; template in the window you were typing in
     if PickerActive()
         ClosePicker(true)
+    ; the finder's recent list (v3.36.0): the shortcut only
+    if trig != ""
+        for i, t in TemplateList
+            if t.trig = trig {
+                NotePick({kind: "t", i: i})
+                break
+            }
     fields := ParseFields(text)
     if fields.Length = 0 {
         out := FixArticles(text)
@@ -5081,6 +5090,9 @@ RunEntry(e, useOpen := false) {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
         return
     }
+    ; the finder's recent list (v3.36.0): a full-entry log by name (not a code word's own log)
+    if !e.HasOwnProp("src") || e.src != "code"
+        NotePick({kind: "e", e: e})
     syn := e.syn
     ; {Bay?}: always asks which bay (start of shift), offering the last one,
     ; and keeps the answer for the rest of the shift (v3.20.3)
@@ -5620,7 +5632,7 @@ RepeatLastLog() {
 ; taught on this PC (no passwords: those live in Windows' Credential Manager)
 BackupSources() {
     list := []
-    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt"]
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt", "picker pins.txt"]
         if FileExist(HomeDir "\" n)
             list.Push([HomeDir "\" n, "home - " n])
     if DirExist(DataDir)
@@ -7156,15 +7168,29 @@ EditFile(path) {
 
 ; =====================================================================
 ;  TEMPLATE FINDER  -  Ctrl+Alt+Space   (also tray menu > Find a template)
-;  Type part of a name, a trigger, or any word from the wording, and the
-;  matching templates show up with a preview. Enter runs the one picked
-;  in the window you were typing in. Up/Down choose, Esc closes.
+;  Type part of a name, a trigger, the first letters of a name ("cd" =
+;  Card Destruction) or any word from the wording, and the matching
+;  templates and full-entry daily logs show up with a preview. Enter runs
+;  the one picked in the window you were typing in. Up/Down choose, Esc
+;  closes.
+;  v3.36.0 (quick picker): with the box empty, your pinned ones come first
+;  (Ctrl+P pins or unpins the picked row, a star marks them), then the
+;  last 10 you ran from anywhere (code word, finder, call pad, Ctrl+Alt+F),
+;  then everything else. The ones you use most get a small boost when you
+;  type. Full-entry daily logs (the Ctrl+Alt+F list) are in the same list.
+;  A Compact tick hides the preview.
+;  Pins: "picker pins.txt" beside templates.txt (OneDrive shares it with
+;  your other bays). Recent and how often: picker.ini in
+;  %LOCALAPPDATA%\Watchlog, this PC only. Both hold names only: never the
+;  filled-in text, never passwords. Logins are never listed, and Watchlog
+;  never types into the search box.
 ; =====================================================================
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 PickerActive() => IsObject(Picker) && WinActive("ahk_id " Picker.hwnd)
 
-ShowPicker() {
+; query / target: used when the Compact tick reopens the finder
+ShowPicker(query := "", target := 0) {
     global Picker
     if IsObject(Picker) {
         ; Pressed again: close it (or bring it back if it's behind)
@@ -7179,44 +7205,67 @@ ShowPicker() {
         try WinActivate "ahk_id " CurForm.hwnd
         return
     }
-    if !TemplateList.Length {
+    if !TemplateList.Length && !Entries.Length {
         MsgBox "No templates are loaded. Check templates.txt (Ctrl+Alt+E).", "Find a template", "Icon!"
         return
     }
-    target := WinExist("A")
-    found := {rows: []}         ; template numbers in the order they're listed
+    if !target
+        target := WinExist("A")
+    found := {rows: []}         ; what's listed, in order: {kind, i or e, tag}
+    uses := PickUsesAll()       ; read once: how often each one was run on this PC
+    compact := PickerCompact()
 
     g := WGui("+AlwaysOnTop", "Find a template  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
-    g.AddText("w560", "Type part of a name, a shortcut, or any word from the log:")
+    if !compact
+        g.AddText("w560", "Type part of a name, its first letters, a shortcut, or any word from the log:")
     box := g.AddEdit("w560")
-    lv := g.AddListView("w560 r12 -Multi NoSortHdr", ["Shortcut", "Template", "Type"])
-    lv.ModifyCol(1, 110), lv.ModifyCol(2, 316), lv.ModifyCol(3, 110)
-    g.AddText("w560", "What it writes:")
-    prev := g.AddEdit("w560 r5 ReadOnly -TabStop")
-    tip := g.AddText("w560 r2", "")
-    g.AddButton("w120 Default", "Insert").OnEvent("Click", Go)
-    g.AddButton("x+6 w120", "Close").OnEvent("Click", (*) => ClosePicker(true))
-    g.AddText("x+14 yp+5", "Up/Down = choose    Enter = insert    Esc = close")
+    lv := g.AddListView("w560 r" (compact ? 10 : 12) " -Multi NoSortHdr", ["Shortcut", "Template", "Type"])
+    lv.ModifyCol(1, 110), lv.ModifyCol(2, 300), lv.ModifyCol(3, 126)
+    prev := "", tipTxt := ""
+    if !compact {
+        g.AddText("w560", "What it writes:")
+        prev := g.AddEdit("w560 r5 ReadOnly -TabStop")
+        tipTxt := g.AddText("w560 r2", "")
+        g.AddButton("w120 Default", "Insert").OnEvent("Click", Go)
+        g.AddButton("x+6 w120", "Close").OnEvent("Click", (*) => ClosePicker(true))
+        g.AddText("x+14 yp+5", "Enter = insert   Ctrl+P = pin   Esc = close")
+    } else {
+        g.AddButton("w0 h0 Default Hidden", "Insert").OnEvent("Click", Go)
+        g.AddText("xm", "Enter = insert   Ctrl+P = pin   Esc = close")
+    }
+    cb := g.AddCheckbox((compact ? "x+20" : "xm y+8") " -TabStop", "Compact (no preview)")
+    cb.Value := compact
+    cb.OnEvent("Click", ToggleCompact)
     box.OnEvent("Change", Filter)
     lv.OnEvent("ItemSelect", Preview)
     lv.OnEvent("DoubleClick", (ctl, row) => row ? Go() : 0)
     g.OnEvent("Escape", (*) => ClosePicker(true))
     g.OnEvent("Close", (*) => ClosePicker(true))
-    Picker := {hwnd: g.Hwnd, gui: g, box: box, lv: lv, target: target, go: Go, preview: Preview}
+    Picker := {hwnd: g.Hwnd, gui: g, box: box, lv: lv, target: target, go: Go, preview: Preview, pin: Pin}
+    box.Value := query
     Filter()
     g.Show()
     WinActivate "ahk_id " g.Hwnd
     box.Focus()
+    if query != ""
+        Send "{End}"
 
-    ; Lists the templates that match what's typed, best match first
+    ; Lists what matches what's typed, best match first. Nothing typed:
+    ; pinned, then recent, then the rest.
     Filter(*) {
-        found.rows := FindTemplates(box.Value)
+        found.rows := PickerFind(box.Value, uses)
+        star := Chr(0x2605) " "
         lv.Opt("-Redraw")
         lv.Delete()
-        for i in found.rows {
-            t := TemplateList[i]
-            lv.Add(, TrigKey(t.trig), t.name != "" ? t.name : t.trig, (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : ""))
+        for it in found.rows {
+            if it.kind = "e" {
+                lv.Add(, "", (it.pinned ? star : "") it.e.name, (it.tag = "recent" ? "Recent: " : "") "Full daily log")
+                continue
+            }
+            t := TemplateList[it.i]
+            kind := (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : "")
+            lv.Add(, TrigKey(t.trig), (it.pinned ? star : "") (t.name != "" ? t.name : t.trig), (it.tag = "recent" ? "Recent: " : "") kind)
         }
         lv.Opt("+Redraw")
         if found.rows.Length
@@ -7224,19 +7273,31 @@ ShowPicker() {
         Preview()
     }
 
-    ; The wording of the picked template, with its blanks in [brackets]
+    ; The wording of the picked one, with its blanks in [brackets]
     Preview(*) {
+        if compact
+            return
         row := lv.GetNext()
         if !row {
             prev.Value := 'Nothing matches "' Trim(box.Value) '". Try one word, like jackpot or medical.'
-            tip.Text := ""
+            tipTxt.Text := ""
             return
         }
-        t := TemplateList[found.rows[row]]
+        it := found.rows[row]
+        if it.kind = "e" {
+            e := it.e
+            prev.Value := "Location: " e.loc "`r`nTopic: " e.topic "`r`nReference: " e.ref
+                . "`r`nSynopsis: " RegExReplace(e.syn, "\{([^{}]+?)\??\}", "[$1]") (e.end ? "`r`nEnd Time: now" : "")
+            tipTxt.Text := "A full-entry daily log: it opens a new daily log in iTrak and fills it in (the same as " HK("entrypick") ")."
+                . (it.pinned ? "  Pinned (Ctrl+P to unpin)." : "")
+            return
+        }
+        t := TemplateList[it.i]
         prev.Value := RegExReplace(t.text, "\{([^{}:]+)(:[^{}]*)?\}", "[$1]")
-        tip.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
+        tipTxt.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
             . (t.repeat ? "It opens a form, and Ctrl+Enter adds another." : t.form ? "It opens a form to fill in." : "It goes in straight away.")
             . (t.src = "mine" ? " (One of yours, from my-templates.txt.)" : "")
+            . (it.pinned ? "  Pinned (Ctrl+P to unpin)." : "")
     }
 
     Go(*) {
@@ -7245,9 +7306,52 @@ ShowPicker() {
             box.Focus()
             return
         }
-        t := TemplateList[found.rows[row]]
+        it := found.rows[row]
         ClosePicker(true)
+        if it.kind = "e" {
+            RunEntry(it.e)
+            return
+        }
+        t := TemplateList[it.i]
         RunTemplate(t.text, t.name != "" ? t.name : t.trig, t.repeat, t.trig, t.fill)
+    }
+
+    ; Ctrl+P: pins the picked row, or unpins it. The list keeps its place.
+    Pin(*) {
+        row := lv.GetNext()
+        if !row
+            return
+        it := found.rows[row]
+        key := PickKey(it)
+        pins := PinList()
+        if n := IndexOf(pins, key)
+            pins.RemoveAt(n)
+        else
+            pins.Push(key)
+        if !SavePins(pins) {
+            Tip("Couldn't save the pins (picker pins.txt beside templates.txt).", 3000, true)
+            return
+        }
+        name := it.kind = "e" ? it.e.name : (TemplateList[it.i].name != "" ? TemplateList[it.i].name : TemplateList[it.i].trig)
+        Activity("Finder: " (n ? "unpinned " : "pinned ") name)
+        Filter()
+        ; put the highlight back on the same one
+        for j, other in found.rows
+            if PickKey(other) = key {
+                lv.Modify(0, "-Select")
+                lv.Modify(j, "Select Focus Vis")
+                Preview()
+                break
+            }
+        Tip(n ? "Unpinned: " name : "Pinned: " name "  (shows at the top when the box is empty)", 1800)
+    }
+
+    ; The Compact tick: remembered on this PC, the finder reopens in that look
+    ToggleCompact(*) {
+        try IniWrite cb.Value ? 1 : 0, LastUsedFile, "Picker", "Compact"
+        q := box.Value
+        ClosePicker(false)
+        ShowPicker(q, target)
     }
 }
 
@@ -7265,22 +7369,161 @@ ClosePicker(back := false) {
     }
 }
 
-; Every word typed has to be in the shortcut, the name or the wording.
-; Shortcut matches come first, then name matches, then wording matches.
-; With nothing typed, every template shows, in templates.txt order.
-FindTemplates(query) {
+PickerCompact() {
+    try return IniRead(LastUsedFile, "Picker", "Compact", "0") = "1"
+    return false
+}
+
+; ---- Pins, recent and how often (v3.36.0) -----------------------------
+; The name a pick is remembered by: "t:" + its shortcut (;card), or
+; "e:" + the full-entry log's name. Lower case, no | or = in it.
+PickKey(it) {
+    k := it.kind = "e" ? "e:" it.e.name : "t:" TemplateList[it.i].trig
+    return StrLower(Trim(StrReplace(StrReplace(k, "|", " "), "=", "-")))
+}
+
+; Pinned ones, in the order they were pinned (picker pins.txt, beside
+; templates.txt, so OneDrive takes them to your other bays)
+PinList() {
+    pins := []
+    try {
+        if FileExist(PinsFile)
+            Loop Parse FileRead(PinsFile, "UTF-8"), "`n", "`r" {
+                k := StrLower(Trim(A_LoopField))
+                if k != "" && SubStr(k, 1, 1) != "#" && !IndexOf(pins, k)
+                    pins.Push(k)
+            }
+    }
+    return pins
+}
+
+SavePins(pins) {
+    out := "# Watchlog: pinned templates for the finder (Ctrl+Alt+Space).`r`n"
+        . "# Ctrl+P in the finder pins or unpins. t: = a code word, e: = a full-entry daily log.`r`n"
+    for k in pins
+        out .= k "`r`n"
+    try {
+        f := FileOpen(PinsFile, "w", "UTF-8")
+        f.Write(out)
+        f.Close()
+        return true
+    }
+    return false
+}
+
+; The last 10 run, newest first (picker.ini, this PC only)
+RecentPicks() {
+    keys := []
+    try {
+        for k in StrSplit(IniRead(PickerFile, "Recent", "List", ""), "|")
+            if Trim(k) != "" && !IndexOf(keys, Trim(k))
+                keys.Push(Trim(k))
+    }
+    return keys
+}
+
+; How often each was run on this PC: key -> times
+PickUsesAll() {
+    uses := Map()
+    uses.CaseSense := false
+    try {
+        Loop Parse IniRead(PickerFile, "Uses"), "`n", "`r" {
+            eq := InStr(A_LoopField, "=", , -1)
+            if eq && IsInteger(SubStr(A_LoopField, eq + 1))
+                uses[SubStr(A_LoopField, 1, eq - 1)] := Integer(SubStr(A_LoopField, eq + 1))
+        }
+    }
+    return uses
+}
+
+; Remembers a template or full-entry log that just ran, from anywhere
+; (code word, finder, call pad, Ctrl+Alt+F). The name only.
+NotePick(it) {
+    if IsObject(TutorialWin)
+        return
+    try {
+        key := PickKey(it)
+        if key = "t:" || key = "e:"
+            return
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        list := key
+        for k in RecentPicks()
+            if k != key && A_Index <= 10 && StrSplit(list, "|").Length < 10
+                list .= "|" k
+        IniWrite list, PickerFile, "Recent", "List"
+        n := 0
+        try n := Integer(IniRead(PickerFile, "Uses", key, "0"))
+        IniWrite n + 1, PickerFile, "Uses", key
+    }
+}
+
+; The template (by shortcut) or full-entry log (by name) for a key, or ""
+PickFromKey(key) {
+    if SubStr(key, 1, 2) = "t:" {
+        for i, t in TemplateList
+            if StrLower(t.trig) = SubStr(key, 3)
+                return {kind: "t", i: i}
+    } else if SubStr(key, 1, 2) = "e:" {
+        for e in Entries
+            if StrLower(e.name) = SubStr(key, 3)
+                return {kind: "e", e: e}
+    }
+    return ""
+}
+
+; Every word typed has to be in the shortcut, the name, its first letters
+; or the wording. Shortcut matches come first, then first letters, then
+; name matches, then wording matches; the ones run most get a small boost.
+; Nothing typed: pinned, then recent, then everything in templates.txt
+; order, then the full-entry logs.
+PickerFind(query, uses := "") {
+    if !IsObject(uses)
+        uses := Map()
+    pins := PinList()
     words := []
     for w in StrSplit(RegExReplace(StrLower(query), "[^a-z0-9#]+", " "), " ")
         if w != ""
             words.Push(w)
+    all := []
+    for i, t in TemplateList
+        all.Push({kind: "t", i: i})
+    for e in Entries
+        all.Push({kind: "e", e: e})
+    rows := []
+    if !words.Length {
+        shown := Map()
+        for k in pins
+            if IsObject(it := PickFromKey(k)) && !shown.Has(k)
+                it.pinned := true, it.tag := "pin", rows.Push(it), shown[k] := 1
+        for k in RecentPicks()
+            if IsObject(it := PickFromKey(k)) && !shown.Has(k)
+                it.pinned := false, it.tag := "recent", rows.Push(it), shown[k] := 1
+        for it in all
+            if !shown.Has(PickKey(it))
+                it.pinned := false, it.tag := "", rows.Push(it)
+        return rows
+    }
     sorted := []
-    for i, t in TemplateList {
-        trig := RegExReplace(StrLower(t.trig), "[^a-z0-9#]+")
-        name := " " RegExReplace(StrLower(t.name), "[^a-z0-9#]+", " ")
-        body := " " RegExReplace(StrLower(t.text), "[^a-z0-9#]+", " ")
+    for it in all {
+        if it.kind = "e" {
+            e := it.e
+            trig := ""
+            name := " " RegExReplace(StrLower(e.name), "[^a-z0-9#]+", " ")
+            body := " " RegExReplace(StrLower(e.loc " " e.topic " " e.ref " " e.syn), "[^a-z0-9#]+", " ")
+        } else {
+            t := TemplateList[it.i]
+            trig := RegExReplace(StrLower(t.trig), "[^a-z0-9#]+")
+            name := " " RegExReplace(StrLower(t.name != "" ? t.name : t.trig), "[^a-z0-9#]+", " ")
+            body := " " RegExReplace(StrLower(t.text), "[^a-z0-9#]+", " ")
+        }
+        inits := ""
+        for nw in StrSplit(Trim(name), " ")
+            if nw != ""
+                inits .= SubStr(nw, 1, 1)
         score := 0
         for w in words {
-            s := WordScore(w, trig, name, body)
+            s := WordScore(w, trig, name, body, inits)
             if !s {
                 score := -1
                 break
@@ -7289,23 +7532,42 @@ FindTemplates(query) {
         }
         if score < 0
             continue
+        key := PickKey(it)
+        it.pinned := IndexOf(pins, key) > 0
+        it.tag := ""
+        ; a small boost for the ones used most (at most 6), and for pins
+        score += Min(uses.Has(key) ? uses[key] : 0, 30) // 5 + (it.pinned ? 3 : 0)
         ; Higher scores go first; equal scores keep their templates.txt order
         pos := sorted.Length + 1
         while pos > 1 && sorted[pos - 1].score < score
             pos--
-        sorted.InsertAt(pos, {i: i, score: score})
+        sorted.InsertAt(pos, {it: it, score: score})
     }
-    rows := []
     for m in sorted
-        rows.Push(m.i)
+        rows.Push(m.it)
     return rows
 }
 
-WordScore(w, trig, name, body) {
+; The matching templates only, as numbers in TemplateList (kept for
+; anything that still asks for the old list)
+FindTemplates(query) {
+    rows := []
+    for it in PickerFind(query)
+        if it.kind = "t"
+            rows.Push(it.i)
+    return rows
+}
+
+; inits = the first letter of each word of the name ("cd" = Card Destruction)
+WordScore(w, trig, name, body, inits := "") {
     if trig = w
         return 100
+    if StrLen(w) >= 2 && StrLen(inits) >= 2 && inits = w
+        return 70
     if InStr(trig, w) = 1
         return 60
+    if StrLen(w) >= 2 && StrLen(inits) >= 2 && InStr(inits, w) = 1
+        return 45
     if InStr(name, " " w)
         return 40
     if InStr(trig, w) || InStr(name, w)
@@ -7336,6 +7598,7 @@ PgUp:: PickerMove(-10)
 PgDn:: PickerMove(10)
 Enter:: Picker.go()
 NumpadEnter:: Picker.go()
+^p:: Picker.pin()
 #HotIf
 
 
@@ -8296,7 +8559,7 @@ ShowCheatSheet() {
     g.SetFont("s20 bold c" teal, "Segoe UI")
     g.AddText("x20 y10 w700", "Watchlog shortcuts")
     g.SetFont("s10 norm c" muted, "Segoe UI")
-    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name or any word.   Forms: Tab = next box, Enter = insert, Esc = cancel.")
+    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name, first letters or any word (Ctrl+P pins).   Forms: Tab = next box, Enter = insert, Esc = cancel.")
     top := 78
     x1 := 20, x2 := x1 + colW + gap, x3 := x2 + colW + gap
     y1 := Section(x1, top, "FORMS", forms, 92)

@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.5  -  README
+  WATCHLOG  v3.36.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -19,8 +19,9 @@ Click the teal icon (or press Ctrl+Alt+M) for the Watchlog home window:
 every feature as a button with a picture, each showing its shortcut.
 Right-click the icon for the menu (section 11).
 
-Can't remember a trigger?  Ctrl+Alt+Space  finds a template by name or
-any word in it (see section 3).
+Can't remember a trigger?  Ctrl+Alt+Space  finds a template by name,
+first letters (cd = Card Destruction) or any word in it, with your
+pinned and recent ones on top (see section 3).
 Quickest way to see everything on your PC:  Ctrl+Alt+H  (cheat sheet).
 The cheat sheet is built from the templates and settings on that PC,
 so it always matches what's set up there.
@@ -113,8 +114,9 @@ couple of seconds. No need to press anything.
 -----------------------------------------------------------------------
  2. HOTKEYS  (hold Ctrl+Alt and press the key)
 -----------------------------------------------------------------------
-  Ctrl+Alt+Space    Find a template: type part of its name or any word
-                    in it, then Enter. See section 3.
+  Ctrl+Alt+Space    Find a template (the quick picker): type part of its
+                    name, its first letters or any word in it, then
+                    Enter. Ctrl+P pins one. See section 3.
   Ctrl+Alt+H        Cheat sheet (laid out in three columns since v3.15.0):
                     every template, login, app and hotkey on this PC.
   Ctrl+Alt+M        Watchlog home (v3.10.0): one window with a button for
@@ -318,14 +320,33 @@ Templates paste the text, and your clipboard is put back the way it was
 afterwards.
 
 CAN'T REMEMBER A TRIGGER?  Ctrl+Alt+Space  (or tray menu > Find a template)
-  A search box opens with every template listed. Type part of a name
-  (jack), a trigger (;bv), or any word from the log (ambulance,
-  defective, trespass) and the list narrows as you type.
+  A search box opens with every template listed, and the full-entry
+  daily logs (the Ctrl+Alt+F list) too. Type part of a name (jack), a
+  trigger (;bv), the first letters of a name (cd = Card Destruction,
+  td = Table Drop), or any word from the log (ambulance, defective,
+  trespass) and the list narrows as you type. The ones you use most
+  get a small push up the list.
+  With nothing typed (v3.36.0):
+    first          your pinned ones, marked with a star
+    then           the last 10 you ran, from anywhere (code word, this
+                   finder, the call pad, Ctrl+Alt+F), marked "Recent"
+    then           everything else
     Up / Down      choose a template (PgUp / PgDn jump 10)
     Enter          insert it where you were typing, exactly as if you'd
                    typed its trigger (a form opens if it has blanks).
+                   A full-entry log opens a new daily log in iTrak and
+                   fills it in, the same as Ctrl+Alt+F.
                    Double-clicking a template does the same.
+    Ctrl+P         pin the one picked, or unpin it
     Esc            close without inserting
+  Compact (tick at the bottom): just the box and the list, no preview.
+  Remembered on this PC.
+  Pins are kept in "picker pins.txt" beside templates.txt, so OneDrive
+  takes them to your other bays. The recent list and how often each was
+  used are kept on this PC only (%LOCALAPPDATA%\Watchlog\picker.ini).
+  Both hold names only (like ;card or Break): never the filled-in text,
+  never a password. Logins are never listed, and Watchlog never types
+  anything into the search box.
   Below the list it shows the wording, with the blanks in [brackets],
   and the trigger to type next time so you can skip the search.
   Typing a whole trigger in the search box runs it straight away, just
@@ -1403,8 +1424,24 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.35, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.36, newest first)
 -----------------------------------------------------------------------
+QUICK PICKER: PINS, RECENT, FIRST LETTERS  (v3.36.0)
+  - The template finder (Ctrl+Alt+Space) is now a quick picker. With
+    the box empty it shows your pinned ones first (star), then the last
+    10 you ran from anywhere ("Recent"), then everything else.
+  - Ctrl+P pins or unpins the one picked. Pins are in "picker pins.txt"
+    beside templates.txt (shared with your other bays by OneDrive).
+  - First letters work: cd = Card Destruction, td = Table Drop. The
+    ones you use most get a small push up the list.
+  - Full-entry daily logs (the Ctrl+Alt+F list) are in the same list:
+    Enter opens a new daily log in iTrak and fills it in.
+  - Compact tick: just the box and the list, no preview (this PC).
+  - Names only are kept (recent and how often: this PC only, in
+    picker.ini). Logins are never listed; nothing is typed into the
+    search box. The hotkey is still Ctrl+Alt+Space.
+  - Daily backups now include picker pins.txt.
+
 TIME SAVED COUNTS CLICKS AND MENU PICKS TOO  (v3.35.5)
   - Time saved, Shift count and the dashboard now count the clicks and
     menu picks Watchlog does for you, apart from keystrokes, in a new
