@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.2"
-VERSION_DATE := "Nov 7, 2026"
+VERSION := "3.37.0"
+VERSION_DATE := "Nov 12, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -66,6 +66,7 @@ RegKey := "HKCU\Software\Watchlog"
 ActivityFile := DataDir "\activity.log"
 TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
+PickerFile := DataDir "\picker.ini"         ; the finder's recent list and how often (names only), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
 AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
 ITrakFile := DataDir "\itrak.ini"           ; where the iTrak new-daily-log click goes (numbers only), this PC only
@@ -75,16 +76,20 @@ ALERT_KEYS := ["RowX", "RowY", "MenuDX", "MenuDY", "SubmitX", "SubmitY", "OkX", 
 CallPadFile := DataDir "\call pad.txt"            ; the call pad text, this PC only, wiped at end of shift
 CallHistFile := DataDir "\call pad history.txt"   ; earlier calls this shift, this PC only
 LayoutFile := DataDir "\layout.ini"        ; where the windows were (numbers only), this PC only
+SdsWatch := {until: 0, spot: "", placed: Map(), why: ""}   ; v3.35.3: SDS kept in its spot after Ctrl+Alt+L
 CapsGuard := IniRead(LastUsedFile, "Caps", "Guard", "1") != "0"   ; Caps Lock guard on/off, this PC
 CapsWasOn := false
-ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
+ClockOn := IniRead(LastUsedFile, "Clock", "Show", ModuleDefault("Clock") ? "1" : "0") != "0"     ; taskbar clock on/off, this PC (v3.32.0)
 ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
-PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
+PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", ModuleDefault("Previews") ? "1" : "0") != "0"   ; hide taskbar previews, this PC (v3.32.0)
 PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
+PinsFile := HomeDir "\picker pins.txt"     ; pinned templates in the finder (v3.36.0), beside templates.txt
 IncidentFile := HomeDir "\incidents.txt"   ; incident reports (v3.33.0), kept beside templates.txt
 EntryRefs := Map()       ; daily log window -> the Reference Watchlog typed in it (Custom 3 of an incident)
-AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", "1") != "0"   ; autocorrect in every program, this PC (v3.33.0)
+AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", ModuleDefault("AutoEverywhere") ? "1" : "0") != "0"   ; autocorrect in every program, this PC (v3.33.0)
 AutoHot := Map(), AutoHotStamp := "-"
+AutoHot.CaseSense := false   ; hotstrings fire whatever case you type, so the count looks words up the same way
+AutoCountIH := "", AutoCountBuf := "", AutoCountWin := 0   ; autocorrect words counted in Time saved (v3.36.1)
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -138,6 +143,7 @@ PadStart := ""           ; HH:mm the current call began
 PadStamp := 0            ; when the pad text last changed
 DashWin := ""             ; the open Shift dashboard window
 PadKeys := 0             ; keys typed on the pad for this call (for the time saved tally)
+NewLogClicks := 1        ; clicks the last iTrak new daily log took (for the time saved tally, v3.35.5)
 PadHistory := []         ; earlier calls this shift, newest first
 AutoMap := Map()         ; casino autocorrect: what you type -> what it becomes
 AutoMap.CaseSense := false
@@ -173,6 +179,11 @@ if A_IsCompiled {
     ; only one Watchlog at a time, even if an older copy or the script runs from elsewhere
     CloseOtherCopies()
     InstallBuiltIns()
+    ; v3.35.4: no "Do you want to run this file?" at the next sign-in
+    StartupFixLog := []
+    if ClearDownloadMark(A_ScriptFullPath)
+        StartupFixLog.Push("Removed the downloaded-file mark from " A_ScriptFullPath)
+    try FixStartupShortcut(true)
 }
 
 MoveFromOldName()
@@ -185,15 +196,22 @@ Loop Reg RegKey
 
 TrimActivity()
 TrimDayItems()
+BackfillClicks()
 Activity("Started v" VERSION " on " A_ComputerName " (Windows user " A_UserName ") from " A_ScriptDir)
 OnExit(LogExit)
 OnError(LogError)
 LoadSettings()
+RefreshModuleSwitches()
 LoadTemplates()
 LoadApps()
 RegisterHotkeys()
 CheckScale()
-DailyBackup()
+; v3.35.4: right after sign-in OneDrive is still starting, so the backup and
+; the team-folder update check wait 30 s (hotkeys work straight away)
+if StartedAtSignIn()
+    SetTimer DailyBackup, -30000
+else
+    DailyBackup()
 RegisterStamps()
 ResumeSdsResign()
 BreakResume()
@@ -220,11 +238,20 @@ BuildCapsTag()
 SetTimer CheckCaps, 150
 
 ; A newer Watchlog in the team folder: offer it before anything else
-CheckForUpdate()
+; (30 s after a sign-in, see DailyBackup above)
+if StartedAtSignIn()
+    SetTimer CheckForUpdate, -30000
+else
+    CheckForUpdate()
+if IsSet(StartupFixLog)
+    for m in StartupFixLog
+        Activity(m)
 AnnounceVersion()
 ; First time on this PC: the setup window (it's the Settings window)
-if FirstRun
+if FirstRun {
     ShowTutorial(true)
+    SetTimer(TeamFolderOffer, -4000)
+}
 
 
 ; =====================================================================
@@ -338,7 +365,7 @@ MoveFromOldName() {
             if SubStr(target, -18) = "\Log Templates.ahk" {
                 FileDelete A_LoopFileFullPath
                 if !FileExist(A_Startup "\Watchlog.lnk")
-                    FileCreateShortcut A_ScriptFullPath, A_Startup "\Watchlog.lnk", A_ScriptDir, , "Watchlog", FileExist(IconFile) ? IconFile : ""
+                    FileCreateShortcut StartupTarget(), A_Startup "\Watchlog.lnk", A_ScriptDir, "/startup", "Watchlog", FileExist(IconFile) ? IconFile : ""
                 moved.Push("Startup shortcut now starts Watchlog")
             }
         }
@@ -416,10 +443,14 @@ LoadSettings() {
     ; A LaunchWork.bat that came in the program folder (a shared copy) works too
     if !FileExist(Cfg["LaunchWork"]) && FileExist(HomeDir "\LaunchWork.bat")
         Cfg["LaunchWork"] := HomeDir "\LaunchWork.bat"
-    Cfg["CitrixTab"] := Trim(IniRead(SettingsFile, "Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
-    Cfg["LaunchWait"] := Trim(IniRead(SettingsFile, "Paths", "LaunchWait", "20"))
-    Cfg["FaceUrl"] := Trim(IniRead(SettingsFile, "Paths", "FaceUrl", "https://itrakappprod.olgnetwork.ca/iTrak/login.aspx"))
-    Cfg["CitrixUrl"] := Trim(IniRead(SettingsFile, "Paths", "CitrixUrl", "https://apps.gcgaming.com/Citrix/GCGCWeb/"))
+    Cfg["CitrixTab"] := Trim(CfgRead("Paths", "CitrixTab", "Citrix|apps.gcgaming.com"))
+    ; which browser Ctrl+Alt+L opens and looks in (v3.37.0): edge (default) or chrome
+    bro := StrLower(Trim(CfgRead("Paths", "Browser", "edge")))
+    Cfg["BrowserExe"] := RegExMatch(bro, "^(chrome|google chrome)$") ? "chrome.exe" : "msedge.exe"
+    Cfg["BrowserName"] := Cfg["BrowserExe"] = "chrome.exe" ? "Chrome" : "Edge"
+    Cfg["LaunchWait"] := Trim(CfgRead("Paths", "LaunchWait", "20"))
+    Cfg["FaceUrl"] := Trim(CfgRead("Paths", "FaceUrl", "https://itrakappprod.olgnetwork.ca/iTrak/login.aspx"))
+    Cfg["CitrixUrl"] := Trim(CfgRead("Paths", "CitrixUrl", "https://apps.gcgaming.com/Citrix/GCGCWeb/"))
     ; The team's shared templates file (blank = templates.txt in this folder)
     Cfg["SharedTemplates"] := Trim(IniRead(SettingsFile, "Templates", "Shared", ""), " `t`"")
     ; Shift journal: full = time, name and text of every log; counts = time
@@ -435,18 +466,24 @@ LoadSettings() {
     ; 1 to 3 symbols, no letters, digits, spaces or : or `
     pfx := Trim(IniRead(SettingsFile, "Triggers", "Prefix", ";"))
     Cfg["Prefix"] := pfx != "" && StrLen(pfx) <= 3 && !RegExMatch(pfx, "[\s:a-zA-Z0-9]") && !InStr(pfx, "``") ? pfx : ";"
-    Cfg["LayoutAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Layout", "AfterStart", "yes"))), "^(no|off|0|false)$")
+    Cfg["LayoutAfterStart"] := !RegExMatch(StrLower(Trim(CfgRead("Layout", "AfterStart", ModuleDefault("LayoutAfterStart") ? "yes" : "no"))), "^(no|off|0|false)$")
+    ; v3.35.3: after Ctrl+Alt+L (and the hourly SDS sign-in), SDS is kept in
+    ; its own spot for this many seconds, so it can't open over the Alert Grid
+    ; (0 = off). SdsSpot = x,y,w,h to use instead of the saved layout's SDS spot.
+    sw := Trim(IniRead(SettingsFile, "Layout", "SdsWatchSeconds", "120"))
+    Cfg["SdsWatchSecs"] := IsInteger(sw) && sw >= 0 ? Min(Integer(sw), 900) : 120
+    Cfg["SdsSpot"] := Trim(IniRead(SettingsFile, "Layout", "SdsSpot", ""))
     ; Ctrl+Alt+L signs into the Bally programs it just opened (after asking)
     Cfg["SignInAfterStart"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "StartOfShift", "SignIn", "yes"))), "^(no|off|0|false)$")
     ; The plain Caps Lock key (which does nothing with the guard on) clears the Alert Grid alerts
-    Cfg["CapsClearsAlerts"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "AlertGrid", "CapsLockClears", "yes"))), "^(no|off|0|false)$")
+    Cfg["CapsClearsAlerts"] := !RegExMatch(StrLower(Trim(CfgRead("AlertGrid", "CapsLockClears", ModuleDefault("CapsLockClears") ? "yes" : "no"))), "^(no|off|0|false)$")
     ; Dark look for every Watchlog window (off unless turned on in the tray menu or Customize)
     Cfg["Dark"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Look", "Dark", "no"))), "^(no|off|0|false)$")
     ; Minutes after an SDS login to sign back into SDS by itself (0 = off)
-    sr := Trim(IniRead(SettingsFile, "SDS", "ResignMinutes", "62"))
+    sr := Trim(CfgRead("SDS", "ResignMinutes", "62"))
     Cfg["SdsResign"] := IsInteger(sr) && sr >= 0 && sr <= 600 ? Integer(sr) : 62
     ; Call pad: Numpad + opens it (Ctrl+Alt+N always does). Key=off frees the + key.
-    Cfg["PadKey"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Key", "NumpadAdd"))), "^(off|no|0|false|none)$")
+    Cfg["PadKey"] := !RegExMatch(StrLower(Trim(CfgRead("CallPad", "Key", ModuleDefault("NumpadCall") ? "NumpadAdd" : "off"))), "^(off|no|0|false|none)$")
     ; Casino autocorrect in the call pad and the log forms
     Cfg["QuickInsert"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Forms", "QuickInsert", "no"))), "^(yes|on|1|true)$") > 0
     Cfg["Autocorrect"] := !RegExMatch(StrLower(Trim(IniRead(SettingsFile, "CallPad", "Autocorrect", "yes"))), "^(no|off|0|false)$")
@@ -454,7 +491,9 @@ LoadSettings() {
     Cfg["ReminderBeep"] := RegExMatch(StrLower(Trim(IniRead(SettingsFile, "Reminder", "Beep", "no"))), "^(yes|on|1|true)$") ? true : false
     ; A folder of your own to take updates from, instead of the team folder
     Cfg["UpdateFolder"] := Trim(IniRead(SettingsFile, "Updates", "Folder", ""), " `t`"")
-    Cfg["CloseApps"] := Trim(IniRead(SettingsFile, "EndOfShift", "Close", "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe"))
+    Cfg["CloseApps"] := Trim(CfgRead("EndOfShift", "Close", NewOperator()
+        ? "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, " Cfg["BrowserExe"] ", explorer.exe"
+        : "outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe"))
 
     ; Programs Ctrl+Alt+L opens before LaunchWork.bat: [StartOfShift] Run1 ... Run9
     ; A * in a path means "any version" (the newest one found is used).
@@ -462,11 +501,18 @@ LoadSettings() {
     Cfg["StartApps"] := []
     hasSection := false
     ; (a [StartOfShift] with only SignIn= in it, from Settings, still means the usual three)
+    ; v3.37.0: your own list first, else the team's (team-settings.ini), else the usual three
+    startFile := SettingsFile
     try hasSection := RegExMatch(IniRead(SettingsFile, "StartOfShift"), "im)^\s*Run\d\s*=") > 0
+    if !hasSection && TeamSettingsFile() != "" && FileExist(TeamSettingsFile()) {
+        try hasSection := RegExMatch(IniRead(TeamSettingsFile(), "StartOfShift"), "im)^\s*Run\d\s*=") > 0
+        if hasSection
+            startFile := TeamSettingsFile()
+    }
     if hasSection {
         Loop 9 {
-            p := Trim(IniRead(SettingsFile, "StartOfShift", "Run" A_Index, ""))
-            w := Trim(IniRead(SettingsFile, "StartOfShift", "Window" A_Index, ""))
+            p := Trim(IniRead(startFile, "StartOfShift", "Run" A_Index, ""))
+            w := Trim(IniRead(startFile, "StartOfShift", "Window" A_Index, ""))
             if p != ""
                 Cfg["StartApps"].Push({path: p, win: w != "" ? w : DefaultStartWindow(p)})
         }
@@ -832,6 +878,7 @@ SdsResignDue() {
     Sleep 3000
     if prev && prev != sds && WinExist("ahk_id " prev)
         try WinActivate "ahk_id " prev
+    SdsKeepInSpot(Min(Cfg["SdsWatchSecs"], 60), "hourly sign-in")
 }
 
 
@@ -1043,6 +1090,12 @@ FirstRunSetup() {
 ;  No passwords are kept here: they're in Windows Credential Manager.
 ; =====================================================================
 
+[User]
+; yes = a new operator: the extras (Caps Lock clears alerts, Numpad + call pad,
+; autocorrect in every program, taskbar clock and hidden previews, putting windows
+; back after start of shift) start OFF. Switch each on in tray menu > Settings.
+NewOperator=yes
+
 [Templates]
 ; The team's shared templates file (in SharePoint, synced by OneDrive).
 ; Blank = templates.txt in this folder. Your own extra templates go in
@@ -1059,23 +1112,13 @@ Save=full
 KeepDays=30
 
 [Paths]
-LaunchWait=20
-CitrixTab=Citrix|apps.gcgaming.com
-; The two web pages Ctrl+Alt+L opens, in Microsoft Edge: iTrak facial rec
-; (blank = not opened) and the Citrix Receiver page (opened last)
-FaceUrl=https://itrakappprod.olgnetwork.ca/iTrak/login.aspx
-CitrixUrl=https://apps.gcgaming.com/Citrix/GCGCWeb/
-
-[StartOfShift]
-; Programs Ctrl+Alt+L opens first (up to Run9), then it opens the Citrix page in Edge.
-; A * means any version, so upgrades don't break these.
-Run1=C:\BallyTechnologies\AlertGridUI*\AlertGridUI\AlertGridUI.bat
-Run2=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
-Run3=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
-
-[EndOfShift]
-; Programs Ctrl+Alt+Shift+L closes (separate with commas)
-Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, Spotify.exe, msedge.exe, explorer.exe
+; Site things (the two web pages Ctrl+Alt+L opens, the browser, wait times,
+; the programs it opens first, the end of shift close list) come from the
+; team's team-settings.ini when there is one, or are built in. Add your own
+; line here only to change it just for you, for example:
+;Browser=chrome
+;FaceUrl=
+;CitrixUrl=
 
 ; APP HOTKEYS - Ctrl+Alt + Key switches to the app, or opens it.
 ; Add more as [App3], [App4] ... up to [App9].
@@ -1580,6 +1623,13 @@ RunTemplate(text, title, repeat := false, trig := "", fill := false) {
     ; template in the window you were typing in
     if PickerActive()
         ClosePicker(true)
+    ; the finder's recent list (v3.36.0): the shortcut only
+    if trig != ""
+        for i, t in TemplateList
+            if t.trig = trig {
+                NotePick({kind: "t", i: i})
+                break
+            }
     fields := ParseFields(text)
     if fields.Length = 0 {
         out := FixArticles(text)
@@ -1634,7 +1684,7 @@ RunTemplate(text, title, repeat := false, trig := "", fill := false) {
 ; is never touched.
 NoteCopy(type) {
     global CopyMemory
-    if type != 1 || !WinActive("ahk_exe msedge.exe")
+    if type != 1 || !WinActive("ahk_exe " Cfg["BrowserExe"])
         return
     text := ""
     try text := Trim(A_Clipboard)
@@ -3492,6 +3542,10 @@ AutoFixEdit(ctrl, *) {
         SendMessage 0xB1, after, after, hw
     }
     busy := false
+    ; Time saved (v3.36.1): only a word that expands counts, and only the
+    ; letters it adds. The form and the call pad count the box as typed, so
+    ; this is the part they leave out: nothing is counted twice.
+    AutoCount(word, rep)
 }
 
 EditAutocorrect() {
@@ -3864,8 +3918,8 @@ ShowJournal() {
         st := JournalStats(file)
         h := "Shift started " st.started "`n" st.total " logs, " st.first " to " st.last
             . (st.ended != "" ? "   (ended " st.ended ")" : latest.open ? "   (still going)" : "")
-        if sv.keys > 0
-            h .= "`nTime saved this shift: " SavedTime(sv.keys) " (" Commas(sv.keys) " keystrokes)"
+        if sv.keys > 0 || sv.clicks > 0
+            h .= "`nTime saved this shift: " SavedTime(sv.keys, sv.clicks) " (" Commas(sv.keys) " keystrokes, " Commas(sv.clicks) " clicks)"
         headT.Text := h
         counts.Value := st.list
         ed.Value := StrReplace(shiftText, "`n", "`r`n")
@@ -3983,6 +4037,15 @@ LogKeys(l, day) {
     return it.n > 0 ? Round(it.keys / it.n) : 0
 }
 
+; What a log type clicked for you, on average (journal lines don't keep clicks)
+LogClicks(name, day) {
+    name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
+    it := ItemRow(IniRead(SavedFile, "DayItems", day "|" name, ""))
+    if it.n < 1
+        it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
+    return it.n > 0 ? Round(it.clicks / it.n) : 0
+}
+
 ; The edit made in the journal window goes through to every count: Shift count,
 ; this shift, Time saved (day, week, month, since the start) and the dashboard.
 ; A log taken out comes off with its own keystrokes; one added by hand goes on
@@ -3991,7 +4054,7 @@ JournalApplyEdit(oldText, newText, day) {
     oldL := JournalLogs(oldText), newL := JournalLogs(newText)
     gone := LogsMissingFrom(oldL, newL), came := LogsMissingFrom(newL, oldL)
     for l in gone
-        AdjustCount(l.name, -1, -LogKeys(l, day), day)
+        AdjustCount(l.name, -1, -LogKeys(l, day), day, -LogClicks(l.name, day))
     for l in came
         AdjustCount(l.name, 1, l.tagged ? l.keys : 0, day)
     return {removed: gone.Length, added: came.Length}
@@ -3999,33 +4062,33 @@ JournalApplyEdit(oldText, newText, day) {
 
 ; Adds dn logs and dkeys keystrokes (either can be negative, never below 0)
 ; to the item in every tally
-AdjustCount(name, dn, dkeys, day) {
+AdjustCount(name, dn, dkeys, day, dclicks := 0) {
     name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
     try {
-        inShift := CountBump("ShiftItems", name, dn, dkeys)
-        CountBump("DayItems", day "|" name, dn, dkeys)
+        inShift := CountBump("ShiftItems", name, dn, dkeys, dclicks)
+        CountBump("DayItems", day "|" name, dn, dkeys, dclicks)
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
-        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys)
-        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        d.log := Max(0, d.log + dn), d.keys := Max(0, d.keys + dkeys), d.clicks := Max(0, d.clicks + dclicks)
+        IniWrite RowStr(d), SavedFile, "Days", day
         ; this shift's totals only when this shift's item tally had the log
         ; (or, for an added log, while the shift is still going)
         if dn < 0 ? inShift : !IniRead(SavedFile, "Shift", "Ended", 0) {
             sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
-            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys)
-            IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+            sh.log := Max(0, sh.log + dn), sh.keys := Max(0, sh.keys + dkeys), sh.clicks := Max(0, sh.clicks + dclicks)
+            IniWrite RowStr(sh), SavedFile, "Shift", "Counts"
         }
     }
 }
 
-; One "times,keystrokes" line: add dn / dkeys (clamped at 0, deleted at 0 times).
-; Returns whether the line had anything in it before.
-CountBump(section, key, dn, dkeys) {
+; One "times,keystrokes,clicks" line: add dn / dkeys / dclicks (clamped at 0,
+; deleted at 0 times). Returns whether the line had anything in it before.
+CountBump(section, key, dn, dkeys, dclicks := 0) {
     it := ItemRow(IniRead(SavedFile, section, key, ""))
-    n := Max(0, it.n + dn), k := Max(0, it.keys + dkeys)
+    n := Max(0, it.n + dn), k := Max(0, it.keys + dkeys), c := Max(0, it.clicks + dclicks)
     if n = 0 {
         try IniDelete SavedFile, section, key
     } else {
-        IniWrite n "," k, SavedFile, section, key
+        IniWrite n "," k "," c, SavedFile, section, key
     }
     return it.n > 0
 }
@@ -4480,12 +4543,12 @@ ClearAlerts() {
     ; the "Successful" box doesn't turn up it starts again (up to 3 tries).
     ; [AlertGrid] Pause= in settings.ini is the wait between clicks in ms
     ; (default 40; raise it if a click lands before the menu is up).
-    gap := Integer(IniRead(SettingsFile, "AlertGrid", "Pause", "40"))
+    gap := Integer(CfgRead("AlertGrid", "Pause", "40"))
     ; [AlertGrid] SelectWait= (ms) is the most it waits for Ctrl+A to show
     ; before the right-click (v3.17.1: it now watches the list turn blue
     ; instead of just waiting, and presses Ctrl+A again if it didn't take.
     ; One alert never changes colour, so 300 ms is all that case costs: v3.17.2)
-    selWait := Integer(IniRead(SettingsFile, "AlertGrid", "SelectWait", "120"))
+    selWait := Integer(CfgRead("AlertGrid", "SelectWait", "120"))
     SetMouseDelay 0
     SetKeyDelay 0
     attempts := 0
@@ -4602,7 +4665,11 @@ ClearAlerts() {
         Activity("Alert Grid: cleared all alerts" (keysUsed ? " (picked the menu line with the arrow keys)" : "")
             . (c["Src"] = "team" ? " (team setup)" : "")
             . (checked ? "" : " (list didn't change colour after Ctrl+A: only one alert, or Ctrl+A missed)"))
-        CountSaved("", 3, "Alert Grid clear")   ; keystrokes only: a clear isn't a log, a login or a stamp
+        ; a clear isn't a log, a login or a stamp. By hand it's Ctrl+A (2 keys)
+        ; and these clicks: the row, right-click, the menu line, Submit, OK, and
+        ; the clear-acknowledged button and "no more alerts" box when taught (v3.35.5)
+        ac := 5 + (IsInteger(c["ClearX"]) && IsInteger(c["ClearY"]) ? 1 : 0) + (IsInteger(c["NoMoreX"]) && IsInteger(c["NoMoreY"]) ? 1 : 0)
+        CountSaved("", 2, "Alert Grid clear", ac)
     } else {
         Activity("Alert Grid: clear all didn't finish" (line ? "" : " (no menu line set for the arrow keys: Settings > Alert Grid)"))
     }
@@ -4747,7 +4814,7 @@ AlertColumn(x, y, bottom) {
 ; what it looks for (part of the title, then "ahk_exe ...")
 ITrakWin() {
     SetTitleMatchMode 2
-    spec := Trim(IniRead(SettingsFile, "ITrak", "Window", "iTrak ahk_exe wfica32.exe"))
+    spec := Trim(CfgRead("ITrak", "Window", "iTrak ahk_exe wfica32.exe"))
     return WinExist(spec)
 }
 
@@ -4811,6 +4878,7 @@ ITrakSpot(hwnd, tx, ty, w0, h0, &x, &y) {
 }
 
 ITrakNewLog(count := true) {
+    global NewLogClicks
     c := ITrakLoad()
     if !c {
         MsgBox "iTrak's new daily log click hasn't been taught on this PC yet (and the team folder has none for this screen).`n`nPress Ctrl+Alt+Shift+I once and follow the steps.", "New iTrak daily log", "Icon!"
@@ -4837,10 +4905,10 @@ ITrakNewLog(count := true) {
     }
     if !wasActive
         Sleep 300    ; Citrix needs a moment to take the keyboard and mouse
-    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    pause := Integer(CfgRead("ITrak", "Pause", "300"))
     w0 := Integer(c["W"]), h0 := Integer(c["H"])
     WinGetClientPos , , &cw, &ch, "ahk_id " win
-    if StrLower(Trim(IniRead(SettingsFile, "ITrak", "RefuseIfResized", "no"))) ~= "^(yes|on|1|true)$" && (Abs(cw - w0) > 2 || Abs(ch - h0) > 2) {
+    if StrLower(Trim(CfgRead("ITrak", "RefuseIfResized", "no"))) ~= "^(yes|on|1|true)$" && (Abs(cw - w0) > 2 || Abs(ch - h0) > 2) {
         Tip("The iTrak window isn't the size it was when taught (" cw "x" ch " now, " w0 "x" h0 " then). Put it back, or teach again.", 4000, true)
         Activity("iTrak new daily log: not clicked (window " cw "x" ch ", taught at " w0 "x" h0 ")")
         return false
@@ -4870,8 +4938,9 @@ ITrakNewLog(count := true) {
     if count
         Tip("New daily log", 1000)
     Activity("iTrak: new daily log clicked (" n " click" (n = 1 ? "" : "s") ", window " cw "x" ch ")" (c["Src"] = "team" ? " (team setup)" : ""))
+    NewLogClicks := n       ; for the full-entry log's clicks saved (v3.35.5)
     if count
-        CountSaved("", 2, "iTrak new daily log")
+        CountSaved("", 0, "iTrak new daily log", n)
     return true
 }
 
@@ -4900,7 +4969,7 @@ EntryFields := ["Location", "Topic", "Reference", "Synopsis"]
 ; [ITrak] EntryWindow= changes what it looks for.
 EntryWin() {
     SetTitleMatchMode 2
-    spec := Trim(IniRead(SettingsFile, "ITrak", "EntryWindow", "Daily Log Entry ahk_exe wfica32.exe"))
+    spec := Trim(CfgRead("ITrak", "EntryWindow", "Daily Log Entry ahk_exe wfica32.exe"))
     return WinExist(spec)
 }
 
@@ -4908,7 +4977,7 @@ EntryWin() {
 EntryWins() {
     SetTitleMatchMode 2
     m := Map()
-    spec := Trim(IniRead(SettingsFile, "ITrak", "EntryWindow", "Daily Log Entry ahk_exe wfica32.exe"))
+    spec := Trim(CfgRead("ITrak", "EntryWindow", "Daily Log Entry ahk_exe wfica32.exe"))
     for h in WinGetList(spec)
         m[h] := true
     return m
@@ -5032,12 +5101,16 @@ SavedBay() {
 ; few letters, Enter, the click), the full length of the Reference and
 ; the Synopsis plus a click each, and the 2 for the new-log click.
 RunEntry(e, useOpen := false) {
-    global EntryFields, LastRun
+    global EntryFields, LastRun, NewLogClicks
+    clicks := 0         ; clicks saved (v3.35.5): new log, each box, End Time Now
     f := EntryLoad()
     if !f {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
         return
     }
+    ; the finder's recent list (v3.36.0): a full-entry log by name (not a code word's own log)
+    if !e.HasOwnProp("src") || e.src != "code"
+        NotePick({kind: "e", e: e})
     syn := e.syn
     ; {Bay?}: always asks which bay (start of shift), offering the last one,
     ; and keeps the answer for the rest of the shift (v3.20.3)
@@ -5090,8 +5163,9 @@ RunEntry(e, useOpen := false) {
         before := EntryWins()
         if !ITrakNewLog(false)
             return
+        clicks += NewLogClicks
         ; wait (at most EntryWait ms) for the NEW Daily Log Entry window
-        wait := Integer(IniRead(SettingsFile, "ITrak", "EntryWait", "8000"))
+        wait := Integer(CfgRead("ITrak", "EntryWait", "8000"))
         deadline := A_TickCount + wait
         while !win && A_TickCount < deadline {
             for h in EntryWins()
@@ -5105,7 +5179,7 @@ RunEntry(e, useOpen := false) {
             Activity("Full-entry log " e.name ": no new Daily Log Entry window appeared within " wait " ms")
             return
         }
-        Sleep Integer(IniRead(SettingsFile, "ITrak", "EntrySettle", "600"))      ; let it finish drawing
+        Sleep Integer(CfgRead("ITrak", "EntrySettle", "600"))      ; let it finish drawing
     }
     try WinActivate "ahk_id " win
     if !WinWaitActive("ahk_id " win, , 3) {
@@ -5119,8 +5193,8 @@ RunEntry(e, useOpen := false) {
     vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
     LastRun := {e: e, syn: syn}
     EntryRefs[win] := e.ref        ; Custom 3 of an incident made from this log (v3.33.0)
-    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
-    keys := 2
+    pause := Integer(CfgRead("ITrak", "Pause", "300"))
+    keys := 0       ; (was 2 for the new log click: clicks are counted apart from v3.35.5)
     for k in EntryFields {
         if vals[k] = ""
             continue
@@ -5137,6 +5211,7 @@ RunEntry(e, useOpen := false) {
         MouseMove x, y, 0
         Sleep 60
         Click
+        clicks += 1
         Sleep pause
         if k = "Synopsis" {
             Paste(vals[k], true)
@@ -5166,7 +5241,7 @@ RunEntry(e, useOpen := false) {
             MouseMove x, y, 0
             Sleep 60
             Click
-            keys += 1
+            clicks += 1
             Sleep 120
         } else
             Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
@@ -5175,8 +5250,8 @@ RunEntry(e, useOpen := false) {
     if IsBreakLog(e)
         BreakBegin(win)
     Tip("Filled in: " e.name, 1500)
-    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes counted as saved)")
-    CountSaved("log", keys, "Full log: " e.name)
+    Activity("Full-entry log " e.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved)")
+    CountSaved("log", keys, "Full log: " e.name, clicks)
     Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
 }
 
@@ -5361,7 +5436,7 @@ ShareITrakSetup() {
 IsBreakLog(e) => RegExMatch(e.name, "i)^break\b")
 
 BreakAllowed() {
-    m := IniRead(SettingsFile, "Break", "Minutes", "60")
+    m := CfgRead("Break", "Minutes", "60")
     return IsNumber(m) && m > 0 ? m * 60 : 3600
 }
 
@@ -5575,7 +5650,7 @@ RepeatLastLog() {
 ; taught on this PC (no passwords: those live in Windows' Credential Manager)
 BackupSources() {
     list := []
-    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt"]
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt", "picker pins.txt"]
         if FileExist(HomeDir "\" n)
             list.Push([HomeDir "\" n, "home - " n])
     if DirExist(DataDir)
@@ -5720,6 +5795,7 @@ GoBackVersion() {
                 try FileMove keep, A_ScriptFullPath, 1
                 throw err
             }
+            ClearDownloadMark(A_ScriptFullPath)
         } else {
             FileCopy A_ScriptFullPath, keep, true
             FileCopy best, A_ScriptFullPath, true
@@ -5843,12 +5919,19 @@ UpdateFrom(f, v) {
 ;  Every log, login and stamp adds the keystrokes it saved: the length
 ;  of what went in minus what you typed (the shortcut, what you put in
 ;  the boxes, one Tab or Enter per box). Time is worked out at 40 words
-;  a minute (200 keystrokes). Kept per day in time saved.ini in
+;  a minute (200 keystrokes). From v3.35.5 the clicks and menu picks
+;  Watchlog does for you are counted too, apart from keystrokes (Alert
+;  Grid clears, iTrak new log, the daily log / incident / audit boxes,
+;  Requested By route, app switches), at [TimeSaved] SecondsPerClick=
+;  (default 0.5) each. Only the clicks you'd make by hand: not retries,
+;  not waiting for windows, not the mouse going back. From v3.36.1 the
+;  autocorrect words that expand count too (only the letters they add; see
+;  AutoCount). Kept per day in time saved.ini in
 ;  %LOCALAPPDATA%\Watchlog: numbers only, never log text or passwords.
 ;  A shift starts with the first count after End of shift or after 6
 ;  hours with nothing counted.
 ; =====================================================================
-CountSaved(kind, keys, name := "") {
+CountSaved(kind, keys, name := "", clicks := 0) {
     if IsObject(TutorialWin)
         return
     try {
@@ -5856,8 +5939,8 @@ CountSaved(kind, keys, name := "") {
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
         if kind != ""
             d.%kind% += 1
-        d.keys += keys
-        IniWrite d.log "," d.login "," d.stamp "," d.keys, SavedFile, "Days", day
+        d.keys += keys, d.clicks += clicks
+        IniWrite RowStr(d), SavedFile, "Days", day
         if IniRead(SavedFile, "Info", "First", "") = ""
             IniWrite day, SavedFile, "Info", "First"
         ; this shift
@@ -5873,31 +5956,37 @@ CountSaved(kind, keys, name := "") {
             ; the shift count: how many times, and keystrokes saved, per item
             name := Trim(StrReplace(StrReplace(StrReplace(name, "=", "-"), "`n", " "), "`r"))
             it := ItemRow(IniRead(SavedFile, "ShiftItems", name, ""))
-            IniWrite (it.n + 1) "," (it.keys + keys), SavedFile, "ShiftItems", name
+            IniWrite (it.n + 1) "," (it.keys + keys) "," (it.clicks + clicks), SavedFile, "ShiftItems", name
             di := ItemRow(IniRead(SavedFile, "DayItems", day "|" name, ""))
-            IniWrite (di.n + 1) "," (di.keys + keys), SavedFile, "DayItems", day "|" name
+            IniWrite (di.n + 1) "," (di.keys + keys) "," (di.clicks + clicks), SavedFile, "DayItems", day "|" name
         }
         if kind != ""
             sh.%kind% += 1
-        sh.keys += keys
-        IniWrite sh.log "," sh.login "," sh.stamp "," sh.keys, SavedFile, "Shift", "Counts"
+        sh.keys += keys, sh.clicks += clicks
+        IniWrite RowStr(sh), SavedFile, "Shift", "Counts"
         IniWrite A_Now, SavedFile, "Shift", "Last"
     }
 }
 
-; "times,keystrokes" -> an object
+; "times,keystrokes,clicks" -> an object (older lines have no clicks: 0)
 ItemRow(str) {
     p := StrSplit(str, ",")
     num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
-    return {n: num(1), keys: num(2)}
+    return {n: num(1), keys: num(2), clicks: num(3)}
 }
 
-; "logs,logins,stamps,keystrokes" -> an object
+; "logs,logins,stamps,keystrokes,clicks,autocorrect words" -> an object
+; (older lines have no clicks or words: 0. Clicks are counted from v3.35.5
+; on, autocorrect words from v3.36.1 on; neither is guessed for before.
+; The words' keystrokes are already inside keystrokes)
 SavedRow(str) {
     p := StrSplit(str, ",")
     num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
-    return {log: num(1), login: num(2), stamp: num(3), keys: num(4)}
+    return {log: num(1), login: num(2), stamp: num(3), keys: num(4), clicks: num(5), auto: num(6)}
 }
+
+; an object -> "logs,logins,stamps,keystrokes,clicks,autocorrect words"
+RowStr(d) => d.log "," d.login "," d.stamp "," d.keys "," d.clicks "," d.auto
 
 ; This shift's counts (all zero when the last shift has ended)
 SavedShift() {
@@ -5921,14 +6010,33 @@ SavedSince(from) {
         if from != "" && StrCompare(SubStr(line, 1, eq - 1), from) < 0
             continue
         d := SavedRow(SubStr(line, eq + 1))
-        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.days += 1
+        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.clicks += d.clicks, t.auto += d.auto, t.days += 1
     }
     return t
 }
 
-; Keystrokes -> "about 12 minutes" / "about 3.5 hours", at 200 a minute
-SavedTime(keys) {
-    mins := keys / 200
+; Seconds one click or menu pick that Watchlog does for you counts as in
+; Time saved (v3.35.5). settings.ini [TimeSaved] SecondsPerClick= (default
+; 0.5, Jakob's pick: about half the usual research figure of about 1.2 s to
+; point and click with the mouse, on purpose, so the number stays cautious)
+ClickSecs() {
+    v := Trim(IniRead(SettingsFile, "TimeSaved", "SecondsPerClick", "0.5"))
+    return IsNumber(v) && v >= 0 && v <= 10 ? v + 0 : 0.5
+}
+
+; "half a second" / "1 second" / "1.5 seconds", for the Time saved windows
+ClickSecsText() {
+    v := ClickSecs()
+    if v = 0.5
+        return "half a second"
+    t := RegExReplace(RegExReplace(Format("{:.2f}", v), "0+$"), "\.$")
+    return t " second" (v = 1 ? "" : "s")
+}
+
+; Keystrokes (and clicks) -> "about 12 minutes" / "about 3.5 hours":
+; keystrokes at 200 a minute (40 words a minute), clicks at ClickSecs() each
+SavedTime(keys, clicks := 0) {
+    mins := keys / 200 + clicks * ClickSecs() / 60
     if mins < 1
         return "under a minute"
     if mins < 60
@@ -5980,24 +6088,25 @@ ShowShiftCount() {
     start := last := ""
     try start := IniRead(SavedFile, "Shift", "Start", "")
     try last := IniRead(SavedFile, "Shift", "Last", "")
-    total := 0, keysTotal := 0
+    total := 0, keysTotal := 0, clicksTotal := 0
     for it in items
-        total += it.n, keysTotal += it.keys
+        total += it.n, keysTotal += it.keys, clicksTotal += it.clicks
     span := live && start != "" && last != "" ? "from " FormatTime(start, "HH:mm") " to " FormatTime(last, "HH:mm") : "nothing counted yet"
     g := WGui("+AlwaysOnTop", "Shift count  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
     g.AddText("w520", "Everything Watchlog did this shift, counted exactly (" span "). Numbers only: no log text.")
-    lv := g.AddListView("w520 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved"])
+    lv := g.AddListView("w520 r14 -Multi NoSortHdr", ["What", "Times", "Keystrokes saved", "Clicks saved"])
     report := "Watchlog shift count on " A_ComputerName " (" span ")`r`n"
     for it in items {
-        lv.Add(, it.name, it.n, Commas(it.keys))
-        report .= it.name ": " it.n " (" Commas(it.keys) " keystrokes saved)`r`n"
+        lv.Add(, it.name, it.n, Commas(it.keys), Commas(it.clicks))
+        report .= it.name ": " it.n " (" Commas(it.keys) " keystrokes, " Commas(it.clicks) " clicks saved)`r`n"
     }
-    lv.ModifyCol(1, 260), lv.ModifyCol(2, 70), lv.ModifyCol(3, 130)
-    sum := total " things done, " Commas(keysTotal) " keystrokes saved, " SavedTime(keysTotal) " at 40 words a minute"
+    lv.ModifyCol(1, 220), lv.ModifyCol(2, 55), lv.ModifyCol(3, 120), lv.ModifyCol(4, 100)
+    sum := total " things done, " Commas(keysTotal) " keystrokes and " Commas(clicksTotal) " clicks saved, " SavedTime(keysTotal, clicksTotal)
+        . " (typing at 40 words a minute, " ClickSecsText() " a click)"
     report .= "TOTAL: " sum "`r`n"
-    g.AddText("xm w480", "Total: " sum)
+    g.AddText("xm w520", "Total: " sum)
     g.AddButton("xm y+12 w120", "Start a new count").OnEvent("Click", NewCount)
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
@@ -6032,17 +6141,22 @@ ShowTimeSaved() {
     g := WGui("+AlwaysOnTop", "Time saved  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 14, g.MarginY := 12
-    g.AddText("w560", "Keystrokes Watchlog saved you: what went in, minus what you typed. Time is worked out at 40 words a minute.")
-    lv := g.AddListView("w560 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Keystrokes saved", "Time saved"])
-    report := "Watchlog time saved on " A_ComputerName " (keystrokes saved, at 40 words a minute)`r`n"
+    cs := ClickSecsText()
+    g.AddText("w640", "Keystrokes Watchlog saved you (what went in, minus what you typed) and the clicks and menu picks it did for you. "
+        . "Time is keystrokes at 40 words a minute, plus " cs " for each click. Waiting for windows isn't counted. "
+        . "Clicks are counted from v3.35.5 on. Autocorrect = words that expand (from v3.36.1 on); only the letters they add are in Keystrokes.")
+    lv := g.AddListView("w720 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Autocorrect", "Keystrokes", "Clicks", "Time saved"])
+    report := "Watchlog time saved on " A_ComputerName " (keystrokes at 40 words a minute, plus " cs " a click; clicks counted from v3.35.5 on, autocorrect words from v3.36.1 on)`r`n"
     for r in rows {
         t := r[2]
-        lv.Add(, r[1], t.log, t.login, t.stamp, Commas(t.keys), SavedTime(t.keys))
-        report .= r[1] ": " t.log " logs, " t.login " logins, " Commas(t.keys) " keystrokes, " SavedTime(t.keys)
+        lv.Add(, r[1], t.log, t.login, t.stamp, t.auto, Commas(t.keys), Commas(t.clicks), SavedTime(t.keys, t.clicks))
+        report .= r[1] ": " t.log " logs, " t.login " logins, " t.auto " autocorrect words, " Commas(t.keys) " keystrokes (" SavedTime(t.keys) "), "
+            . Commas(t.clicks) " clicks (" SavedTime(0, t.clicks) "), " SavedTime(t.keys, t.clicks) " in all"
             . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
     }
-    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 120), lv.ModifyCol(6, 120)
-    g.AddButton("xm+142 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 80), lv.ModifyCol(6, 90), lv.ModifyCol(7, 70), lv.ModifyCol(8, 120)
+    g.AddButton("xm+184 y+12 w130", "Autocorrect words").OnEvent("Click", (*) => (g.Destroy(), ShowAutoSaved()))
+    g.AddButton("x+8 yp w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
     g.AddButton("x+8 yp w110", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
@@ -6056,6 +6170,76 @@ ShowTimeSaved() {
     }
 }
 
+
+; Which autocorrect words pay off (v3.36.1): each word you typed that
+; expanded, how many times and the keystrokes it saved, for the last 30
+; days and since v3.36.1. From the per-day counts in time saved.ini.
+ShowAutoSaved() {
+    from30 := FormatTime(DateAdd(A_Now, -29, "Days"), "yyyy-MM-dd")
+    words := Map()
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if !bar || !eq || bar > eq
+                continue
+            name := SubStr(line, bar + 1, eq - bar - 1)
+            if SubStr(name, 1, 13) != "Autocorrect: "
+                continue
+            w := SubStr(name, 14), it := ItemRow(SubStr(line, eq + 1))
+            if !words.Has(w)
+                words[w] := {name: w, n: 0, keys: 0, n30: 0, keys30: 0}
+            a := words[w]
+            a.n += it.n, a.keys += it.keys
+            if StrCompare(SubStr(line, 1, bar - 1), from30) >= 0
+                a.n30 += it.n, a.keys30 += it.keys
+        }
+    }
+    list := []
+    for w, a in words
+        list.Push(a)
+    ; most keystrokes saved first
+    Loop list.Length - 1 {
+        i := A_Index + 1
+        cur := list[i], j := i - 1
+        while j >= 1 && list[j].keys < cur.keys {
+            list[j + 1] := list[j]
+            j -= 1
+        }
+        list[j + 1] := cur
+    }
+    g := WGui("+AlwaysOnTop", "Autocorrect words  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w560", "Your autocorrect words that expand, and what they saved. Only the letters a word adds count "
+        . "(shrd = Shred-it saves 4). Plain spelling fixes aren't counted. Counted from v3.36.1 on, in every program, the call pad and the forms.")
+    lv := g.AddListView("w560 r12 -Multi NoSortHdr", ["Word you type", "Last 30 days", "Keystrokes", "All", "Keystrokes", "Time saved (all)"])
+    report := "Watchlog autocorrect words on " A_ComputerName " (words that expand; keystrokes at 40 words a minute)`r`n"
+    total := 0, keys := 0
+    for a in list {
+        lv.Add(, a.name, a.n30, Commas(a.keys30), a.n, Commas(a.keys), SavedTime(a.keys))
+        report .= a.name ": " a.n " times, " Commas(a.keys) " keystrokes (" SavedTime(a.keys) "); last 30 days " a.n30 " times`r`n"
+        total += a.n, keys += a.keys
+    }
+    if !list.Length
+        lv.Add(, "(nothing counted yet)")
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 85), lv.ModifyCol(3, 80), lv.ModifyCol(4, 55), lv.ModifyCol(5, 80), lv.ModifyCol(6, 110)
+    sum := total " words, " Commas(keys) " keystrokes, " SavedTime(keys)
+    report .= "TOTAL: " sum "`r`n"
+    g.AddText("xm w560", "Total: " sum)
+    g.AddButton("xm+142 y+12 w120", "Edit the words").OnEvent("Click", (*) => (g.Destroy(), ShowAutoEditor()))
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w90", "Time saved").OnEvent("Click", (*) => (g.Destroy(), ShowTimeSaved()))
+    g.AddButton("x+8 yp w80 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := report
+        g.Destroy()
+        Tip("Report copied. Paste it with Ctrl+V.")
+    }
+}
 
 
 ; =====================================================================
@@ -6076,9 +6260,93 @@ ShowTimeSaved() {
 ItemKind(name) {
     if name = "Alert Grid clear"
         return "alert"
-    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new )")
+    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new |Autocorrect: )")
         return "other"
     return "log"
+}
+
+; Once, the first time v3.35.5 or later starts: gives the days already
+; counted their clicks, the best it can (Jakob, Nov 8: "make this retroactive
+; the best you can"). Only the per-item lines ([DayItems] from v3.16.0 on,
+; and this shift's [ShiftItems]) say what was done, so days before v3.16.0
+; stay at 0 clicks. Cautious numbers per time, the low end of what each one
+; clicks now: Alert Grid clear 5, iTrak new daily log 1, app switch 1,
+; full-entry log 3, incident 6. ;audit and anything else get 0 (the log name
+; doesn't say whether it was filled in by clicks or pasted).
+; The clicks that used to be counted as made-up keystrokes come off the
+; keystrokes at the same time, so nothing is counted twice: Alert Grid clear
+; 1, new daily log 2, full-entry log 2, incident 2 (never below 0).
+; Lines that already have clicks (3 numbers) are left alone.
+BackfillClicks() {
+    try {
+        if IniRead(SavedFile, "Info", "ClicksBackfilled", "") != ""
+            return
+    } catch
+        return
+    est(name) {
+        if name = "Alert Grid clear"
+            return [5, 1]
+        if name = "iTrak new daily log"
+            return [1, 2]
+        if SubStr(name, 1, 10) = "Switch to "
+            return [1, 0]
+        if SubStr(name, 1, 10) = "Full log: "
+            return [3, 2]
+        if SubStr(name, 1, 10) = "Incident: "
+            return [6, 2]
+        return [0, 0]
+    }
+    days := Map(), totalClicks := 0
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if !bar || !eq || bar > eq
+                continue
+            val := SubStr(line, eq + 1)
+            if StrSplit(val, ",").Length >= 3
+                continue
+            day := SubStr(line, 1, bar - 1), name := SubStr(line, bar + 1, eq - bar - 1)
+            it := ItemRow(val), e := est(name)
+            c := it.n * e[1], k := Max(0, it.keys - it.n * e[2])
+            IniWrite it.n "," k "," c, SavedFile, "DayItems", day "|" name
+            if !days.Has(day)
+                days[day] := {clicks: 0, keysOff: 0}
+            days[day].clicks += c, days[day].keysOff += it.keys - k
+            totalClicks += c
+        }
+    }
+    for day, a in days {
+        try {
+            d := SavedRow(IniRead(SavedFile, "Days", day, ""))
+            d.clicks += a.clicks, d.keys := Max(0, d.keys - a.keysOff)
+            IniWrite RowStr(d), SavedFile, "Days", day
+        }
+    }
+    ; this shift (if one is going): its own item lines
+    try {
+        sc := 0, so := 0
+        section := IniRead(SavedFile, "ShiftItems")
+        for line in StrSplit(section, "`n", "`r") {
+            if !(eq := InStr(line, "="))
+                continue
+            val := SubStr(line, eq + 1), name := SubStr(line, 1, eq - 1)
+            if StrSplit(val, ",").Length >= 3
+                continue
+            it := ItemRow(val), e := est(name)
+            c := it.n * e[1], k := Max(0, it.keys - it.n * e[2])
+            IniWrite it.n "," k "," c, SavedFile, "ShiftItems", name
+            sc += c, so += it.keys - k
+        }
+        if sc || so {
+            sh := SavedRow(IniRead(SavedFile, "Shift", "Counts", ""))
+            sh.clicks += sc, sh.keys := Max(0, sh.keys - so)
+            IniWrite RowStr(sh), SavedFile, "Shift", "Counts"
+        }
+    }
+    try IniWrite FormatTime(, "yyyy-MM-dd"), SavedFile, "Info", "ClicksBackfilled"
+    if totalClicks
+        Activity("Time saved: gave " days.Count " earlier day(s) " Commas(totalClicks) " estimated clicks (cautious, from the per-item counts), and took the old made-up click keystrokes off")
 }
 
 ; Drops [DayItems] lines older than 400 days (once, when Watchlog starts)
@@ -6159,7 +6427,7 @@ DashRange(from, to) {
     return r
 }
 
-; Rows for the last `count` days, newest first: [{day, label, logs, alerts, keys}]
+; Rows for the last `count` days, newest first: [{day, label, logs, alerts, keys, clicks}]
 DashDays(count) {
     rng := DashRange(FormatTime(DateAdd(A_Now, -(count - 1), "Days"), "yyyy-MM-dd"), FormatTime(, "yyyy-MM-dd"))
     rows := []
@@ -6168,7 +6436,7 @@ DashDays(count) {
         day := FormatTime(t, "yyyy-MM-dd")
         d := SavedRow(IniRead(SavedFile, "Days", day, ""))
         al := rng.days.Has(day) ? rng.days[day].alerts : 0
-        rows.Push({day: day, label: FormatTime(t, "ddd MMM d"), logs: d.log, alerts: al, keys: d.keys})
+        rows.Push({day: day, label: FormatTime(t, "ddd MMM d"), logs: d.log, alerts: al, keys: d.keys, clicks: d.clicks})
     }
     return {rows: rows, range: rng}
 }
@@ -6179,9 +6447,9 @@ HtmlSafe(s) => StrReplace(StrReplace(StrReplace(s, "&", "&amp;"), "<", "&lt;"), 
 
 ; What the This shift tab shows: {logs, alerts, keys, span, items(log types)}
 ShiftFacts() {
-    f := {logs: 0, alerts: 0, keys: 0, span: "nothing counted yet", types: []}
+    f := {logs: 0, alerts: 0, keys: 0, clicks: 0, span: "nothing counted yet", types: []}
     sh := SavedShift()
-    f.logs := sh.log, f.keys := sh.keys
+    f.logs := sh.log, f.keys := sh.keys, f.clicks := sh.clicks
     start := last := ""
     try start := IniRead(SavedFile, "Shift", "Start", "")
     try last := IniRead(SavedFile, "Shift", "Last", "")
@@ -6201,7 +6469,7 @@ ShiftFacts() {
 
 DashSummaryText(f, withTime) {
     s := "Shift summary, " A_ComputerName ", " FormatTime(, "yyyy-MM-dd") " (" f.span ")`r`n"
-    s .= f.logs " logs, " f.alerts " Alert Grid clears" (withTime ? ", " SavedTime(f.keys) " of typing saved" : "") "`r`n"
+    s .= f.logs " logs, " f.alerts " Alert Grid clears" (withTime ? ", " SavedTime(f.keys, f.clicks) " saved (typing and clicks)" : "") "`r`n"
     for it in f.types
         s .= "  " Format("{:4}", it.n) "  " it.name "`r`n"
     return s
@@ -6221,7 +6489,7 @@ DashSheetHtml(f, withTime) {
         . "<div class='tile'><b>" f.logs "</b><span>logs</span></div>"
         . "<div class='tile'><b>" f.alerts "</b><span>Alert Grid clears</span></div>"
     if withTime
-        h .= "<div class='tile'><b>" StrReplace(StrReplace(SavedTime(f.keys), "about ", ""), "under a minute", "&lt;1 min") "</b><span>typing saved</span></div>"
+        h .= "<div class='tile'><b>" StrReplace(StrReplace(SavedTime(f.keys, f.clicks), "about ", ""), "under a minute", "&lt;1 min") "</b><span>time saved (typing and clicks)</span></div>"
     h .= "</div><table>"
     for it in f.types
         h .= "<tr><td>" HtmlSafe(it.name) "</td><td class='n'>" it.n "</td><td style='width:45%'><div class='bar' style='width:" Round(it.n / top * 100) "%'></div></td></tr>"
@@ -6241,7 +6509,7 @@ ShowDashboard(tab := 1) {
     tb := g.AddTab3("w600 h430", ["This shift", "Week", "Month"])
 
     tb.UseTab(1)
-    y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys), "about ", ""), "typing saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
+    y := Tiles(g, [[f.logs, "logs"], [f.alerts, "alert clears"], [StrReplace(SavedTime(f.keys, f.clicks), "about ", ""), "time saved"], [f.span = "nothing counted yet" ? "-" : RegExReplace(f.span, ".* \((.*)\)$", "$1"), "shift length"]])
     g.AddText("xm+12 y" y " w470 BackgroundTrans", BreakText())
     g.AddButton("xm+490 y" (y - 4) " w90 h26", "Change...").OnEvent("Click", (*) => (g.Opt("+OwnDialogs"), BreakEdit() && ShowDashboard()))
     y += 24
@@ -6255,17 +6523,17 @@ ShowDashboard(tab := 1) {
     for pair in [[2, wk, 7, "Last 7 days"], [3, mo, 30, "Last 30 days"]] {
         tb.UseTab(pair[1])
         d := pair[2]
-        logs := alerts := keys := used := best := 0
+        logs := alerts := keys := clicks := used := best := 0
         bestDay := ""
         for r in d.rows {
-            logs += r.logs, alerts += r.alerts, keys += r.keys
+            logs += r.logs, alerts += r.alerts, keys += r.keys, clicks += r.clicks
             if r.logs || r.alerts
                 used += 1
             if r.logs > best
                 best := r.logs, bestDay := r.label
         }
         avg := used ? Round(logs / used) : 0
-        y := Tiles(g, [[logs, "logs"], [alerts, "alert clears"], [SavedTime(keys) = "under a minute" ? "<1 min" : StrReplace(SavedTime(keys), "about ", ""), "typing saved"], [used ? avg : "-", "logs per day worked"]])
+        y := Tiles(g, [[logs, "logs"], [alerts, "alert clears"], [SavedTime(keys, clicks) = "under a minute" ? "<1 min" : StrReplace(SavedTime(keys, clicks), "about ", ""), "time saved"], [used ? avg : "-", "logs per day worked"]])
         if pair[1] = 3 {
             prevLogs := 0
             for day, v in prevRng.days
@@ -6274,12 +6542,12 @@ ShowDashboard(tab := 1) {
             note .= prevRng.logs || prevLogs ? "     Previous 30 days: " prevLogs " logs (counted by log type)" : ""
             g.AddText("xm+12 y" y " w570 BackgroundTrans", note)
         }
-        dl := g.AddListView("xm+12 " (pair[1] = 3 ? "y+6" : "y" y) " w570 r" (pair[1] = 2 ? 7 : 6) " -Multi NoSortHdr", ["Day", "Logs", "Alert clears", "Typing saved", ""])
+        dl := g.AddListView("xm+12 " (pair[1] = 3 ? "y+6" : "y" y) " w570 r" (pair[1] = 2 ? 7 : 6) " -Multi NoSortHdr", ["Day", "Logs", "Alert clears", "Time saved", ""])
         mx := 0
         for r in d.rows
             mx := Max(mx, r.logs)
         for r in d.rows
-            dl.Add(, r.label, r.logs, r.alerts, r.keys ? SavedTime(r.keys) : "", Bar(r.logs, mx, 16))
+            dl.Add(, r.label, r.logs, r.alerts, r.keys || r.clicks ? SavedTime(r.keys, r.clicks) : "", Bar(r.logs, mx, 16))
         dl.ModifyCol(1, 110), dl.ModifyCol(2, 55), dl.ModifyCol(3, 90), dl.ModifyCol(4, 110), dl.ModifyCol(5, 170)
         tl := g.AddListView("xm+12 y+8 w570 r" (pair[1] = 2 ? 5 : 4) " -Multi NoSortHdr", ["Top log types (" pair[4] ")", "Times"])
         for it in d.range.types {
@@ -6407,7 +6675,7 @@ LoadApps() {
     for a in [{name: "Teams",   key: "T", win: "ahk_exe ms-teams.exe", path: "msteams:"}
             , {name: "Outlook", key: "U", win: "ahk_exe olk.exe",      path: "shell:AppsFolder\Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows"}
             , {name: "Spotify", key: "Y", win: "ahk_exe Spotify.exe",  path: "spotify:"}
-            , {name: "Edge",    key: "G", win: "ahk_exe msedge.exe",   path: "msedge.exe"}] {
+            , {name: Cfg["BrowserName"], key: "G", win: "ahk_exe " Cfg["BrowserExe"], path: Cfg["BrowserExe"]}] {
         if InStr(named, "|" a.name "|") || InStr(taken, a.key)
             continue
         Hotkey "^!" StrLower(a.key), MakeSwitchHandler(a.name, a.win, a.path)
@@ -6448,7 +6716,7 @@ MakeSwitchHandler(name, win, path) {
 ; Switches to the app, minimizes it if it's already in front, or opens it
 SwitchTo(name, match, runTarget := "") {
     SetTitleMatchMode 2
-    CountSaved("", 0, "Switch to " name)
+    CountSaved("", 0, "Switch to " name, 1)        ; one taskbar click saved (v3.35.5)
     if match != "" && WinExist(match) {
         if WinActive(match)
             WinMinimize
@@ -6570,7 +6838,7 @@ WindowInfo() {
 ; True if Edge has a window open
 ; (it can run in the background with no window, which doesn't count)
 BrowserOpen() {
-    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe msedge.exe")
+    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe " Cfg["BrowserExe"])
         if SafeTitle(id) != ""
             return true
     return false
@@ -6642,17 +6910,19 @@ StartOfShift() {
             missing .= "   CitrixUrl in settings.ini is empty`n"
         else {
             ; one command, facial rec first and Citrix last, so Edge ends on the Citrix tab
-            try Run 'msedge.exe ' (Cfg["FaceUrl"] != "" ? '"' Cfg["FaceUrl"] '" ' : "") '"' Cfg["CitrixUrl"] '"'
+            try Run Cfg["BrowserExe"] ' ' (Cfg["FaceUrl"] != "" ? '"' Cfg["FaceUrl"] '" ' : "") '"' Cfg["CitrixUrl"] '"'
             catch
-                missing .= "   Microsoft Edge (msedge.exe)`n"
+                missing .= "   " Cfg["BrowserName"] " (" Cfg["BrowserExe"] ")`n"
         }
     }
 
     Tip("")
     if sites
         EdgeToFront(true)
-    if Cfg["LayoutAfterStart"]
+    if Cfg["LayoutAfterStart"] {
         RestoreLayout(true)
+        SdsKeepInSpot(Cfg["SdsWatchSecs"], "start of shift")
+    }
     if sites
         EdgeToFront(false)
     if missing != ""
@@ -6701,6 +6971,325 @@ SignInStarted(apps) {
         Sleep 3000
     }
 }
+
+; =====================================================================
+;  TEAM SETTINGS AND TEAM SETUP  (v3.37.0)
+;  Three layers, each only filling in what the one above leaves blank:
+;    1. you     settings.ini (your own OneDrive, goes with you to any bay)
+;    2. team    team-settings.ini, beside the shared templates.txt
+;    3. built in, the way Watchlog always worked
+;  Spots taught on a bay (Alert Grid, iTrak) stay per PC, as before.
+;  Tray > Advanced > Team setup shows what this PC has and what's missing.
+; =====================================================================
+TeamDir() {
+    sh := ""
+    try sh := Trim(IniRead(SettingsFile, "Templates", "Shared", ""), " `t`"")
+    if sh = ""
+        return ""
+    SplitPath sh, , &dir
+    return dir
+}
+
+TeamSettingsFile() {
+    d := TeamDir()
+    return d = "" ? "" : d "\team-settings.ini"
+}
+
+; A setting: your own settings.ini first (even if you left it blank on purpose),
+; then the team's team-settings.ini, then def (what is built into Watchlog)
+CfgRead(sec, key, def) {
+    none := Chr(1)
+    v := none
+    try v := IniRead(SettingsFile, sec, key, none)
+    if v != none
+        return v
+    f := TeamSettingsFile()
+    if f != "" && FileExist(f) {
+        try v := IniRead(f, sec, key, none)
+        if v != none
+            return v
+    }
+    return def
+}
+
+; True for someone whose settings.ini Watchlog made on this run or earlier
+; with [User] NewOperator=yes. People who were already using Watchlog before
+; v3.37.0 have no such line, so nothing changes for them.
+NewOperator() {
+    if !FileExist(SettingsFile)
+        return true
+    v := ""
+    try v := IniRead(SettingsFile, "User", "NewOperator", "")
+    return RegExMatch(StrLower(Trim(v)), "^(yes|1|true|on)$") > 0
+}
+
+; Is an extra on when the person has not chosen yet? The team's [Modules]
+; line wins, otherwise on for people already using Watchlog and off for a
+; new operator. name: Clock, Previews, AutoEverywhere, CapsLockClears,
+; NumpadCall, LayoutAfterStart
+ModuleDefault(name) {
+    f := TeamSettingsFile()
+    if f != "" && FileExist(f) {
+        t := ""
+        try t := StrLower(Trim(IniRead(f, "Modules", name, "")))
+        if t != ""
+            return !RegExMatch(t, "^(no|off|0|false)$")
+    }
+    return !NewOperator()
+}
+
+; The three switches read when the script starts are read again once the
+; settings are loaded (the first run makes settings.ini after they were read)
+RefreshModuleSwitches() {
+    global ClockOn, PreviewHideOn, AutoEverywhereOn
+    ClockOn := IniRead(LastUsedFile, "Clock", "Show", ModuleDefault("Clock") ? "1" : "0") != "0"
+    PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", ModuleDefault("Previews") ? "1" : "0") != "0"
+    AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", ModuleDefault("AutoEverywhere") ? "1" : "0") != "0"
+}
+
+; Folders in OneDrive (up to 2 levels down) that look like the team's Watchlog
+; folder: a templates.txt next to team-settings.ini, Watchlog.exe or Watchlog.ahk,
+; or in a folder with Watchlog in its name. Never your own Watchlog folder.
+TeamFolderCandidates() {
+    found := []
+    seen := Map()
+    own := StrLower(RTrim(HomeDir, "\"))
+    for v in ["OneDriveCommercial", "OneDrive", "OneDriveConsumer"] {
+        root := RTrim(EnvGet(v), "\")
+        if root = "" || !DirExist(root) || seen.Has(StrLower(root))
+            continue
+        seen[StrLower(root)] := true
+        TeamScan(root, 0, found, own)
+    }
+    return found
+}
+
+TeamScan(dir, depth, found, own) {
+    if found.Length >= 5
+        return
+    d := RTrim(dir, "\")
+    if StrLower(d) != own && FileExist(d "\templates.txt")
+        && (FileExist(d "\team-settings.ini") || FileExist(d "\Watchlog.exe") || FileExist(d "\Watchlog.ahk") || InStr(d, "Watchlog"))
+        found.Push(d)
+    if depth >= 2
+        return
+    Loop Files d "\*", "D" {
+        if SubStr(A_LoopFileName, 1, 1) = "."
+            continue
+        TeamScan(A_LoopFileFullPath, depth + 1, found, own)
+    }
+}
+
+TeamHasSection(file, sec) {
+    if file = "" || !FileExist(file)
+        return false
+    try return Trim(IniRead(file, sec)) != ""
+    return false
+}
+
+; What this PC has from the team: [[level, text]], level ok, warn or bad
+TeamChecks() {
+    c := []
+    sh := Cfg["SharedTemplates"]
+    dir := TeamDir()
+    if sh = "" {
+        c.Push(["warn", "No team folder picked yet. This PC uses its own templates.txt and its own settings. Press Pick the team folder."])
+    } else {
+        c.Push(DirExist(dir) ? ["ok", "Team folder reachable: " dir]
+            : ["bad", "Can't reach the team folder: " dir "  (is OneDrive running, and has the folder synced to this PC?)"])
+        c.Push(FileExist(sh) ? ["ok", "Team templates.txt found."]
+            : ["bad", "templates.txt isn't in the team folder."])
+        tf := TeamSettingsFile()
+        c.Push(FileExist(tf) ? ["ok", "team-settings.ini found: the supervisor's defaults are in use."]
+            : ["warn", "No team-settings.ini yet, so the defaults built into Watchlog are used. A supervisor can make one with Set up a team folder."])
+    }
+    scale := Round(A_ScreenDPI / 96 * 100)
+    ownA := FileExist(AlertFile) ? "taught on this PC" : ""
+    shrA := TeamHasSection(AlertTeamFile(), AlertTeamSection()) ? "shared for " scale "% scaling" : ""
+    c.Push(ownA != "" || shrA != "" ? ["ok", "Alert Grid clear: " (ownA != "" ? ownA : shrA) "."]
+        : ["warn", "Alert Grid clear isn't taught on this PC yet (tray > Alert Grid > Teach). Skip it if you don't use it."])
+    ownI := FileExist(ITrakFile) ? "taught on this PC" : ""
+    shrI := TeamHasSection(ITrakTeamFile(), ITrakTeamSection()) ? "shared for " scale "% scaling" : ""
+    c.Push(ownI != "" || shrI != "" ? ["ok", "iTrak new daily log button: " (ownI != "" ? ownI : shrI) "."]
+        : ["warn", "iTrak spots aren't taught on this PC yet (tray > iTrak). Only needed for the full-entry logs, code words that fill the daily log, `;audit and incident reports."])
+    missing := 0
+    for l in LoginList
+        if CredLoad(l.user) = ""
+            missing += 1
+    if LoginList.Length = 0
+        c.Push(["warn", "No logins set up (tray > Settings). Passwords are saved on this PC only, so each bay asks once."])
+    else
+        c.Push(missing ? ["warn", missing " of your " LoginList.Length " logins have no saved password on this PC yet. Each asks once, the first time you use it."]
+            : ["ok", "All " LoginList.Length " logins have a saved password on this PC."])
+    c.Push(["ok", "Screen scaling on this PC: " scale "%. Spots shared through the team folder only work on screens with the same scaling."])
+    c.Push([InStr(VersionStatus(), "OUT OF DATE") ? "bad" : "ok", "Version v" VERSION ". " VersionStatus()])
+    return c
+}
+
+ShowTeamSetup() {
+    checks := TeamChecks()
+    teal := "0F766E", ink := "1F2933", muted := "6B7280"
+    good := "15803D", warn := "B45309", bad := "B91C1C"
+    g := WGui("+AlwaysOnTop", "Team setup  -  v" VERSION)
+    g.BackColor := "F4F7F7"
+    g.MarginX := 18, g.MarginY := 14
+    g.SetFont("s18 bold c" teal, "Segoe UI")
+    g.AddText("w760", "Team setup")
+    g.SetFont("s10 norm c" muted, "Segoe UI")
+    g.AddText("w760 y+0", "Points this PC at the team's shared folder: the wording, the team's defaults and the shared update. Your own settings always win over the team's.")
+    for ch in checks {
+        g.SetFont("s12 bold c" (ch[1] = "ok" ? good : ch[1] = "warn" ? warn : bad), "Segoe UI")
+        g.AddText("x18 y+8 w22", Chr(0x25CF))
+        g.SetFont("s10 norm c" ink, "Segoe UI")
+        g.AddText("x42 yp+2 w736", ch[2])
+    }
+    g.SetFont("s10 norm c" ink, "Segoe UI")
+    g.AddButton("x18 y+18 w190 Default", "Pick the team folder...").OnEvent("Click", (*) => (g.Destroy(), PickTeamFolder()))
+    g.AddButton("x+6 w190", "Set up a team folder...").OnEvent("Click", (*) => (g.Destroy(), SetUpTeamFolder()))
+    g.AddButton("x+6 w150", "Check again").OnEvent("Click", (*) => (g.Destroy(), ShowTeamSetup()))
+    g.AddButton("x+6 w150", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+}
+
+; Pick the team's folder (offers one it finds in OneDrive first)
+PickTeamFolder() {
+    dir := ""
+    cands := TeamFolderCandidates()
+    if cands.Length && MsgBox("Found a Watchlog team folder in your OneDrive:`n`n" cands[1] "`n`nUse it?", "Team setup", "YesNo Icon?") = "Yes"
+        dir := cands[1]
+    if dir = "" {
+        dir := DirSelect("*" (TeamDir() != "" ? TeamDir() : A_MyDocuments), 3, "Pick the team's shared Watchlog folder (the one with templates.txt in it)")
+        if dir = ""
+            return
+    }
+    UseTeamFolder(RTrim(dir, "\"))
+}
+
+; Sets this PC to read the team folder (settings.ini [Templates] Shared=), then reloads
+UseTeamFolder(dir) {
+    if StrLower(dir) = StrLower(RTrim(HomeDir, "\")) {
+        MsgBox "That is your own Watchlog folder. Pick the shared team folder instead.", "Team setup", "Icon!"
+        return false
+    }
+    if !FileExist(dir "\templates.txt") {
+        MsgBox "There's no templates.txt in:`n" dir "`n`nPick the folder the team shares. A supervisor starting a new team folder can use Set up a team folder first.", "Team setup", "Icon!"
+        return false
+    }
+    IniWrite dir "\templates.txt", SettingsFile, "Templates", "Shared"
+    Activity("Team folder set to " dir)
+    MsgBox "Done. This PC now uses the team's folder:`n`n" dir "`n`nWatchlog reloads now.", "Team setup"
+    Reload
+}
+
+; Supervisor: puts the team's starting files in an empty (or existing) folder:
+; templates.txt (the wording this PC uses now), a team-settings.ini to fill in,
+; and Watchlog.exe so operators can update from it. Nothing is overwritten.
+SetUpTeamFolder() {
+    dir := DirSelect("*" A_MyDocuments, 3, "Pick the folder the team will share (a SharePoint folder added to OneDrive, for example)")
+    if dir = ""
+        return
+    dir := RTrim(dir, "\")
+    if StrLower(dir) = StrLower(RTrim(HomeDir, "\")) {
+        MsgBox "That is your own Watchlog folder. Pick a different folder to share.", "Team setup", "Icon!"
+        return
+    }
+    if MsgBox("Put the team's starting files in:`n`n" dir "`n`ntemplates.txt (the wording you use now), team-settings.ini (to fill in) and Watchlog.exe. Files already there are not replaced.`n`nYour own settings, logins and passwords are not copied.", "Team setup", "YesNo Icon?") != "Yes"
+        return
+    made := "", kept := ""
+    tplFrom := Tpl.src != "local" && FileExist(Tpl.file) ? Tpl.file : TemplatesFile
+    for f in [[tplFrom, "templates.txt"], [A_IsCompiled ? A_ScriptFullPath : "", "Watchlog.exe"]] {
+        if f[1] = "" || !FileExist(f[1])
+            continue
+        if FileExist(dir "\" f[2]) {
+            kept .= "   " f[2] "`n"
+            continue
+        }
+        try {
+            FileCopy f[1], dir "\" f[2]
+            made .= "   " f[2] "`n"
+        } catch as e {
+            MsgBox "Couldn't copy " f[2] ":`n" e.Message, "Team setup", "Icon!"
+            return
+        }
+    }
+    if FileExist(dir "\team-settings.ini") {
+        kept .= "   team-settings.ini`n"
+    } else {
+        try {
+            FileAppend TeamSettingsStarter() "`n", dir "\team-settings.ini", "UTF-16"
+            made .= "   team-settings.ini`n"
+        } catch as e {
+            MsgBox "Couldn't write team-settings.ini:`n" e.Message, "Team setup", "Icon!"
+            return
+        }
+    }
+    Activity("Team folder set up in " dir)
+    msg := "Done in:`n" dir "`n`n" (made != "" ? "Added:`n" made "`n" : "") (kept != "" ? "Already there, left alone:`n" kept "`n" : "")
+        . "Open team-settings.ini there to set the team's defaults.`n`nUse this folder on this PC now?"
+    if MsgBox(msg, "Team setup", "YesNo Iconi") = "Yes"
+        UseTeamFolder(dir)
+}
+
+TeamSettingsStarter() {
+    return "
+    (
+; =====================================================================
+;  WATCHLOG - team settings
+;  Set once by the supervisor, shared by every operator through this folder.
+;  A line in someone's own settings.ini beats this file, and anything left
+;  out uses the value built into Watchlog. Take the leading ; off a line to
+;  switch it on. Watchlog reads this file every time it starts.
+; =====================================================================
+
+[Paths]
+; The browser Ctrl+Alt+L opens and looks in: edge or chrome
+;Browser=edge
+; The pages Ctrl+Alt+L opens (FaceUrl blank = not opened)
+;FaceUrl=https://itrakappprod.olgnetwork.ca/iTrak/login.aspx
+;CitrixUrl=https://apps.gcgaming.com/Citrix/GCGCWeb/
+;CitrixTab=Citrix|apps.gcgaming.com
+;LaunchWait=20
+
+[StartOfShift]
+; The programs Ctrl+Alt+L opens first (up to Run9). A * means any version.
+;Run1=C:\BallyTechnologies\AlertGridUI*\AlertGridUI\AlertGridUI.bat
+;Run2=C:\BallyTechnologies\SDSUI*\SDSUI\SDSUI.bat
+;Run3=C:\BallyTechnologies\CMPDesktop*\CMPDesktop\CMPDesktop.exe
+
+[EndOfShift]
+; The programs Ctrl+Alt+Shift+L closes, separated by commas
+;Close=outlook.exe, olk.exe, ms-teams.exe, Teams.exe, javaw.exe, CMPDesktop.exe, wfica32.exe, msedge.exe, explorer.exe
+
+[SDS]
+; Minutes after an SDS login to sign back in (0 = off)
+;ResignMinutes=62
+
+[Break]
+;Minutes=60
+
+[Modules]
+; The extras, for a NEW operator who hasn't chosen yet (yes or no). People who
+; already use Watchlog keep what they have, and anyone can change their own in
+; tray menu > Settings.
+;CapsLockClears=no
+;NumpadCall=no
+;AutoEverywhere=no
+;Clock=no
+;Previews=no
+;LayoutAfterStart=no
+    )"
+}
+
+; A new operator with no team folder yet: offer one found in OneDrive (first run only)
+TeamFolderOffer() {
+    if Cfg["SharedTemplates"] != ""
+        return
+    cands := TeamFolderCandidates()
+    if cands.Length && MsgBox("Found a Watchlog team folder in your OneDrive:`n`n" cands[1] "`n`nUse it, so this PC gets the team's wording and settings? (You can change this any time in tray > Advanced > Team setup.)", "Watchlog team setup", "YesNo Icon?") = "Yes"
+        UseTeamFolder(cands[1])
+}
+
 
 ; Tray: pick a folder of your own for Watchlog.exe updates (settings.ini [Updates] Folder=)
 ChooseUpdateFolder() {
@@ -6759,7 +7348,7 @@ SafeTitle(id) {
 ; no title in the background), front-most first
 EdgeWindows() {
     list := []
-    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe msedge.exe")
+    for id in WinGetList("ahk_class Chrome_WidgetWin_1 ahk_exe " Cfg["BrowserExe"])
         if SafeTitle(id) != ""
             list.Push(id)
     return list
@@ -6991,15 +7580,29 @@ EditFile(path) {
 
 ; =====================================================================
 ;  TEMPLATE FINDER  -  Ctrl+Alt+Space   (also tray menu > Find a template)
-;  Type part of a name, a trigger, or any word from the wording, and the
-;  matching templates show up with a preview. Enter runs the one picked
-;  in the window you were typing in. Up/Down choose, Esc closes.
+;  Type part of a name, a trigger, the first letters of a name ("cd" =
+;  Card Destruction) or any word from the wording, and the matching
+;  templates and full-entry daily logs show up with a preview. Enter runs
+;  the one picked in the window you were typing in. Up/Down choose, Esc
+;  closes.
+;  v3.36.0 (quick picker): with the box empty, your pinned ones come first
+;  (Ctrl+P pins or unpins the picked row, a star marks them), then the
+;  last 10 you ran from anywhere (code word, finder, call pad, Ctrl+Alt+F),
+;  then the full-entry daily logs, then the code word templates. The ones you use most get a small boost when you
+;  type. Full-entry daily logs (the Ctrl+Alt+F list) are in the same list.
+;  A Compact tick hides the preview.
+;  Pins: "picker pins.txt" beside templates.txt (OneDrive shares it with
+;  your other bays). Recent and how often: picker.ini in
+;  %LOCALAPPDATA%\Watchlog, this PC only. Both hold names only: never the
+;  filled-in text, never passwords. Logins are never listed, and Watchlog
+;  never types into the search box.
 ; =====================================================================
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 PickerActive() => IsObject(Picker) && WinActive("ahk_id " Picker.hwnd)
 
-ShowPicker() {
+; query / target: used when the Compact tick reopens the finder
+ShowPicker(query := "", target := 0) {
     global Picker
     if IsObject(Picker) {
         ; Pressed again: close it (or bring it back if it's behind)
@@ -7014,44 +7617,67 @@ ShowPicker() {
         try WinActivate "ahk_id " CurForm.hwnd
         return
     }
-    if !TemplateList.Length {
+    if !TemplateList.Length && !Entries.Length {
         MsgBox "No templates are loaded. Check templates.txt (Ctrl+Alt+E).", "Find a template", "Icon!"
         return
     }
-    target := WinExist("A")
-    found := {rows: []}         ; template numbers in the order they're listed
+    if !target
+        target := WinExist("A")
+    found := {rows: []}         ; what's listed, in order: {kind, i or e, tag}
+    uses := PickUsesAll()       ; read once: how often each one was run on this PC
+    compact := PickerCompact()
 
     g := WGui("+AlwaysOnTop", "Find a template  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
-    g.AddText("w560", "Type part of a name, a shortcut, or any word from the log:")
+    if !compact
+        g.AddText("w560", "Type part of a name, its first letters, a shortcut, or any word from the log:")
     box := g.AddEdit("w560")
-    lv := g.AddListView("w560 r12 -Multi NoSortHdr", ["Shortcut", "Template", "Type"])
-    lv.ModifyCol(1, 110), lv.ModifyCol(2, 316), lv.ModifyCol(3, 110)
-    g.AddText("w560", "What it writes:")
-    prev := g.AddEdit("w560 r5 ReadOnly -TabStop")
-    tip := g.AddText("w560 r2", "")
-    g.AddButton("w120 Default", "Insert").OnEvent("Click", Go)
-    g.AddButton("x+6 w120", "Close").OnEvent("Click", (*) => ClosePicker(true))
-    g.AddText("x+14 yp+5", "Up/Down = choose    Enter = insert    Esc = close")
+    lv := g.AddListView("w560 r" (compact ? 10 : 12) " -Multi NoSortHdr", ["Shortcut", "Template", "Type"])
+    lv.ModifyCol(1, 110), lv.ModifyCol(2, 300), lv.ModifyCol(3, 126)
+    prev := "", tipTxt := ""
+    if !compact {
+        g.AddText("w560", "What it writes:")
+        prev := g.AddEdit("w560 r5 ReadOnly -TabStop")
+        tipTxt := g.AddText("w560 r2", "")
+        g.AddButton("w120 Default", "Insert").OnEvent("Click", Go)
+        g.AddButton("x+6 w120", "Close").OnEvent("Click", (*) => ClosePicker(true))
+        g.AddText("x+14 yp+5", "Enter = insert   Ctrl+P = pin   Esc = close")
+    } else {
+        g.AddButton("w0 h0 Default Hidden", "Insert").OnEvent("Click", Go)
+        g.AddText("xm", "Enter = insert   Ctrl+P = pin   Esc = close")
+    }
+    cb := g.AddCheckbox((compact ? "x+20" : "xm y+8") " -TabStop", "Compact (no preview)")
+    cb.Value := compact
+    cb.OnEvent("Click", ToggleCompact)
     box.OnEvent("Change", Filter)
     lv.OnEvent("ItemSelect", Preview)
     lv.OnEvent("DoubleClick", (ctl, row) => row ? Go() : 0)
     g.OnEvent("Escape", (*) => ClosePicker(true))
     g.OnEvent("Close", (*) => ClosePicker(true))
-    Picker := {hwnd: g.Hwnd, gui: g, box: box, lv: lv, target: target, go: Go, preview: Preview}
+    Picker := {hwnd: g.Hwnd, gui: g, box: box, lv: lv, target: target, go: Go, preview: Preview, pin: Pin}
+    box.Value := query
     Filter()
     g.Show()
     WinActivate "ahk_id " g.Hwnd
     box.Focus()
+    if query != ""
+        Send "{End}"
 
-    ; Lists the templates that match what's typed, best match first
+    ; Lists what matches what's typed, best match first. Nothing typed:
+    ; pinned, then recent, then the rest.
     Filter(*) {
-        found.rows := FindTemplates(box.Value)
+        found.rows := PickerFind(box.Value, uses)
+        star := Chr(0x2605) " "
         lv.Opt("-Redraw")
         lv.Delete()
-        for i in found.rows {
-            t := TemplateList[i]
-            lv.Add(, TrigKey(t.trig), t.name != "" ? t.name : t.trig, (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : ""))
+        for it in found.rows {
+            if it.kind = "e" {
+                lv.Add(, "", (it.pinned ? star : "") it.e.name, (it.tag = "recent" ? "Recent: " : "") "Full daily log")
+                continue
+            }
+            t := TemplateList[it.i]
+            kind := (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : "")
+            lv.Add(, TrigKey(t.trig), (it.pinned ? star : "") (t.name != "" ? t.name : t.trig), (it.tag = "recent" ? "Recent: " : "") kind)
         }
         lv.Opt("+Redraw")
         if found.rows.Length
@@ -7059,19 +7685,31 @@ ShowPicker() {
         Preview()
     }
 
-    ; The wording of the picked template, with its blanks in [brackets]
+    ; The wording of the picked one, with its blanks in [brackets]
     Preview(*) {
+        if compact
+            return
         row := lv.GetNext()
         if !row {
             prev.Value := 'Nothing matches "' Trim(box.Value) '". Try one word, like jackpot or medical.'
-            tip.Text := ""
+            tipTxt.Text := ""
             return
         }
-        t := TemplateList[found.rows[row]]
+        it := found.rows[row]
+        if it.kind = "e" {
+            e := it.e
+            prev.Value := "Location: " e.loc "`r`nTopic: " e.topic "`r`nReference: " e.ref
+                . "`r`nSynopsis: " RegExReplace(e.syn, "\{([^{}]+?)\??\}", "[$1]") (e.end ? "`r`nEnd Time: now" : "")
+            tipTxt.Text := "A full-entry daily log: it opens a new daily log in iTrak and fills it in (the same as " HK("entrypick") ")."
+                . (it.pinned ? "  Pinned (Ctrl+P to unpin)." : "")
+            return
+        }
+        t := TemplateList[it.i]
         prev.Value := RegExReplace(t.text, "\{([^{}:]+)(:[^{}]*)?\}", "[$1]")
-        tip.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
+        tipTxt.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
             . (t.repeat ? "It opens a form, and Ctrl+Enter adds another." : t.form ? "It opens a form to fill in." : "It goes in straight away.")
             . (t.src = "mine" ? " (One of yours, from my-templates.txt.)" : "")
+            . (it.pinned ? "  Pinned (Ctrl+P to unpin)." : "")
     }
 
     Go(*) {
@@ -7080,9 +7718,52 @@ ShowPicker() {
             box.Focus()
             return
         }
-        t := TemplateList[found.rows[row]]
+        it := found.rows[row]
         ClosePicker(true)
+        if it.kind = "e" {
+            RunEntry(it.e)
+            return
+        }
+        t := TemplateList[it.i]
         RunTemplate(t.text, t.name != "" ? t.name : t.trig, t.repeat, t.trig, t.fill)
+    }
+
+    ; Ctrl+P: pins the picked row, or unpins it. The list keeps its place.
+    Pin(*) {
+        row := lv.GetNext()
+        if !row
+            return
+        it := found.rows[row]
+        key := PickKey(it)
+        pins := PinList()
+        if n := IndexOf(pins, key)
+            pins.RemoveAt(n)
+        else
+            pins.Push(key)
+        if !SavePins(pins) {
+            Tip("Couldn't save the pins (picker pins.txt beside templates.txt).", 3000, true)
+            return
+        }
+        name := it.kind = "e" ? it.e.name : (TemplateList[it.i].name != "" ? TemplateList[it.i].name : TemplateList[it.i].trig)
+        Activity("Finder: " (n ? "unpinned " : "pinned ") name)
+        Filter()
+        ; put the highlight back on the same one
+        for j, other in found.rows
+            if PickKey(other) = key {
+                lv.Modify(0, "-Select")
+                lv.Modify(j, "Select Focus Vis")
+                Preview()
+                break
+            }
+        Tip(n ? "Unpinned: " name : "Pinned: " name "  (shows at the top when the box is empty)", 1800)
+    }
+
+    ; The Compact tick: remembered on this PC, the finder reopens in that look
+    ToggleCompact(*) {
+        try IniWrite cb.Value ? 1 : 0, LastUsedFile, "Picker", "Compact"
+        q := box.Value
+        ClosePicker(false)
+        ShowPicker(q, target)
     }
 }
 
@@ -7100,22 +7781,162 @@ ClosePicker(back := false) {
     }
 }
 
-; Every word typed has to be in the shortcut, the name or the wording.
-; Shortcut matches come first, then name matches, then wording matches.
-; With nothing typed, every template shows, in templates.txt order.
-FindTemplates(query) {
+PickerCompact() {
+    try return IniRead(LastUsedFile, "Picker", "Compact", "0") = "1"
+    return false
+}
+
+; ---- Pins, recent and how often (v3.36.0) -----------------------------
+; The name a pick is remembered by: "t:" + its shortcut (;card), or
+; "e:" + the full-entry log's name. Lower case, no | or = in it.
+PickKey(it) {
+    k := it.kind = "e" ? "e:" it.e.name : "t:" TemplateList[it.i].trig
+    return StrLower(Trim(StrReplace(StrReplace(k, "|", " "), "=", "-")))
+}
+
+; Pinned ones, in the order they were pinned (picker pins.txt, beside
+; templates.txt, so OneDrive takes them to your other bays)
+PinList() {
+    pins := []
+    try {
+        if FileExist(PinsFile)
+            Loop Parse FileRead(PinsFile, "UTF-8"), "`n", "`r" {
+                k := StrLower(Trim(A_LoopField))
+                if k != "" && SubStr(k, 1, 1) != "#" && !IndexOf(pins, k)
+                    pins.Push(k)
+            }
+    }
+    return pins
+}
+
+SavePins(pins) {
+    out := "# Watchlog: pinned templates for the finder (Ctrl+Alt+Space).`r`n"
+        . "# Ctrl+P in the finder pins or unpins. t: = a code word, e: = a full-entry daily log.`r`n"
+    for k in pins
+        out .= k "`r`n"
+    try {
+        f := FileOpen(PinsFile, "w", "UTF-8")
+        f.Write(out)
+        f.Close()
+        return true
+    }
+    return false
+}
+
+; The last 10 run, newest first (picker.ini, this PC only)
+RecentPicks() {
+    keys := []
+    try {
+        for k in StrSplit(IniRead(PickerFile, "Recent", "List", ""), "|")
+            if Trim(k) != "" && !IndexOf(keys, Trim(k))
+                keys.Push(Trim(k))
+    }
+    return keys
+}
+
+; How often each was run on this PC: key -> times
+PickUsesAll() {
+    uses := Map()
+    uses.CaseSense := false
+    try {
+        Loop Parse IniRead(PickerFile, "Uses"), "`n", "`r" {
+            eq := InStr(A_LoopField, "=", , -1)
+            if eq && IsInteger(SubStr(A_LoopField, eq + 1))
+                uses[SubStr(A_LoopField, 1, eq - 1)] := Integer(SubStr(A_LoopField, eq + 1))
+        }
+    }
+    return uses
+}
+
+; Remembers a template or full-entry log that just ran, from anywhere
+; (code word, finder, call pad, Ctrl+Alt+F). The name only.
+NotePick(it) {
+    if IsObject(TutorialWin)
+        return
+    try {
+        key := PickKey(it)
+        if key = "t:" || key = "e:"
+            return
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        list := key
+        for k in RecentPicks()
+            if k != key && A_Index <= 10 && StrSplit(list, "|").Length < 10
+                list .= "|" k
+        IniWrite list, PickerFile, "Recent", "List"
+        n := 0
+        try n := Integer(IniRead(PickerFile, "Uses", key, "0"))
+        IniWrite n + 1, PickerFile, "Uses", key
+    }
+}
+
+; The template (by shortcut) or full-entry log (by name) for a key, or ""
+PickFromKey(key) {
+    if SubStr(key, 1, 2) = "t:" {
+        for i, t in TemplateList
+            if StrLower(t.trig) = SubStr(key, 3)
+                return {kind: "t", i: i}
+    } else if SubStr(key, 1, 2) = "e:" {
+        for e in Entries
+            if StrLower(e.name) = SubStr(key, 3)
+                return {kind: "e", e: e}
+    }
+    return ""
+}
+
+; Every word typed has to be in the shortcut, the name, its first letters
+; or the wording. Shortcut matches come first, then first letters, then
+; name matches, then wording matches; the ones run most get a small boost.
+; Nothing typed: pinned, then recent, then the full-entry logs, then the
+; templates in templates.txt order. Equal scores: full-entry logs first.
+PickerFind(query, uses := "") {
+    if !IsObject(uses)
+        uses := Map()
+    pins := PinList()
     words := []
     for w in StrSplit(RegExReplace(StrLower(query), "[^a-z0-9#]+", " "), " ")
         if w != ""
             words.Push(w)
+    ; full-entry daily logs first, then the code word templates (Jakob, Nov 11)
+    all := []
+    for e in Entries
+        all.Push({kind: "e", e: e})
+    for i, t in TemplateList
+        all.Push({kind: "t", i: i})
+    rows := []
+    if !words.Length {
+        shown := Map()
+        for k in pins
+            if IsObject(it := PickFromKey(k)) && !shown.Has(k)
+                it.pinned := true, it.tag := "pin", rows.Push(it), shown[k] := 1
+        for k in RecentPicks()
+            if IsObject(it := PickFromKey(k)) && !shown.Has(k)
+                it.pinned := false, it.tag := "recent", rows.Push(it), shown[k] := 1
+        for it in all
+            if !shown.Has(PickKey(it))
+                it.pinned := false, it.tag := "", rows.Push(it)
+        return rows
+    }
     sorted := []
-    for i, t in TemplateList {
-        trig := RegExReplace(StrLower(t.trig), "[^a-z0-9#]+")
-        name := " " RegExReplace(StrLower(t.name), "[^a-z0-9#]+", " ")
-        body := " " RegExReplace(StrLower(t.text), "[^a-z0-9#]+", " ")
+    for it in all {
+        if it.kind = "e" {
+            e := it.e
+            trig := ""
+            name := " " RegExReplace(StrLower(e.name), "[^a-z0-9#]+", " ")
+            body := " " RegExReplace(StrLower(e.loc " " e.topic " " e.ref " " e.syn), "[^a-z0-9#]+", " ")
+        } else {
+            t := TemplateList[it.i]
+            trig := RegExReplace(StrLower(t.trig), "[^a-z0-9#]+")
+            name := " " RegExReplace(StrLower(t.name != "" ? t.name : t.trig), "[^a-z0-9#]+", " ")
+            body := " " RegExReplace(StrLower(t.text), "[^a-z0-9#]+", " ")
+        }
+        inits := ""
+        for nw in StrSplit(Trim(name), " ")
+            if nw != ""
+                inits .= SubStr(nw, 1, 1)
         score := 0
         for w in words {
-            s := WordScore(w, trig, name, body)
+            s := WordScore(w, trig, name, body, inits)
             if !s {
                 score := -1
                 break
@@ -7124,23 +7945,42 @@ FindTemplates(query) {
         }
         if score < 0
             continue
-        ; Higher scores go first; equal scores keep their templates.txt order
+        key := PickKey(it)
+        it.pinned := IndexOf(pins, key) > 0
+        it.tag := ""
+        ; a small boost for the ones used most (at most 6), and for pins
+        score += Min(uses.Has(key) ? uses[key] : 0, 30) // 5 + (it.pinned ? 3 : 0)
+        ; Higher scores go first; equal scores keep the list order (full logs first)
         pos := sorted.Length + 1
         while pos > 1 && sorted[pos - 1].score < score
             pos--
-        sorted.InsertAt(pos, {i: i, score: score})
+        sorted.InsertAt(pos, {it: it, score: score})
     }
-    rows := []
     for m in sorted
-        rows.Push(m.i)
+        rows.Push(m.it)
     return rows
 }
 
-WordScore(w, trig, name, body) {
+; The matching templates only, as numbers in TemplateList (kept for
+; anything that still asks for the old list)
+FindTemplates(query) {
+    rows := []
+    for it in PickerFind(query)
+        if it.kind = "t"
+            rows.Push(it.i)
+    return rows
+}
+
+; inits = the first letter of each word of the name ("cd" = Card Destruction)
+WordScore(w, trig, name, body, inits := "") {
     if trig = w
         return 100
+    if StrLen(w) >= 2 && StrLen(inits) >= 2 && inits = w
+        return 70
     if InStr(trig, w) = 1
         return 60
+    if StrLen(w) >= 2 && StrLen(inits) >= 2 && InStr(inits, w) = 1
+        return 45
     if InStr(name, " " w)
         return 40
     if InStr(trig, w) || InStr(name, w)
@@ -7171,6 +8011,7 @@ PgUp:: PickerMove(-10)
 PgDn:: PickerMove(10)
 Enter:: Picker.go()
 NumpadEnter:: Picker.go()
+^p:: Picker.pin()
 #HotIf
 
 
@@ -7206,7 +8047,7 @@ ShowSettings(welcome := false, startTab := 1) {
     if !IndexOf(keepDays, Cfg["KeepDays"])
         keepDays.InsertAt(1, Cfg["KeepDays"]), keepNames.InsertAt(1, Cfg["KeepDays"] " days")
     modes := ["full", "counts", "off"]
-    clickGap := IniRead(SettingsFile, "AlertGrid", "Pause", "40")
+    clickGap := CfgRead("AlertGrid", "Pause", "40")
     W := 640
 
     g := WGui("+AlwaysOnTop", (welcome ? "Welcome to Watchlog" : "Watchlog settings") "  -  v" VERSION)
@@ -7733,19 +8574,121 @@ StartupShortcuts() {
     Loop Files A_Startup "\*.lnk" {
         try {
             FileGetShortcut A_LoopFileFullPath, &target, , &args
-            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName)
+            if InStr(target, A_ScriptName) || InStr(args, A_ScriptName) || RegExMatch(target, "i)\\Watchlog\.(exe|ahk)$")
                 found.Push(A_LoopFileFullPath)
         }
     }
     return found
 }
 
+; v3.35.4: what the Startup shortcut should open. The installed copy on
+; this PC's own drive when there is one: a shortcut into OneDrive (or a
+; network folder) makes Windows ask "Do you want to run this file?" at
+; every sign-in, and it can't remember the answer.
+StartupTarget() => (A_IsCompiled && FileExist(INSTALL_EXE)) ? INSTALL_EXE : A_ScriptFullPath
+
+; True for a path in OneDrive or on a network share
+IsCloudPath(path) {
+    if SubStr(path, 1, 2) = "\\"
+        return true
+    for v in ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"] {
+        d := EnvGet(v)
+        if d != "" && StrLower(SubStr(path, 1, StrLen(d) + 1)) = StrLower(d "\")
+            return true
+    }
+    return InStr(path, "\OneDrive") > 0
+}
+
+; Removes the "downloaded from the internet" mark Windows keeps beside a
+; file (its Zone.Identifier stream). Copying an exe out of a zip or from
+; OneDrive brings that mark along, and the mark is what makes Windows ask
+; before running it. Returns true when there was a mark to remove.
+ClearDownloadMark(path) {
+    if path = "" || !FileExist(path)
+        return false
+    return DllCall("DeleteFileW", "Str", path ":Zone.Identifier", "Int") != 0
+}
+
+; Makes the Startup shortcut open StartupTarget() with /startup (so Watchlog
+; knows Windows just started). quiet = only fix a Watchlog.exe shortcut,
+; never a script one someone pointed somewhere on purpose.
+FixStartupShortcut(quiet := true) {
+    fixed := 0
+    want := StartupTarget()
+    SplitPath want, , &wantDir
+    for lnk in StartupShortcuts() {
+        try {
+            FileGetShortcut lnk, &target, , &args
+            if StrLower(target) = StrLower(want) && Trim(args) = "/startup"
+                continue
+            if quiet && !(A_IsCompiled && RegExMatch(target, "i)\\Watchlog\.exe$"))
+                continue
+            FileCreateShortcut want, lnk, wantDir, "/startup", "Watchlog", FileExist(IconFile) ? IconFile : ""
+            Activity("Startup shortcut " lnk " now opens " want " (it opened " target ")")
+            fixed += 1
+        }
+    }
+    return fixed
+}
+
+; Started by the Startup shortcut, or Windows started under 3 minutes ago
+StartedAtSignIn() => (A_Args.Length && A_Args[1] = "/startup") || A_TickCount < 180000
+
+; tray > Advanced > Check start with Windows (v3.35.4)
+CheckStartWithWindows() {
+    have := StartupShortcuts()
+    me := A_ScriptFullPath
+    r := "Watchlog is running from:`n" me (IsCloudPath(me) ? "`n  (OneDrive or a network folder: Windows will ask before running it)" : "") "`n`n"
+    if A_IsCompiled
+        r .= "Installed copy on this PC: " (FileExist(INSTALL_EXE) ? INSTALL_EXE : "none") "`n`n"
+    bad := 0
+    if !have.Length {
+        r .= "Start with Windows: off (no Watchlog shortcut in the Startup folder).`n"
+    } else {
+        for lnk in have {
+            target := "", args := ""
+            try FileGetShortcut lnk, &target, , &args
+            SplitPath lnk, &name
+            r .= "Startup shortcut '" name "' opens:`n" target (args != "" ? "  " args : "") "`n"
+            if IsCloudPath(target) {
+                r .= "  PROBLEM: that's in OneDrive or a network folder, so Windows asks before running it at every sign-in.`n"
+                bad += 1
+            } else if !FileExist(target) {
+                r .= "  PROBLEM: that file isn't there.`n"
+                bad += 1
+            } else if StrLower(target) != StrLower(StartupTarget()) || Trim(args) != "/startup" {
+                r .= "  Not the installed copy (or missing /startup).`n"
+                bad += 1
+            } else {
+                r .= "  OK.`n"
+            }
+        }
+    }
+    if A_IsCompiled {
+        marked := DllCall("GetFileAttributesW", "Str", me ":Zone.Identifier", "Int") != -1
+        r .= "`nDownloaded-file mark on Watchlog.exe: " (marked ? "yes (Watchlog removes it each time it starts)" : "none") "`n"
+    }
+    Activity("Checked start with Windows: " (have.Length ? bad " problem(s)" : "off"))
+    if !have.Length || !bad {
+        MsgBox r, "Watchlog: start with Windows", "Iconi"
+        return
+    }
+    if MsgBox(r "`nFix it? The shortcut will open " StartupTarget() ".", "Watchlog: start with Windows", "YesNo Icon! Default1") = "Yes" {
+        FixStartupShortcut(false)
+        Tip("Startup shortcut fixed", 2000, true)
+    }
+}
+
 SetStartup(on) {
     have := StartupShortcuts()
-    if on && !have.Length {
+    if on && have.Length {
+        FixStartupShortcut(true)
+    } else if on {
         try {
-            FileCreateShortcut A_ScriptFullPath, A_Startup "\Watchlog.lnk", A_ScriptDir, , "Watchlog", FileExist(IconFile) ? IconFile : ""
-            Activity("Start with Windows turned on")
+            want := StartupTarget()
+            SplitPath want, , &wantDir
+            FileCreateShortcut want, A_Startup "\Watchlog.lnk", wantDir, "/startup", "Watchlog", FileExist(IconFile) ? IconFile : ""
+            Activity("Start with Windows turned on (" want ")")
         } catch as e {
             MsgBox "Couldn't add it to the Startup folder:`n" e.Message, "Watchlog", "Icon!"
         }
@@ -8029,7 +8972,7 @@ ShowCheatSheet() {
     g.SetFont("s20 bold c" teal, "Segoe UI")
     g.AddText("x20 y10 w700", "Watchlog shortcuts")
     g.SetFont("s10 norm c" muted, "Segoe UI")
-    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name or any word.   Forms: Tab = next box, Enter = insert, Esc = cancel.")
+    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name, first letters or any word (Ctrl+P pins).   Forms: Tab = next box, Enter = insert, Esc = cancel.")
     top := 78
     x1 := 20, x2 := x1 + colW + gap, x3 := x2 + colW + gap
     y1 := Section(x1, top, "FORMS", forms, 92)
@@ -8247,6 +9190,162 @@ RestoreLayout(auto := false) {
             . "Put SDS and Alert Grid where they belong, then press Ctrl+Alt+Shift+S to save your layout again. You only need to do this once.", "Watchlog", "Iconi"
     } else if !auto
         Tip("Put " moved " windows back.", 2500, true)
+}
+
+
+; =====================================================================
+;  KEEP SDS OUT OF THE ALERT GRID'S SPOT  (v3.35.3)
+;  Putting the layout back happens a few seconds after the start of shift
+;  sign-in, but SDS keeps changing after that: once signed in it swaps its
+;  login screen for the main screen (a new window, or the same one with a
+;  new title and size) and Java puts that wherever it likes, which on
+;  Jakob's bay was the Alert Grid's spot. So for a while after Ctrl+Alt+L
+;  (SdsWatchSeconds, default 120) Watchlog checks SDS once a second and
+;  puts it back in its spot when it
+;    - opens a new SDS window,
+;    - changes its title (login screen -> "SDS | Welcome, ..."), or
+;    - sits over the Alert Grid's spot.
+;  Dragging SDS somewhere else yourself is left alone (no new title).
+;  SDS's spot: [Layout] SdsSpot=x,y,w,h in settings.ini if set, else the
+;  SDS window in the saved layout (Ctrl+Alt+Shift+S). The Alert Grid's
+;  spot: the saved layout, else wherever the Alert Grid window is now.
+;  Small SDS windows (under half the spot's width or height, e.g. the
+;  login screen or a message) are only moved, not resized.
+; =====================================================================
+
+; The SDS spot to use, {x, y, w, h, max}, or "" if none is known
+SdsSpot() {
+    if RegExMatch(Cfg["SdsSpot"], "^\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$", &m)
+        return {x: Integer(m[1]), y: Integer(m[2]), w: Integer(m[3]), h: Integer(m[4]), max: 0, from: "settings.ini SdsSpot"}
+    return LayoutSpot("SDS")
+}
+
+; The first saved window of this kind (SDS, AlertGrid) in layout.ini, or ""
+LayoutSpot(kind) {
+    if !FileExist(LayoutFile) || IniRead(LayoutFile, "Layout", "format", "1") != "2"
+        return ""
+    loop Integer(IniRead(LayoutFile, "Layout", "count", "0")) {
+        sec := "W" A_Index
+        if IniRead(LayoutFile, sec, "exe", "") != "javaw.exe" || IniRead(LayoutFile, sec, "kind", "") != kind
+            continue
+        if IniRead(LayoutFile, sec, "nth", "1") != "1"
+            continue
+        return {x: Integer(IniRead(LayoutFile, sec, "x", "0")), y: Integer(IniRead(LayoutFile, sec, "y", "0"))
+            , w: Integer(IniRead(LayoutFile, sec, "w", "800")), h: Integer(IniRead(LayoutFile, sec, "h", "600"))
+            , max: Integer(IniRead(LayoutFile, sec, "max", "0")), from: "saved layout"}
+    }
+    return ""
+}
+
+; Where the Alert Grid goes: the saved layout, else its window now, or ""
+AlertGridSpot() {
+    if a := LayoutSpot("AlertGrid")
+        return a
+    try {
+        if hwnd := AlertGridWin() {
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+            return {x: x, y: y, w: w, h: h, max: 0, from: "Alert Grid window"}
+        }
+    }
+    return ""
+}
+
+; How much of the smaller of the two boxes the other one covers (0 to 1)
+SpotOverlap(a, b) {
+    w := Min(a.x + a.w, b.x + b.w) - Max(a.x, b.x)
+    h := Min(a.y + a.h, b.y + b.h) - Max(a.y, b.y)
+    if w <= 0 || h <= 0
+        return 0
+    small := Min(a.w * a.h, b.w * b.h)
+    return small > 0 ? (w * h) / small : 0
+}
+
+; Starts (or restarts) the watch: secs = how long, why = for the activity log
+SdsKeepInSpot(secs, why) {
+    if secs <= 0
+        return
+    spot := SdsSpot()
+    if !spot {
+        Activity("SDS spot: no SDS in the saved layout, so SDS isn't kept out of the Alert Grid's spot (open SDS and the Alert Grid where you want them, then Ctrl+Alt+Shift+S)")
+        return
+    }
+    ag := AlertGridSpot()
+    ; a layout saved while SDS sat on the Alert Grid would just keep it there
+    if ag && SpotOverlap(spot, ag) > 0.25 {
+        Activity("SDS spot: the " spot.from " has SDS over the Alert Grid's spot, nothing moved")
+        if IniRead(LayoutFile, "Layout", "sdsWarned", "0") != "1" {
+            try IniWrite 1, LayoutFile, "Layout", "sdsWarned"
+            MsgBox "Your saved window layout has SDS in the same spot as the Alert Grid, so Watchlog can't keep them apart.`n`n"
+                . "Put SDS and the Alert Grid where you want them, then press Ctrl+Alt+Shift+S to save your layout again.", "Watchlog", "Iconi"
+        }
+        return
+    }
+    SdsWatch.until := A_TickCount + secs * 1000
+    SdsWatch.spot := spot
+    SdsWatch.why := why
+    SdsWatch.placed := Map()
+    ; windows already in the spot (the layout was just put back) count as placed
+    for hwnd in SdsWindows()
+        try SdsWatch.placed[hwnd] := WinGetTitle("ahk_id " hwnd)
+    Activity("SDS spot: keeping SDS at " spot.x "," spot.y " (" spot.w "x" spot.h ", from the " spot.from ") for " secs " s after " why)
+    SetTimer SdsWatchTick, 1000
+}
+
+; Every SDS window on screen (javaw.exe, title starting with SDS)
+SdsWindows() {
+    list := []
+    for hwnd in WinGetList("ahk_exe javaw.exe") {
+        try {
+            if LayoutSkip(hwnd) || LayoutKind(hwnd, "javaw.exe") != "SDS"
+                continue
+            if WinGetMinMax("ahk_id " hwnd) = -1
+                continue
+            list.Push(hwnd)
+        }
+    }
+    return list
+}
+
+SdsWatchTick() {
+    if A_TickCount > SdsWatch.until {
+        SetTimer SdsWatchTick, 0
+        return
+    }
+    spot := SdsWatch.spot
+    ag := AlertGridSpot()
+    for hwnd in SdsWindows() {
+        try {
+            t := WinGetTitle("ahk_id " hwnd)
+            mm := WinGetMinMax("ahk_id " hwnd)
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+        } catch
+            continue
+        last := SdsWatch.placed.Has(hwnd) ? SdsWatch.placed[hwnd] : ""
+        reason := last = "" ? "new SDS window" : last != t ? "SDS changed screens" : ""
+        if reason = "" && ag && mm != 1 && SpotOverlap({x: x, y: y, w: w, h: h}, ag) > 0.25
+            reason := "SDS was over the Alert Grid's spot"
+        SdsWatch.placed[hwnd] := t
+        if reason = ""
+            continue
+        small := w < spot.w / 2 || h < spot.h / 2
+        if small {
+            ; a small window: just move it inside SDS's spot, same size
+            if Abs(x - spot.x) <= 8 && Abs(y - spot.y) <= 8
+                continue
+            try WinMove spot.x, spot.y, , , "ahk_id " hwnd
+        } else {
+            if mm = 0 && !spot.max && Abs(x - spot.x) <= 8 && Abs(y - spot.y) <= 8 && Abs(w - spot.w) <= 8 && Abs(h - spot.h) <= 8
+                continue
+            try {
+                if mm != 0
+                    WinRestore "ahk_id " hwnd
+                WinMove spot.x, spot.y, spot.w, spot.h, "ahk_id " hwnd
+                if spot.max
+                    WinMaximize "ahk_id " hwnd
+            }
+        }
+        Activity("SDS spot: moved SDS back to its spot (" reason ", " SdsWatch.why ")")
+    }
 }
 
 
@@ -8573,7 +9672,7 @@ IncidentPickWin := ""
 IncidentWins() {
     SetTitleMatchMode 2
     m := Map()
-    spec := Trim(IniRead(SettingsFile, "ITrak", "IncidentWindow", "Incident File ahk_exe wfica32.exe"))
+    spec := Trim(CfgRead("ITrak", "IncidentWindow", "Incident File ahk_exe wfica32.exe"))
     for h in WinGetList(spec)
         m[h] := true
     return m
@@ -8778,10 +9877,10 @@ IncidentRun(r, out, ref, dl, incWin) {
         brief .= (A_Index > 1 ? "|" : "") parts[A_Index + 4]
     vals := Map("Type", Trim(parts[1]), "Specific", Trim(parts[2]), "Category", Trim(parts[3]), "Risk", Trim(parts[4])
         , "Custom3", ref, "Brief", Trim(brief))
-    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    pause := Integer(CfgRead("ITrak", "Pause", "300"))
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
-    keys := 0
+    keys := 0, clicks := 0      ; clicks saved (v3.35.5): Create Incident and each box
     if !incWin {
         try WinActivate "ahk_id " dl
         if !WinWaitActive("ahk_id " dl, , 3) {
@@ -8798,8 +9897,8 @@ IncidentRun(r, out, ref, dl, incWin) {
         MouseMove x, y, 0
         Sleep 60
         Click
-        keys += 2
-        wait := Integer(IniRead(SettingsFile, "ITrak", "IncidentWait", "10000"))
+        clicks += 1
+        wait := Integer(CfgRead("ITrak", "IncidentWait", "10000"))
         deadline := A_TickCount + wait
         while !incWin && A_TickCount < deadline {
             for h in IncidentWins()
@@ -8814,7 +9913,7 @@ IncidentRun(r, out, ref, dl, incWin) {
             Activity("Incident " r.name ": no new Incident File window within " wait " ms")
             return
         }
-        Sleep Integer(IniRead(SettingsFile, "ITrak", "IncidentSettle", "900"))
+        Sleep Integer(CfgRead("ITrak", "IncidentSettle", "900"))
     }
     try WinActivate "ahk_id " incWin
     if !WinWaitActive("ahk_id " incWin, , 3) {
@@ -8838,6 +9937,7 @@ IncidentRun(r, out, ref, dl, incWin) {
         MouseMove x, y, 0
         Sleep 60
         Click
+        clicks += 1
         Sleep pause
         if k = "Secondary"
             break                       ; the cursor waits there for your supervisor
@@ -8859,8 +9959,8 @@ IncidentRun(r, out, ref, dl, incWin) {
     }
     MouseMove ox, oy, 0
     Tip("Incident filled in: type your supervisor in Secondary Operator, set the dates, check it and Save.", 5000, true)
-    Activity("Incident " r.name ": filled in (" keys " keystrokes counted as saved)")
-    CountSaved("log", keys, "Incident: " r.name)
+    Activity("Incident " r.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved)")
+    CountSaved("log", keys, "Incident: " r.name, clicks)
     Journal("Incident: " r.name, "Incident Type: " vals["Type"] "`nSpecific: " vals["Specific"] "`nCategory: " vals["Category"]
         . "`nRisk: " vals["Risk"] "`nCustom 3: " vals["Custom3"] "`nExecutive Brief: " vals["Brief"], keys)
 }
@@ -8964,7 +10064,7 @@ AuditNames := Map("Detail", "the Detail tab (top left)", "Console", "Console #",
 
 ; The open Audit windows (newest in front first)
 AuditWins() {
-    spec := Trim(IniRead(SettingsFile, "ITrak", "AuditWindow", "^Audit - "))
+    spec := Trim(CfgRead("ITrak", "AuditWindow", "^Audit - "))
     list := []
     SetTitleMatchMode "RegEx"
     try {
@@ -9014,7 +10114,7 @@ AuditLoad() {
 ; settings.ini [ITrak] AuditEndFormat= changes the layout.
 AuditEndText(hhmm) {
     ts := AuditStamp(hhmm)
-    return ts = "" ? "" : FormatTime(ts, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+    return ts = "" ? "" : FormatTime(ts, Trim(CfgRead("ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
 }
 
 ; "22:36" -> a full time stamp (today's date, seconds 00), or "" if not a time
@@ -9045,15 +10145,15 @@ AuditStamp(hhmm) {
 ; (Ctrl+A and AuditEndFormat typed in one go).
 ; Returns the text for the journal, like "Nov 05 2026 10:36:00 PM".
 AuditTypeTime(ts) {
-    shown := FormatTime(ts, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
-    parts := Trim(IniRead(SettingsFile, "ITrak", "AuditTimeParts", "MM dd yyyy hh mm ss t"))
+    shown := FormatTime(ts, Trim(CfgRead("ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+    parts := Trim(CfgRead("ITrak", "AuditTimeParts", "MM dd yyyy hh mm ss t"))
     if parts = "" || StrLower(parts) = "off" {
         SendInput "^a"
         Sleep 60
         EntryType shown
         return shown
     }
-    gap := Integer(IniRead(SettingsFile, "ITrak", "AuditTimePause", "80"))
+    gap := Integer(CfgRead("ITrak", "AuditTimePause", "80"))
     for i, code in StrSplit(RegExReplace(parts, "\s+", " "), " ") {
         SendInput "{Left 8}"            ; to the month, whichever part a click or auto-advance left us on
         Sleep gap
@@ -9114,11 +10214,11 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         Activity("Audit: Start not typed (spot not taught yet)")
     }
     shownTimes := Map()
-    pause := Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    pause := Integer(CfgRead("ITrak", "Pause", "300"))
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
     w0 := Integer(sp["W"]), h0 := Integer(sp["H"])
-    keys := 0, done := []
+    keys := 0, clicks := 0, done := []      ; clicks saved (v3.35.5): each box and Requested By click
     for k in AuditFields {
         if vals[k] = "" || !sp.Has(k "X")
             continue
@@ -9135,10 +10235,11 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         MouseMove x, y, 0
         Sleep 60
         Click
+        clicks += 1
         Sleep pause
         if k = "Detail" {
             ; you're still on the Audit tab after picking the employee (v3.34.1)
-            Sleep Integer(IniRead(SettingsFile, "ITrak", "AuditTabWait", "500"))
+            Sleep Integer(CfgRead("ITrak", "AuditTabWait", "500"))
             continue
         }
         if k = "Remarks" {
@@ -9156,7 +10257,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
             SendInput "^a"
             Sleep 60
             EntryType typed
-            Sleep Integer(IniRead(SettingsFile, "ITrak", "AuditAreaWait", "800"))
+            Sleep Integer(CfgRead("ITrak", "AuditAreaWait", "800"))
             SendInput "{Enter}"
             Activity("Audit: Area Audited typed as " typed)
             keys += 5
@@ -9182,9 +10283,9 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         ; (the list may still be loading, and a fast double-click can be
         ; seen as one click). Each click waits AuditRoutePause after the one
         ; before; a double-click waits AuditDoubleWait more first.
-        rp := Integer(IniRead(SettingsFile, "ITrak", "AuditRoutePause", "500"))
-        dw := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleWait", "200"))
-        gap := Integer(IniRead(SettingsFile, "ITrak", "AuditDoubleGap", "120"))
+        rp := Integer(CfgRead("ITrak", "AuditRoutePause", "500"))
+        dw := Integer(CfgRead("ITrak", "AuditDoubleWait", "200"))
+        gap := Integer(CfgRead("ITrak", "AuditDoubleGap", "120"))
         WinGetClientPos &cx, &cy, , , "ahk_id " win
         for p in route {
             x := cx + p.x, y := cy + p.y
@@ -9214,18 +10315,18 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
                 Click "Up"
             }
             Activity("Audit: Requested By click " A_Index " (" (p.n = 2 ? "double" : "single") ")")
-            keys += 2
+            clicks += 1     ; a double-click counts as one (was 2 keystrokes before v3.35.5)
             Sleep rp
         }
     }
     MouseMove ox, oy, 0
     if startSkipped && AuditAskStart(win, startTs) {
-        shownTimes["Start"] := FormatTime(startTs, Trim(IniRead(SettingsFile, "ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
+        shownTimes["Start"] := FormatTime(startTs, Trim(CfgRead("ITrak", "AuditEndFormat", "MMM dd yyyy hh:mm:ss tt")))
         MouseMove ox, oy, 0
     }
     Tip("Audit filled in: check it, then Save.", 4000, true)
-    Activity("Audit filled in (" keys " keystrokes counted as saved; Requested By route " route.Length " clicks)")
-    CountSaved("log", keys, title)
+    Activity("Audit filled in (" keys " keystrokes and " clicks " clicks counted as saved; Requested By route " route.Length " clicks)")
+    CountSaved("log", keys, title, clicks)
     Journal(title, "Console #: " console "`nArea Audited: " area (shownTimes.Has("Start") ? "`nAudit Start: " shownTimes["Start"] : "") "`nAudit End: " (shownTimes.Has("End") ? shownTimes["End"] : "") "`nAudit Remarks: " syn, keys)
     return true
 }
@@ -9237,7 +10338,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
 AuditAreaText(area) {
     if !RegExMatch(area, "i)^Pit\s*#?\s*(\d+)$", &m)
         return area
-    fmt := Trim(IniRead(SettingsFile, "ITrak", "AuditPitText", "Pit #{n}"))
+    fmt := Trim(CfgRead("ITrak", "AuditPitText", "Pit #{n}"))
     return StrReplace(fmt = "" ? "Pit #{n}" : fmt, "{n}", m[1])
 }
 
@@ -9263,7 +10364,7 @@ AuditAskStart(win, startTs) {
     MouseMove x, y, 0
     Sleep 60
     Click
-    Sleep Integer(IniRead(SettingsFile, "ITrak", "Pause", "300"))
+    Sleep Integer(CfgRead("ITrak", "Pause", "300"))
     shown := AuditTypeTime(startTs)
     Activity("Audit: Start typed after teaching (" shown ")")
     return true
@@ -9429,6 +10530,7 @@ AutoEverywhereSync() {
     on := AutoEverywhereOn && Cfg["Autocorrect"]
     if on
         LoadAutocorrect()
+    AutoCountSync(on)
     stamp := on ? AutoStamp "|" AutoMap.Count : "off"
     if stamp == AutoHotStamp
         return
@@ -9456,6 +10558,77 @@ AutoEverywhereSync() {
     }
     HotIf
     Activity("Autocorrect in every program: " (on ? AutoHot.Count " words" : "off"))
+}
+
+; ---- Autocorrect words in Time saved (v3.36.1) -----------------------
+; Jakob (Nov 12): "I have started adding my own custom words to the list to
+; save time and I would like that to be reflected". Only words that EXPAND
+; count (Jakob, Nov 12: "only expanding words"): the fix has to be at least
+; 3 letters longer than what you typed, and only the letters it adds count
+; (shrd = Shred-it saves 4 keystrokes). A plain spelling fix (ram = RAM,
+; shredit = Shred-it) adds nothing. Each word counts in Time saved and in
+; the Shift count as "Autocorrect: <the word you typed>" (the short word
+; only, never what you were writing).
+AutoGain(typed, rep) => StrLen(rep) - StrLen(typed) >= 3 ? StrLen(rep) - StrLen(typed) : 0
+
+AutoCount(typed, rep) {
+    gain := AutoGain(typed, rep)
+    if gain > 0
+        CountSaved("auto", gain, "Autocorrect: " StrLower(typed))
+    return gain
+}
+
+; In other programs Windows does the swap through the hotstrings above,
+; which can't report back. A quiet key watcher (it sees your own typing
+; only, blocks nothing, keeps the last 40 letters in memory and never saves
+; them) spots the same words: a word from the list, after a space, Tab,
+; Enter or punctuation, typed outside Watchlog's own windows.
+AutoCountSync(on) {
+    global AutoCountIH, AutoCountBuf
+    if on && !IsObject(AutoCountIH) {
+        try {
+            ih := InputHook("V I1 L0")
+            ih.KeyOpt("{Backspace}{Delete}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Escape}", "N")
+            ih.OnChar := AutoCountChar
+            ih.OnKeyDown := AutoCountKey
+            ih.Start()
+            AutoCountIH := ih
+        }
+    } else if !on && IsObject(AutoCountIH) {
+        try AutoCountIH.Stop()
+        AutoCountIH := "", AutoCountBuf := ""
+    }
+}
+
+; Backspace takes the last letter off (like the hotstrings do); moving the
+; cursor starts over, because the letters before it are no longer known
+AutoCountKey(ih, vk, sc) {
+    global AutoCountBuf
+    AutoCountBuf := vk = 8 ? SubStr(AutoCountBuf, 1, -1) : ""
+}
+
+AutoCountChar(ih, ch) {
+    global AutoCountBuf, AutoCountWin
+    w := 0
+    try w := WinExist("A")
+    if w != AutoCountWin
+        AutoCountWin := w, AutoCountBuf := ""
+    if ch = "`r"
+        ch := "`n"
+    ; Ctrl+key and the like: what's on screen is no longer known
+    if Ord(ch) < 32 && ch != "`t" && ch != "`n" {
+        AutoCountBuf := ""
+        return
+    }
+    static ends := "-()[]{}':;`"/\,.?! `t`n"
+    if InStr(ends, ch) && AutoCountBuf != "" && !A_IsSuspended && AutoHot.Count {
+        try {
+            if AutoEverywhereHere() && RegExMatch(AutoCountBuf, "([\p{L}\d]+)$", &m) && AutoHot.Has(m[1])
+                && (StrLen(AutoCountBuf) < 40 || StrLen(m[1]) < StrLen(AutoCountBuf))
+                AutoCount(m[1], AutoHot[m[1]])
+        }
+    }
+    AutoCountBuf := SubStr(AutoCountBuf ch, -40)
 }
 
 ToggleAutoEverywhere(*) {
@@ -9547,6 +10720,8 @@ InstallSelf(fresh) {
         }
         Sleep 300
     }
+    if copied
+        ClearDownloadMark(INSTALL_EXE)
     if !copied {
         MsgBox "Watchlog couldn't install itself to:`n" INSTALL_EXE "`n`nIt will keep running from where it is.", "Watchlog setup", "Icon!"
         return false
@@ -9621,7 +10796,7 @@ SetShortcut(lnk, want) {
                 FileDelete lnk
             return
         }
-        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, , "Watchlog - log templates"
+        FileCreateShortcut INSTALL_EXE, lnk, INSTALL_DIR, lnk = StartupLink() ? "/startup" : "", "Watchlog - log templates"
     } catch as err {
         MsgBox "Watchlog couldn't update the shortcut:`n" lnk "`n`n" err.Message, "Watchlog", "Icon!"
     }
@@ -9653,6 +10828,7 @@ UpdateExeFrom(f, v) {
     ok := false
     try {
         FileCopy f, tmp, true
+        ClearDownloadMark(tmp)
         ok := RunWait('"' tmp '" /selftest', , "Hide") = 0
     }
     try FileDelete tmp
@@ -9670,6 +10846,7 @@ UpdateExeFrom(f, v) {
         FileMove A_ScriptFullPath, backup, 1
         moved := true
         FileCopy f, A_ScriptFullPath, 1
+        ClearDownloadMark(A_ScriptFullPath)
     } catch as err {
         if moved
             try FileMove backup, A_ScriptFullPath, 1
@@ -9991,12 +11168,14 @@ BuildTrayMenu() {
     MenuItem(more, "Security and status", (*) => ShowSecurity(), 0xE72E)
     MenuItem(more, "Activity log", (*) => OpenActivity(), 0xE81C)
     MenuItem(more, "Make a copy to share", (*) => MakeShareCopy(), 0xE8C8)
+    MenuItem(more, "Team setup...", (*) => ShowTeamSetup(), 0xE716)
     more.Add()
     MenuItem(more, (Cfg["SharedTemplates"] != "" ? "Edit team templates" : "Edit templates") " in Notepad", (*) => EditFile(Cfg["SharedTemplates"] != "" ? Cfg["SharedTemplates"] : TemplatesFile), 0xE8A5)
     MenuItem(more, "Edit my templates in Notepad", (*) => EditMine(), 0xE8A5)
     MenuItem(more, "Edit settings file", (*) => EditFile(SettingsFile), 0xE8A5)
     MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
     MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
+    MenuItem(more, "Check start with Windows", (*) => CheckStartWithWindows(), 0xE7E8)
     MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
     more.Add()
     MenuItem(more, "Back up my settings and templates now", (*) => BackupNow(), 0xE74E)
@@ -10930,7 +12109,7 @@ ShowHome() {
     cardW := (fullW - 2 * 12) // 3
     Card(1, sh0.log, "logs this shift")
     Card(2, sh0.login, sh0.login = 1 ? "login this shift" : "logins this shift")
-    Card(3, SavedTime(sh0.keys), "typing saved this shift")
+    Card(3, SavedTime(sh0.keys, sh0.clicks), "time saved this shift")
 
     Group("Logs", 0x0E746E, [
         ["Call pad", "Numpad +", 0xE717, () => ShowCallPad(), true]
@@ -10978,7 +12157,7 @@ ShowHome() {
     Status(BreakLeftSecs() < 0 ? "C62828" : "0E746E", BreakText())
     sh := SavedShift()
     Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")
-        . ", " SavedTime(sh.keys) " saved")
+        . ", " SavedTime(sh.keys, sh.clicks) " saved")
 
     g.SetFont("s10 c303030")
     capsCB := g.AddCheckbox("xm y+12" (CapsGuard ? " Checked" : ""), "Caps Lock guard")

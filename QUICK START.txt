@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.2  -  QUICK START  (one page)
+  WATCHLOG  v3.37.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -26,9 +26,13 @@ SET IT UP  (about 2 minutes, once per PC)
      you try a quick entry and a form. Your settings and templates are
      kept in Documents\Watchlog.
   3. Later, click the tray icon (the white page with an eye, on teal) >
-     Settings > Templates > Browse to pick the team's templates.txt in the
-     SharePoint folder (your supervisor will say where). Then everyone
-     uses the same wording and gets updates automatically.
+     Advanced > Team setup > Pick the team folder, and pick the shared
+     SharePoint folder (your supervisor will say where; Watchlog offers
+     it if it finds it in OneDrive). Then everyone uses the same wording
+     and the team's settings, and gets updates automatically. The
+     extras (Caps Lock clears alerts, Numpad + call pad, autocorrect in
+     every program, taskbar clock) start off: switch on what you like in
+     Settings.
   4. In File Explorer, right-click the synced SharePoint folder and
      choose "Always keep on this device", so the team templates are
      there even when the network is slow.
@@ -44,7 +48,9 @@ USE IT
   ;jack, ;audit, ;bv ...   Type a code anywhere. No Space or Enter
                            needed: it fires as soon as you finish it.
   Ctrl+Alt+Space           Can't remember a code? Type any word (like
-                           jackpot or medical) and press Enter.
+                           jackpot or medical) or first letters (cd)
+                           and press Enter. Pinned (Ctrl+P) and recent
+                           ones show first.
   Ctrl+Alt+H               Cheat sheet: every code, login and hotkey.
   Tab / Enter / Esc        In a form: next box / insert / cancel.
   Numpad +                 Call pad: jot a call, Ctrl+Enter makes the log

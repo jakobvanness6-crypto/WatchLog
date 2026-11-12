@@ -15,10 +15,40 @@ Gaps to build (proposal):
 Not included: code signing (needs IT/money, Jakob's step), reading data out of other programs, anything that logs on its own.
 Open questions for Jakob: how many bays and operators at first; who is the wording supervisor; is a SharePoint library already available; does the manager want a pilot with one other operator first.
 
+### TEAM READINESS AUDIT (Nov 11, 2026; planning only, NOT built). Full write-up: docs/Team readiness audit.md
+Jakob (Nov 11): too much is built around his own workflow; it has to be general before the team gets it. Each operator has their OWN Windows account (Jakob, Nov 11), so logins, passwords, Requested By, pins, journal and time saved are already separate. The problem is the other way: everything a bay needs (team folder, Alert Grid/new log/daily log/audit/incident spots, layout) is taught per person, so a new operator starts empty on every bay, with Jakob's defaults (Edge only, Caps Lock clears alerts, Numpad + call pad, autocorrect everywhere, clock/previews).
+Proposed fix: three layers, person beats bay beats team: team-settings.ini (browser, links, Bally paths, SDS/break minutes, iTrak formats, new-operator defaults), bay spots shared in the team folder per PC name + scale (first person to teach a bay shares it), person (own settings, as now; Requested By never shared).
+Order: v3.37.0 team folder on first run + team settings + safe defaults; v3.38.0 bay sharing + bay checklist with Teach buttons, untaught bays paste instead of fail; v3.39.0 new-operator walk-through + version check; then supervisor wording pass and guides; pilot with one operator; v4.0.
+Jakob Nov 12 (later): operators organise windows, programs, shortcuts and even log/incident methods differently. Plan change: every feature is an opt-in module with a small core for new operators; window layout is personal (not forced per bay); bay-shared spots need spots measured from inside the iTrak windows first. See audit section 'Everyone works differently'.
+Jakob Nov 12: team SharePoint folder not set up yet (needs manager/IT or a SharePoint site owner); supervisor bay = same but one monitor (own bay spots); pilot = Michael. Pilot can start before SharePoint with Make a copy to share or a OneDrive folder shared to Michael.
+Still asked: does anyone work differently? who pilots, which bay? is the team SharePoint folder set up?
 
-Current version: v3.35.2 (Nov 7, 2026): ;audit types Pit #2 / Pit #3 the way iTrak's list has them (it got Pit #1) and asks to teach the Start spot if it's missing, then types Start (built, NOT run). Before that v3.35.1 (Nov 6, 2026): new ;oc code word, opening and closing tables in one log (built, NOT run). Before that v3.35.0 (Nov 5, 2026): ;audit types real Start and End dates (exactly 20:00 apart), Area Audited waits longer (Pit 2, never Pit 1), Reference cleared before typing so NA is not doubled (built, NOT run). Before that v3.34.3 (Nov 3): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
+### AUTOCORRECT IN TIME SAVED: BUILT in v3.36.1 (Nov 12, 2026), built NOT run. Jakob: "could you add it?" then "only expanding words for that build", so item 2's 2-key credit for a plain typo fix is OUT (a fix must be 3+ letters longer; only the added letters count). Item 5 Ctrl+Z take-back not done (count stays). Per-word list: Time saved > Autocorrect words.
+Today a fixed or expanded word adds nothing to Time saved (in other programs the swap isn't counted; in forms and the call pad the corrected text counts as keys you typed). Jakob now adds his own short words that expand, so the saving should show.
+Plan (one small version, third digit):
+1. Every autocorrect swap, in every program and in the call pad/form boxes, is counted once when it fires.
+2. Keys saved per swap = letters in the replacement minus letters typed, when the replacement is at least 3 longer (a short word that expands: "shrd" -> "Shred-it" saves 4). A spelling fix counts nothing (Jakob, Nov 12: only expanding words count).
+3. Counted as keystrokes in Time saved and Shift count, with a new "Autocorrect" row (swaps and keys) so the manager can see it apart; per-word counts feed the Time saved list so he can see which custom words pay off.
+4. Forms and the call pad: don't count the swap twice (the expanded letters already count as typed there, so the swap adds only the difference).
+5. Ctrl+Z undo of a swap takes the count back off. No word text is stored, only the word's trigger and a count (same privacy as the recent list).
+6. Earlier days stay as they are (no backfill; nothing was recorded).
+DECIDED (Jakob, Nov 12): only expanding words count; typo fixes add nothing.
+
+
+Current version: v3.37.0 (Nov 12, 2026): team setup: tray > Advanced > Team setup (pick the team folder, set up a team folder), team-settings.ini (browser, links, start/end lists, defaults for a new operator), new operators start with the extras off, Edge or Chrome (built, NOT run). Before that v3.36.1 (Nov 12, 2026): autocorrect words that expand count in Time saved (only the letters they add, 3+ longer than typed; plain spelling fixes add nothing), Autocorrect column and an Autocorrect words list in Time saved (built, NOT run). Before that v3.36.0 (Nov 11, 2026): quick picker: the Ctrl+Alt+Space finder shows pinned (Ctrl+P) and the last 10 used first, matches first letters (cd = Card Destruction), boosts the ones used most, lists the full-entry daily logs too, and has a Compact tick (built, NOT run). Before that v3.35.5 (Nov 8, 2026): Time saved counts the clicks and menu picks Watchlog does, half a second each, with a cautious estimate for earlier days (built, NOT run). Before that v3.35.4 (Nov 8, 2026): Start with Windows opens the installed copy, no more "Do you want to run this file?" at sign-in (built, NOT run). Before that v3.35.3 (Nov 7, 2026): start of shift keeps SDS in its saved spot for 2 minutes, so it can't open over the Alert Grid (built, NOT run). Before that v3.35.2 (Nov 7, 2026): ;audit types Pit #2 / Pit #3 the way iTrak's list has them (it got Pit #1) and asks to teach the Start spot if it's missing, then types Start (built, NOT run). Before that v3.35.1 (Nov 6, 2026): new ;oc code word, opening and closing tables in one log (built, NOT run). Before that v3.35.0 (Nov 5, 2026): ;audit types real Start and End dates (exactly 20:00 apart), Area Audited waits longer (Pit 2, never Pit 1), Reference cleared before typing so NA is not doubled (built, NOT run). Before that v3.34.3 (Nov 3): quicker Requested By clicks for ;audit (CONFIRMED on Jakob's bay, Nov 3). Before that v3.34.2 (Nov 3): ;audit WORKS on Jakob's bay (confirmed Nov 3), but slow. Before that v3.34.1 (Nov 3): ;audit clicks the Detail tab first (built, NOT run). Before that v3.34.0 (Nov 3): ;audit fills the iTrak Audit window (built, NOT run). Before that v3.33.2 (Nov 3): Shred-it autocorrect and break time you can change by hand (built, NOT run). Before that v3.33.1 (Nov 3): jackpot amounts under 10,000 mean thousands (built, NOT run). Before that v3.33.0 (Nov 1): incident reports (Ctrl+Alt+Shift+N), 13 more code words fill the daily log, autocorrect in every program, cheque on ;jack, skip-filled-forms switch.
 
 ## Waiting to be built
+
+## QUICK PICKER: BUILT in v3.36.0 (Nov 11, 2026; Jakob: "Let's work on a quick picker"). Built, NOT run. Items 1-5 below all in; no second numpad hotkey (ask Jakob if he wants one).
+Jakob wants a Flow Launcher-style picker. Ctrl+Alt+Space (ShowPicker / FindTemplates) already does search + live filter + Enter runs in the previous window. Planned additions, one version (v3.36.0):
+1. Pinned favourites at the top when the box is empty; Ctrl+P pins/unpins the selected row (marked with a star). Saved next to templates.txt on OneDrive so every bay shares them.
+2. Recent: last 10 templates run from anywhere (code word, finder, call pad), under the pins. Kept per PC, template names only, never the filled-in text.
+3. Smarter matching: initials ("cd" = Card Destruction) and a small boost for the ones used most.
+4. Full-entry daily logs (Ctrl+Alt+F list) in the same results.
+5. Optional compact look (box + list, no preview).
+Hotkey stays Ctrl+Alt+Space (avoid Alt+Space and Ctrl+Space); optional second one-hand numpad key if Jakob wants one.
+Safety: logins never listed; nothing typed into the search box; template runs only in the window he came from, same password rules as code words.
+
 
 ### Test results v3.33.0 (Jakob, Nov 1) and follow-ups. NOT built
 - Works: clock, Ctrl+Alt+I, code words fill the whole log, incident teach + fill (stops in Secondary Operator as designed), call pad cheque, autocorrect everywhere.
@@ -49,6 +79,33 @@ Synopsis is already pasted; Location, Topic, Reference and the Info From Look Fo
 
 
 - Shorthand for other logs: see the original plan under "Done in v3.26.0".
+
+## Done Nov 9, 2026 (templates.txt only, wording Nov 9, 2026, program stays v3.35.5)
+- ;face: the daily log Reference is now NA (Jakob: "fill it with NA, not the alert #"). This replaces the Nov 7 guess below. Built, NOT run.
+
+## Done in v3.37.0 (Nov 12, 2026): TEAM READINESS STEP 1 (Jakob: "build it"), built NOT run
+From docs/Team readiness audit.md, step 1 only (steps 2 and 3, bay sharing and the new-operator walk-through, are NOT built).
+- Tray > Advanced > Team setup: green/amber/red list (team folder reachable, team templates, team-settings.ini, Alert Grid and iTrak spots here or shared for this scaling, saved passwords, scaling, version); Pick the team folder (offers one found in OneDrive; a new operator is offered it on first run); Set up a team folder (supervisor: copies templates.txt, a starter team-settings.ini and Watchlog.exe, replaces nothing).
+- team-settings.ini beside the team templates.txt, three layers: own settings.ini > team > built in (CfgRead). Read: [Paths] Browser/FaceUrl/CitrixUrl/CitrixTab/LaunchWait, [StartOfShift] Run1-9/Window1-9 (own list first, else the team's), [EndOfShift] Close, [SDS] ResignMinutes, [Break] Minutes, [ITrak] and [AlertGrid] waits/formats, [Modules].
+- Browser: [Paths] Browser= edge (default) or chrome; the start of shift page opener, the tab search, the app key G and the alert-copy check follow it.
+- New operators: a brand new settings.ini has [User] NewOperator=yes. Extras start OFF (ModuleDefault): Caps Lock clears alerts, Numpad + call pad, autocorrect in every program, taskbar clock, hidden previews, windows put back after start of shift; the team's [Modules] line decides instead if present. A new operator's built-in end of shift list has no Spotify and uses the chosen browser. Nobody already using Watchlog changes (no NewOperator line = on, as before); the first-run settings.ini no longer writes the site defaults (web pages, start and end lists), so the team's apply.
+- NOT done (later steps): sharing taught spots per bay; measuring daily log/audit/incident spots from inside the iTrak window; new-operator walk-through; per-PC version status for a supervisor; feature switches for ;audit, incidents and full-entry logs (they do nothing without taught spots).
+
+## Done in v3.35.5 (Nov 8)
+- Time saved counts the clicks and menu picks Watchlog does, apart from keystrokes, at 0.5 s a click (Jakob's pick; settings.ini [TimeSaved] SecondsPerClick=). Clicks column in Time saved and Shift count; dashboard and home show time saved with clicks. Old fake click keystrokes moved to Clicks.
+- Retroactive (Jakob): once, earlier days get cautious click estimates from the per-item counts (Alert Grid clear 5, new log 1, app switch 1, full-entry log 3, incident 6, ;audit 0), and the old fake click keystrokes come off. Days before v3.16.0 stay 0.
+- Drop-down picks stay counted as keystrokes (iTrak picks by typing + Enter), only the click into the box is a click.
+
+## Done in v3.35.4 (Nov 8)
+- Start with Windows: the "Do you want to run this file?" prompt at every sign-in came from Jakob's Startup shortcut opening a Watchlog.exe in OneDrive (he fixed it by hand Nov 8 and the prompt went away). Now the Startup shortcut always opens the installed copy (%LOCALAPPDATA%\Programs\Watchlog\Watchlog.exe) with /startup; Watchlog fixes a Watchlog.exe Startup shortcut pointing elsewhere each time it starts (logged).
+- Watchlog removes the "downloaded from the internet" mark (Zone.Identifier) from its own exe at every start and after install, update and go back a version.
+- tray > Advanced > Check start with Windows: where it runs from, where the shortcut points, OneDrive/network warning, one-click fix.
+- At sign-in (/startup, or Windows up under 3 min) the daily backup and team-folder update check wait 30 s.
+- Code signing not needed for this. Built, NOT run.
+
+## Done in v3.35.3 (Nov 7)
+- ;face (templates.txt, wording Nov 7, 2026): the daily log Reference is now the Alert # (it was always blank before; Jakob thought it had been taken out). With Add another, the last alert's # is used. Guess at what he wants in Reference: confirm with him.
+- Jakob: start of shift (Ctrl+Alt+L) still opened SDS where the Alert Grid goes. Best guess at the cause: the layout is put back right after the sign-in is typed, but SDS swaps its login screen for the main screen afterwards and Java places that window itself. New SdsKeepInSpot(): for [Layout] SdsWatchSeconds (default 120; 60 after the hourly SDS sign-in) a 1 s timer puts SDS back in its spot when a new SDS window appears, its title changes, or it overlaps the Alert Grid's spot by over 25%. Spot = [Layout] SdsSpot=x,y,w,h or the saved layout's SDS (format=2). Alert Grid's spot = saved layout, else the live window. Small SDS windows only moved, not resized. If the saved layout has SDS on the Alert Grid, a one-time message asks to re-save. Built, NOT run (Wine test blocked this session).
 
 ## Done in v3.34.3 (Nov 3)
 - Jakob: "everything works now" (;audit incl. Requested By), but the Requested By selection was unnecessarily slow. Route pause 1200 -> 500 ms, double-click wait 800 -> 200 ms. Built, NOT run.
