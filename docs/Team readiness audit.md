@@ -4,6 +4,8 @@ Written Nov 11, 2026, on v3.36.0. Revised the same day after Jakob's answer: **e
 
 **Confirmed by Jakob (Nov 11): everyone has their own Windows account and moves between the 3 operator bays (he is usually Bay 1 but sometimes 2 or 3); same for all operators. The supervisor bay is different.** So each person's OneDrive settings follow them to any bay, but passwords, taught spots, layout and time saved are per account per PC. That means each operator teaches every bay they sit at, and each bay needs its spots shared once for everyone (item 2). The supervisor bay is treated as its own bay with its own spots and, if the supervisor works differently, its own team-settings section.
 
+**Answers from Jakob (Nov 12):** the team SharePoint folder is NOT set up yet (he doesn't know how to start it; see the steps in the reply and in Pending changes). The supervisor bay works the same for Watchlog except it has ONE monitor, so it needs its own bay spots and layout. Pilot: coworker Michael (techy, has seen the program, would use it). Still open: anyone on Chrome? OK for the safe new-operator defaults?
+
 Jakob (Nov 11): "Many features I have designed are designed around my specific workflow but there are quite a few things that would break when I introduce it to the team. It needs to be more general and adaptive."
 
 ## The short version
