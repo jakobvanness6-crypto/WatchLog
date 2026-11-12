@@ -2,6 +2,8 @@
 
 Written Nov 11, 2026, on v3.36.0. Revised the same day after Jakob's answer: **each operator signs in to the bays with their own Windows account.** Planning only: nothing in the program has changed. Nothing gets built until Jakob says "build it".
 
+**Confirmed by Jakob (Nov 11): everyone has their own Windows account and moves between the 3 operator bays (he is usually Bay 1 but sometimes 2 or 3); same for all operators. The supervisor bay is different.** So each person's OneDrive settings follow them to any bay, but passwords, taught spots, layout and time saved are per account per PC. That means each operator teaches every bay they sit at, and each bay needs its spots shared once for everyone (item 2). The supervisor bay is treated as its own bay with its own spots and, if the supervisor works differently, its own team-settings section.
+
 Jakob (Nov 11): "Many features I have designed are designed around my specific workflow but there are quite a few things that would break when I introduce it to the team. It needs to be more general and adaptive."
 
 ## The short version
@@ -124,6 +126,6 @@ Each step is one version, built only on "build it", with all docs bumped togethe
 
 ## Questions for Jakob
 1. ~~Shared Windows account?~~ Answered Nov 11: each operator has their own Windows account.
-2. Does anyone work differently from you (a supervisor bay, someone who does audits all shift, someone who uses Chrome)?
+2. Besides the supervisor bay, does anyone work differently from you (someone who does audits all shift, someone who uses Chrome)? And what does the supervisor bay do differently?
 3. Who would pilot it with you first, and on which bay?
 4. Is the team SharePoint folder already set up, and does it sync to everyone's OneDrive?
