@@ -38,6 +38,16 @@ The fix is three layers with a clear owner each:
 
 Person beats bay beats team beats the built-in default. A brand new operator signs in, Watchlog finds the team folder, picks up the bay's spots and the team defaults, and works on day one.
 
+## Everyone works differently (Jakob, Nov 12)
+Jakob: operators arrange their windows differently, use different programs, tools and shortcuts, and some fill out logs and incidents in entirely different ways. So Watchlog can't assume one workflow. Changes to the plan:
+
+1. **Everything is a switch, and a new operator starts with a small core.** Core on for everyone: shared wording (code words and forms), the finder, Alert Grid clear (if they use it), time saved. Opt-in modules, each with its own on/off in the first-run walk-through and tray: start of shift (and its program list), window layout, full-entry daily logs, code words that fill the whole daily log (>>), ;audit, incident reports, call pad, autocorrect everywhere, taskbar clock, Caps Lock clears alerts, Numpad +, SDS keep-in-spot. A module that is off never moves a window, grabs a key or types anything.
+2. **Window layout is personal, never forced by the bay.** Item 6 changes: no bay layout. Each person may save their own layout per bay, or none. Spots must not depend on where windows sit.
+3. **Shared bay spots only work if they are measured from inside the window.** Alert Grid and the new log button already are (since v3.18.0). The daily log field, audit and incident spots are not all, so bay sharing (item 2) has a prerequisite: measure them from inside the iTrak windows, or two people with different window sizes break each other. Until then bay sharing stays off for those spots.
+4. **Start of shift and end of shift lists are personal** (team gives a default list; a person can change or turn them off). Today's built-in lists come from Jakob's programs.
+5. **Different methods of filling logs and incidents:** shared wording stays optional. People can use only the parts that fit: their own my-templates, their own full-entry logs, their own incident wording file. Nothing in the team file is forced on anyone.
+6. **Question for later:** which of these modules would Michael actually use? His answer decides the default set for new operators.
+
 ## Must fix before a pilot
 
 Ordered by how badly it breaks for the second operator.
