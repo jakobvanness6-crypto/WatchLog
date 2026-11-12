@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.2  -  README
+  WATCHLOG  v3.37.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -19,8 +19,9 @@ Click the teal icon (or press Ctrl+Alt+M) for the Watchlog home window:
 every feature as a button with a picture, each showing its shortcut.
 Right-click the icon for the menu (section 11).
 
-Can't remember a trigger?  Ctrl+Alt+Space  finds a template by name or
-any word in it (see section 3).
+Can't remember a trigger?  Ctrl+Alt+Space  finds a template by name,
+first letters (cd = Card Destruction) or any word in it, with your
+pinned and recent ones on top (see section 3).
 Quickest way to see everything on your PC:  Ctrl+Alt+H  (cheat sheet).
 The cheat sheet is built from the templates and settings on that PC,
 so it always matches what's set up there.
@@ -113,8 +114,9 @@ couple of seconds. No need to press anything.
 -----------------------------------------------------------------------
  2. HOTKEYS  (hold Ctrl+Alt and press the key)
 -----------------------------------------------------------------------
-  Ctrl+Alt+Space    Find a template: type part of its name or any word
-                    in it, then Enter. See section 3.
+  Ctrl+Alt+Space    Find a template (the quick picker): type part of its
+                    name, its first letters or any word in it, then
+                    Enter. Ctrl+P pins one. See section 3.
   Ctrl+Alt+H        Cheat sheet (laid out in three columns since v3.15.0):
                     every template, login, app and hotkey on this PC.
   Ctrl+Alt+M        Watchlog home (v3.10.0): one window with a button for
@@ -318,14 +320,34 @@ Templates paste the text, and your clipboard is put back the way it was
 afterwards.
 
 CAN'T REMEMBER A TRIGGER?  Ctrl+Alt+Space  (or tray menu > Find a template)
-  A search box opens with every template listed. Type part of a name
-  (jack), a trigger (;bv), or any word from the log (ambulance,
-  defective, trespass) and the list narrows as you type.
+  A search box opens with every template listed, and the full-entry
+  daily logs (the Ctrl+Alt+F list) too. Type part of a name (jack), a
+  trigger (;bv), the first letters of a name (cd = Card Destruction,
+  td = Table Drop), or any word from the log (ambulance, defective,
+  trespass) and the list narrows as you type. The ones you use most
+  get a small push up the list.
+  With nothing typed (v3.36.0):
+    first          your pinned ones, marked with a star
+    then           the last 10 you ran, from anywhere (code word, this
+                   finder, the call pad, Ctrl+Alt+F), marked "Recent"
+    then           the full-entry daily logs (Break, Table Drop ...)
+    then           the code word templates
     Up / Down      choose a template (PgUp / PgDn jump 10)
     Enter          insert it where you were typing, exactly as if you'd
                    typed its trigger (a form opens if it has blanks).
+                   A full-entry log opens a new daily log in iTrak and
+                   fills it in, the same as Ctrl+Alt+F.
                    Double-clicking a template does the same.
+    Ctrl+P         pin the one picked, or unpin it
     Esc            close without inserting
+  Compact (tick at the bottom): just the box and the list, no preview.
+  Remembered on this PC.
+  Pins are kept in "picker pins.txt" beside templates.txt, so OneDrive
+  takes them to your other bays. The recent list and how often each was
+  used are kept on this PC only (%LOCALAPPDATA%\Watchlog\picker.ini).
+  Both hold names only (like ;card or Break): never the filled-in text,
+  never a password. Logins are never listed, and Watchlog never types
+  anything into the search box.
   Below the list it shows the wording, with the blanks in [brackets],
   and the trigger to type next time so you can skip the search.
   Typing a whole trigger in the search box runs it straight away, just
@@ -568,7 +590,11 @@ What happens, in order (about 20 seconds):
      no tabs are searched for. The addresses are FaceUrl and CitrixUrl
      in settings.ini (also in Settings); blank FaceUrl = not opened.
   5. It puts your saved window layout back, then brings the Edge window
-     with the Citrix page to the front.
+     with the Citrix page to the front. For 2 minutes after that
+     (v3.35.3) it keeps SDS in its saved spot: when SDS swaps its login
+     screen for the main screen, opens a new window, or lands on the
+     Alert Grid's spot, it is put back. If you drag SDS yourself it is
+     left alone. Same for 1 minute after the hourly SDS sign-in.
   6. If anything couldn't be found, a message lists it.
 
 Still manual: launching iTrak itself from the Citrix page (its launch
@@ -661,6 +687,22 @@ TIME SAVED (tray > Time saved, or the Time saved button in Ctrl+Alt+J)
   length of what went in, minus what you typed (the shortcut, what you
   put in the boxes, one Tab or Enter per box). A box left blank saves
   nothing. Time is worked out at 40 words a minute (200 keystrokes).
+  Clicks too (v3.35.5): the clicks and menu picks Watchlog does for you
+  are counted apart, in a Clicks column, and each one adds half a
+  second (settings.ini [TimeSaved] SecondsPerClick=). Only the clicks
+  you would make by hand on the normal path: an Alert Grid clear is 5
+  to 7 (row, right-click, menu line, Submit, OK, clear button, no more
+  alerts box), a new iTrak daily log its taught clicks, a full-entry
+  log 1 per box plus Now, an incident 1 for Create Incident plus 1 per
+  box, ;audit 1 per box plus each Requested By click, an app switch 1.
+  Retries, waiting for windows and the mouse going back aren't counted.
+  Earlier days get a cautious estimate once, when v3.35.5 first starts
+  (see section 19).
+  Autocorrect too (v3.36.1): a word in your autocorrect list that
+  expands (at least 3 letters longer than what you typed) counts the
+  letters it adds, in every program, the call pad and the forms. Plain
+  spelling fixes add nothing. The Autocorrect column counts the words;
+  the Autocorrect words button shows which ones pay off.
   The window shows this shift, today, the last 7 and 30 days, and
   everything since the first day, with a Copy report button.
   Ctrl+Alt+J shows this shift's time saved at the top.
@@ -763,7 +805,8 @@ and the less-used items sit in sub-menus):
                                 (15), Make a copy to share (16), Edit
                                 templates / my templates / settings /
                                 the autocorrect list in Notepad, Open
-                                Watchlog folder, Choose my own update
+                                Watchlog folder, Check start with
+                                Windows (v3.35.4), Choose my own update
                                 folder, Back up my settings and templates
                                 now, Restore from a backup..., Go back to
                                 the previous version... (v3.28.0), Pause
@@ -999,6 +1042,39 @@ TEAM TEMPLATES (one shared file for everyone)
     Tray menu > Advanced > Edit team templates in Notepad opens it too.
   Tip: right-click the synced folder > "Always keep on this device".
 
+TEAM SETUP AND team-settings.ini  (v3.37.0)
+  Tray menu > Advanced > Team setup shows, with green, amber and red
+  dots, what this PC has from the team: the team folder reachable, the
+  team templates and team-settings.ini found, Alert Grid and iTrak spots
+  (taught here, or shared for this screen scaling), saved passwords, the
+  screen scaling and the version.
+  - Pick the team folder: one button sets the shared templates and the
+    shared update folder together (Shared= in settings.ini). If a
+    folder with a templates.txt and "Watchlog" in its name, or a
+    team-settings.ini next to it, is in OneDrive, Watchlog offers it
+    (a new operator is offered it on first run).
+  - Set up a team folder (supervisor): pick an empty folder (a SharePoint
+    folder added to OneDrive); Watchlog puts templates.txt (the wording
+    this PC uses now), a team-settings.ini to fill in and Watchlog.exe
+    there. Nothing already in the folder is replaced, and your own
+    settings, logins and passwords are never copied.
+  - team-settings.ini sits next to the team templates.txt. It holds what is
+    the same for the whole team: [Paths] Browser (edge or chrome),
+    FaceUrl, CitrixUrl, CitrixTab, LaunchWait; [StartOfShift] Run1 to
+    Run9; [EndOfShift] Close; [SDS] ResignMinutes; [Break] Minutes; the
+    waits and date formats in [ITrak] and [AlertGrid]; and [Modules]. A
+    line in your own settings.ini always wins over the team's, and a
+    value left out uses the one built into Watchlog.
+  - [Modules] (yes or no): CapsLockClears, NumpadCall, AutoEverywhere,
+    Clock, Previews, LayoutAfterStart. These extras start OFF for a NEW
+    operator (settings.ini made by v3.37.0 or later has NewOperator=yes
+    under [User]) unless the team file says yes. People who were already
+    using Watchlog keep everything on as before. Anyone can switch any of
+    them in the tray menu or Settings.
+  - Taught spots (Alert Grid, iTrak) are still per PC, and the passwords
+    too (Windows keeps them on that PC only). Sharing the spots for a
+    whole bay is planned for the next version.
+
 YOUR OWN TEMPLATES (my-templates.txt)
   In the template editor, pick "My own templates" at the top (or tray
   menu > Advanced > Edit my templates in Notepad). It makes
@@ -1130,6 +1206,10 @@ Save it and it reloads itself.
 
 [Layout]
   AfterStart=      no = Ctrl+Alt+L doesn't put the windows back (default yes)
+  SdsWatchSeconds= how long after Ctrl+Alt+L SDS is kept in its spot
+                   (default 120, 0 = off; v3.35.3)
+  SdsSpot=         x,y,w,h for SDS instead of the saved layout's SDS spot
+                   (blank = use the saved layout; v3.35.3)
 
 [Look]
   Dark=            yes = dark windows (default no; also tray > Dark look)
@@ -1233,6 +1313,15 @@ WINDOW LAYOUT (v3.7.0)
     layout also notes which one each window is (from the start of its
     title; the title itself isn't kept) and they can't swap spots. A
     layout saved before v3.19.3 asks once to be saved again.
+  - SDS after start of shift (v3.35.3): putting the layout back happens
+    before SDS has finished signing in, and SDS then opens its main screen
+    wherever Java likes (it landed on the Alert Grid's spot). So for 2
+    minutes Watchlog puts SDS back in its saved spot whenever it opens a
+    new window, changes screens, or sits over the Alert Grid's spot.
+    Needs a layout saved with BOTH SDS and Alert Grid open where you want
+    them. If the saved layout itself has SDS on the Alert Grid's spot, it
+    says so once: fix the windows and press Ctrl+Alt+Shift+S again.
+    The Activity log shows each move ("SDS spot: ...").
   - W is no longer free for an app hotkey ([AppN] Key=W is skipped).
 
 CAPS LOCK GUARD (v3.7.0)
@@ -1289,6 +1378,8 @@ YOUR OWN OTHER BAY PCs (script version)
   3. Double-click Watchlog.ahk. Then tray menu > Settings: tick
      "Start Watchlog when I sign in to Windows" and Save. (The
      Startup folder doesn't sync, so each PC needs this once.)
+     With the exe, the shortcut opens the installed copy on that PC,
+     never one in OneDrive (v3.35.4).
   4. Sign in to Edge with your work account once on that PC.
   5. The first time you use each login there, type its password once.
 
@@ -1372,8 +1463,125 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.35, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.37, newest first)
 -----------------------------------------------------------------------
+TEAM FOLDER, TEAM SETTINGS AND A SAFE START FOR NEW OPERATORS  (v3.37.0)
+  - Tray > Advanced > Team setup: pick the team folder (offered when found
+    in OneDrive), set up a new team folder (supervisor), and a status
+    list. See section 13.
+  - team-settings.ini beside the team templates.txt: browser (edge or
+    chrome instead of Edge only), the web pages, start and end of shift
+    lists, SDS and break minutes, iTrak waits and formats, and which extras
+    a new operator starts with. Your own settings.ini wins.
+  - A new operator starts with the extras off (Caps Lock clears alerts,
+    Numpad + call pad, autocorrect in every program, taskbar clock and
+    hidden previews, putting windows back after start of shift) and
+    without Jakob's start and end of shift lists. Nothing changes for
+    anyone already using Watchlog.
+
+AUTOCORRECT WORDS THAT EXPAND COUNT IN TIME SAVED  (v3.36.1)
+  - Your own short words in the autocorrect list now count in Time
+    saved, in every program, the call pad and the log forms. Only words
+    that EXPAND count: the fix has to be at least 3 letters longer than
+    what you typed, and only the letters it adds are counted (shrd =
+    Shred-it saves 4 keystrokes). A plain spelling fix (ram = RAM,
+    shredit = Shred-it) adds nothing.
+  - Time saved has an Autocorrect column (how many words expanded); the
+    keystrokes they saved are in Keystrokes and in the time.
+  - New Autocorrect words button in Time saved: each word you type, how
+    many times it fired and what it saved (last 30 days and in all), so
+    you can see which of your words pay off. Shift count lists them too
+    as "Autocorrect: <word>". The dashboard doesn't count them as logs.
+  - Only the short word you type is kept, with a count. Never what you
+    were writing. In other programs a quiet key watcher spots the words
+    (it blocks nothing and keeps only the last 40 letters in memory).
+  - The call pad and the forms aren't counted twice: they count the box
+    as what you typed, and the word's extra letters come only from here.
+  - Counted from v3.36.1 on; earlier days stay as they were. Ctrl+Z on
+    a fixed word doesn't take the count back off.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+QUICK PICKER: PINS, RECENT, FIRST LETTERS  (v3.36.0)
+  - The template finder (Ctrl+Alt+Space) is now a quick picker. With
+    the box empty it shows your pinned ones first (star), then the last
+    10 you ran from anywhere ("Recent"), then the full-entry daily
+    logs, then the code word templates. When two match equally well
+    while you type, the full-entry log comes first.
+  - Ctrl+P pins or unpins the one picked. Pins are in "picker pins.txt"
+    beside templates.txt (shared with your other bays by OneDrive).
+  - First letters work: cd = Card Destruction, td = Table Drop. The
+    ones you use most get a small push up the list.
+  - Full-entry daily logs (the Ctrl+Alt+F list) are in the same list:
+    Enter opens a new daily log in iTrak and fills it in.
+  - Compact tick: just the box and the list, no preview (this PC).
+  - Names only are kept (recent and how often: this PC only, in
+    picker.ini). Logins are never listed; nothing is typed into the
+    search box. The hotkey is still Ctrl+Alt+Space.
+  - Daily backups now include picker pins.txt.
+
+TIME SAVED COUNTS CLICKS AND MENU PICKS TOO  (v3.35.5)
+  - Time saved, Shift count and the dashboard now count the clicks and
+    menu picks Watchlog does for you, apart from keystrokes, in a new
+    Clicks column. Time saved = keystrokes at 40 words a minute, plus
+    half a second a click. Half a second is on purpose: about half the
+    usual research figure for pointing and clicking (about 1.2 s), so
+    the number stays cautious. Change it with settings.ini [TimeSaved]
+    SecondsPerClick=.
+  - Counted: Alert Grid clear all (5 to 7 clicks), iTrak new daily log,
+    each box in full-entry logs, incident reports and ;audit, End Time
+    Now, every Requested By click (a double-click counts as one), app
+    switches (one taskbar click). Not counted: retries, waiting for
+    windows, the mouse going back.
+  - The few clicks that used to be counted as made-up keystrokes (new
+    log, Now, Create Incident, Requested By, part of an Alert Grid
+    clear) are now only in Clicks, so nothing is counted twice.
+  - Copy report shows typing time and click time apart.
+  - Earlier days: the first time this version starts, it gives the days
+    already counted their clicks the best it can, from the per-item
+    counts kept since v3.16.0, at the low end of what each one clicks
+    now: Alert Grid clear 5, new daily log 1, app switch 1, full-entry
+    log 3, incident 6. ;audit and pasted logs get 0, because the old
+    counts can't tell them apart. The old made-up click keystrokes come
+    off at the same time. Days before v3.16.0 stay at 0 clicks. It runs
+    once (time saved.ini [Info] ClicksBackfilled=) and says what it did
+    in the Activity log.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+START WITH WINDOWS: NO MORE "DO YOU WANT TO RUN THIS FILE?"  (v3.35.4)
+  - Windows asked "Do you want to run this file?" at every sign-in, and
+    unticking "Always ask" never stuck. The cause: the Startup shortcut
+    opened a Watchlog.exe in OneDrive. Windows treats OneDrive (and
+    network folders) like the internet, so it asks every time.
+  - Now the Startup shortcut always opens the installed copy on this
+    PC's own drive (%LOCALAPPDATA%\Programs\Watchlog\Watchlog.exe).
+    Each time Watchlog starts it fixes a Watchlog.exe Startup shortcut
+    that points anywhere else, and says so in the Activity log.
+  - Watchlog also removes Windows' "downloaded from the internet" mark
+    from its own exe when it starts, and after it installs, updates or
+    goes back a version (that mark is the other thing that makes
+    Windows ask).
+  - Tray menu > Advanced > Check start with Windows: shows where
+    Watchlog runs from and where the Startup shortcut points, flags
+    OneDrive or network paths, and offers to fix the shortcut.
+  - Faster start at sign-in: the shortcut passes /startup, and then
+    the daily backup and the team-folder update check wait 30 seconds
+    (OneDrive is often still starting). Shortcuts work straight away.
+  - Code signing isn't needed for this.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
+START OF SHIFT: SDS STAYS OUT OF THE ALERT GRID'S SPOT  (v3.35.3)
+  - Ctrl+Alt+L put the windows back before SDS had finished signing in.
+    SDS then opened its main screen on the Alert Grid's spot. Now, for 2
+    minutes after Ctrl+Alt+L (and 1 minute after the hourly SDS sign-in),
+    SDS is put back in its saved spot whenever it opens a new window,
+    changes screens (login to Welcome) or sits over the Alert Grid's spot.
+    Dragging SDS yourself is left alone.
+  - Needs a saved layout with SDS and Alert Grid both open where you want
+    them (Ctrl+Alt+Shift+S). If the saved layout has SDS on the Alert
+    Grid's spot, it tells you once to fix it and save again.
+  - settings.ini [Layout] SdsWatchSeconds= (default 120, 0 = off) and
+    SdsSpot=x,y,w,h (blank = the saved layout's SDS spot).
+
 AUDIT: PIT #2 / #3 AND START TIME  (v3.35.2)
   - Area Audited: iTrak's list writes the pits as "Pit #1", "Pit #2", "Pit #3". Watchlog
     typed "Pit 2", which stopped matching at the 2 and left Pit #1. Now "Pit 2" on the form
@@ -1484,7 +1692,7 @@ INCIDENT REPORTS, MORE CODE WORDS FILL THE DAILY LOG, AUTOCORRECT EVERYWHERE  (v
   - Code words that now fill the whole daily log (Location | Topic | Reference):
     ;player (pit of the table | Player Update | NA), ;refuse (Security Desk - Main Lobby |
     Call / Phone | NA), ;evict (Security Desk - Main Lobby | Trespass), ;face (Security Desk -
-    Main Lobby | Facial Recognition Alert Rejected), ;aml (slots area | AML Alert), ;abandon
+    Main Lobby | Facial Recognition Alert Rejected | NA), ;aml (slots area | AML Alert), ;abandon
     (slots area | Request for Review), ;found (slots area | Lost & Found), ;maint (ABM/NRT |
     AJM/CTR Fill), ;close (pit | Table Opening/Closing | NA), ;selfex (Security Office |
     Self-Exclusion), ;inventory (Cash Cage | Security Escort), ;badge (Security Main entrance |
@@ -1650,7 +1858,9 @@ Tray menu > Advanced > Edit the autocorrect list saves the list as
 autocorrect.txt in the Watchlog folder and opens it in Notepad. That file is
 then the whole list: add lines like  wrong = right, or put # in front of one
 to switch it off. A saved change is used within a second (v3.14.1).
-[CallPad] Autocorrect=no turns it off. It does not run in other programs.
+[CallPad] Autocorrect=no turns it off. (From v3.33.0 it also runs in other
+programs: tray > Autocorrect in every program. From v3.36.1 words that expand
+count in Time saved: see TIME SAVED in section 10.)
 
 SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
   Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and
