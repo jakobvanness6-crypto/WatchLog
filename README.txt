@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.36.0  -  README
+  WATCHLOG  v3.36.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -698,6 +698,11 @@ TIME SAVED (tray > Time saved, or the Time saved button in Ctrl+Alt+J)
   Retries, waiting for windows and the mouse going back aren't counted.
   Earlier days get a cautious estimate once, when v3.35.5 first starts
   (see section 19).
+  Autocorrect too (v3.36.1): a word in your autocorrect list that
+  expands (at least 3 letters longer than what you typed) counts the
+  letters it adds, in every program, the call pad and the forms. Plain
+  spelling fixes add nothing. The Autocorrect column counts the words;
+  the Autocorrect words button shows which ones pay off.
   The window shows this shift, today, the last 7 and 30 days, and
   everything since the first day, with a Copy report button.
   Ctrl+Alt+J shows this shift's time saved at the top.
@@ -1427,6 +1432,28 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.36, newest first)
 -----------------------------------------------------------------------
+AUTOCORRECT WORDS THAT EXPAND COUNT IN TIME SAVED  (v3.36.1)
+  - Your own short words in the autocorrect list now count in Time
+    saved, in every program, the call pad and the log forms. Only words
+    that EXPAND count: the fix has to be at least 3 letters longer than
+    what you typed, and only the letters it adds are counted (shrd =
+    Shred-it saves 4 keystrokes). A plain spelling fix (ram = RAM,
+    shredit = Shred-it) adds nothing.
+  - Time saved has an Autocorrect column (how many words expanded); the
+    keystrokes they saved are in Keystrokes and in the time.
+  - New Autocorrect words button in Time saved: each word you type, how
+    many times it fired and what it saved (last 30 days and in all), so
+    you can see which of your words pay off. Shift count lists them too
+    as "Autocorrect: <word>". The dashboard doesn't count them as logs.
+  - Only the short word you type is kept, with a count. Never what you
+    were writing. In other programs a quiet key watcher spots the words
+    (it blocks nothing and keeps only the last 40 letters in memory).
+  - The call pad and the forms aren't counted twice: they count the box
+    as what you typed, and the word's extra letters come only from here.
+  - Counted from v3.36.1 on; earlier days stay as they were. Ctrl+Z on
+    a fixed word doesn't take the count back off.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 QUICK PICKER: PINS, RECENT, FIRST LETTERS  (v3.36.0)
   - The template finder (Ctrl+Alt+Space) is now a quick picker. With
     the box empty it shows your pinned ones first (star), then the last
@@ -1784,7 +1811,9 @@ Tray menu > Advanced > Edit the autocorrect list saves the list as
 autocorrect.txt in the Watchlog folder and opens it in Notepad. That file is
 then the whole list: add lines like  wrong = right, or put # in front of one
 to switch it off. A saved change is used within a second (v3.14.1).
-[CallPad] Autocorrect=no turns it off. It does not run in other programs.
+[CallPad] Autocorrect=no turns it off. (From v3.33.0 it also runs in other
+programs: tray > Autocorrect in every program. From v3.36.1 words that expand
+count in Time saved: see TIME SAVED in section 10.)
 
 SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
   Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and

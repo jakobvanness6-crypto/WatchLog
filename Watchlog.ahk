@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.36.0"
-VERSION_DATE := "Nov 11, 2026"
+VERSION := "3.36.1"
+VERSION_DATE := "Nov 12, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -88,6 +88,8 @@ IncidentFile := HomeDir "\incidents.txt"   ; incident reports (v3.33.0), kept be
 EntryRefs := Map()       ; daily log window -> the Reference Watchlog typed in it (Custom 3 of an incident)
 AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", "1") != "0"   ; autocorrect in every program, this PC (v3.33.0)
 AutoHot := Map(), AutoHotStamp := "-"
+AutoHot.CaseSense := false   ; hotstrings fire whatever case you type, so the count looks words up the same way
+AutoCountIH := "", AutoCountBuf := "", AutoCountWin := 0   ; autocorrect words counted in Time saved (v3.36.1)
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -3528,6 +3530,10 @@ AutoFixEdit(ctrl, *) {
         SendMessage 0xB1, after, after, hw
     }
     busy := false
+    ; Time saved (v3.36.1): only a word that expands counts, and only the
+    ; letters it adds. The form and the call pad count the box as typed, so
+    ; this is the part they leave out: nothing is counted twice.
+    AutoCount(word, rep)
 }
 
 EditAutocorrect() {
@@ -5906,7 +5912,9 @@ UpdateFrom(f, v) {
 ;  Grid clears, iTrak new log, the daily log / incident / audit boxes,
 ;  Requested By route, app switches), at [TimeSaved] SecondsPerClick=
 ;  (default 0.5) each. Only the clicks you'd make by hand: not retries,
-;  not waiting for windows, not the mouse going back. Kept per day in time saved.ini in
+;  not waiting for windows, not the mouse going back. From v3.36.1 the
+;  autocorrect words that expand count too (only the letters they add; see
+;  AutoCount). Kept per day in time saved.ini in
 ;  %LOCALAPPDATA%\Watchlog: numbers only, never log text or passwords.
 ;  A shift starts with the first count after End of shift or after 6
 ;  hours with nothing counted.
@@ -5955,16 +5963,18 @@ ItemRow(str) {
     return {n: num(1), keys: num(2), clicks: num(3)}
 }
 
-; "logs,logins,stamps,keystrokes,clicks" -> an object (older lines have no
-; clicks: 0. Clicks are counted from v3.35.5 on, never guessed for before)
+; "logs,logins,stamps,keystrokes,clicks,autocorrect words" -> an object
+; (older lines have no clicks or words: 0. Clicks are counted from v3.35.5
+; on, autocorrect words from v3.36.1 on; neither is guessed for before.
+; The words' keystrokes are already inside keystrokes)
 SavedRow(str) {
     p := StrSplit(str, ",")
     num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
-    return {log: num(1), login: num(2), stamp: num(3), keys: num(4), clicks: num(5)}
+    return {log: num(1), login: num(2), stamp: num(3), keys: num(4), clicks: num(5), auto: num(6)}
 }
 
-; an object -> "logs,logins,stamps,keystrokes,clicks"
-RowStr(d) => d.log "," d.login "," d.stamp "," d.keys "," d.clicks
+; an object -> "logs,logins,stamps,keystrokes,clicks,autocorrect words"
+RowStr(d) => d.log "," d.login "," d.stamp "," d.keys "," d.clicks "," d.auto
 
 ; This shift's counts (all zero when the last shift has ended)
 SavedShift() {
@@ -5988,7 +5998,7 @@ SavedSince(from) {
         if from != "" && StrCompare(SubStr(line, 1, eq - 1), from) < 0
             continue
         d := SavedRow(SubStr(line, eq + 1))
-        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.clicks += d.clicks, t.days += 1
+        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.clicks += d.clicks, t.auto += d.auto, t.days += 1
     }
     return t
 }
@@ -6122,18 +6132,19 @@ ShowTimeSaved() {
     cs := ClickSecsText()
     g.AddText("w640", "Keystrokes Watchlog saved you (what went in, minus what you typed) and the clicks and menu picks it did for you. "
         . "Time is keystrokes at 40 words a minute, plus " cs " for each click. Waiting for windows isn't counted. "
-        . "Clicks are counted from v3.35.5 on.")
-    lv := g.AddListView("w640 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Keystrokes", "Clicks", "Time saved"])
-    report := "Watchlog time saved on " A_ComputerName " (keystrokes at 40 words a minute, plus " cs " a click; clicks counted from v3.35.5 on)`r`n"
+        . "Clicks are counted from v3.35.5 on. Autocorrect = words that expand (from v3.36.1 on); only the letters they add are in Keystrokes.")
+    lv := g.AddListView("w720 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Autocorrect", "Keystrokes", "Clicks", "Time saved"])
+    report := "Watchlog time saved on " A_ComputerName " (keystrokes at 40 words a minute, plus " cs " a click; clicks counted from v3.35.5 on, autocorrect words from v3.36.1 on)`r`n"
     for r in rows {
         t := r[2]
-        lv.Add(, r[1], t.log, t.login, t.stamp, Commas(t.keys), Commas(t.clicks), SavedTime(t.keys, t.clicks))
-        report .= r[1] ": " t.log " logs, " t.login " logins, " Commas(t.keys) " keystrokes (" SavedTime(t.keys) "), "
+        lv.Add(, r[1], t.log, t.login, t.stamp, t.auto, Commas(t.keys), Commas(t.clicks), SavedTime(t.keys, t.clicks))
+        report .= r[1] ": " t.log " logs, " t.login " logins, " t.auto " autocorrect words, " Commas(t.keys) " keystrokes (" SavedTime(t.keys) "), "
             . Commas(t.clicks) " clicks (" SavedTime(0, t.clicks) "), " SavedTime(t.keys, t.clicks) " in all"
             . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
     }
-    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 90), lv.ModifyCol(6, 70), lv.ModifyCol(7, 120)
-    g.AddButton("xm+222 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 80), lv.ModifyCol(6, 90), lv.ModifyCol(7, 70), lv.ModifyCol(8, 120)
+    g.AddButton("xm+184 y+12 w130", "Autocorrect words").OnEvent("Click", (*) => (g.Destroy(), ShowAutoSaved()))
+    g.AddButton("x+8 yp w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
     g.AddButton("x+8 yp w110", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
@@ -6147,6 +6158,76 @@ ShowTimeSaved() {
     }
 }
 
+
+; Which autocorrect words pay off (v3.36.1): each word you typed that
+; expanded, how many times and the keystrokes it saved, for the last 30
+; days and since v3.36.1. From the per-day counts in time saved.ini.
+ShowAutoSaved() {
+    from30 := FormatTime(DateAdd(A_Now, -29, "Days"), "yyyy-MM-dd")
+    words := Map()
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if !bar || !eq || bar > eq
+                continue
+            name := SubStr(line, bar + 1, eq - bar - 1)
+            if SubStr(name, 1, 13) != "Autocorrect: "
+                continue
+            w := SubStr(name, 14), it := ItemRow(SubStr(line, eq + 1))
+            if !words.Has(w)
+                words[w] := {name: w, n: 0, keys: 0, n30: 0, keys30: 0}
+            a := words[w]
+            a.n += it.n, a.keys += it.keys
+            if StrCompare(SubStr(line, 1, bar - 1), from30) >= 0
+                a.n30 += it.n, a.keys30 += it.keys
+        }
+    }
+    list := []
+    for w, a in words
+        list.Push(a)
+    ; most keystrokes saved first
+    Loop list.Length - 1 {
+        i := A_Index + 1
+        cur := list[i], j := i - 1
+        while j >= 1 && list[j].keys < cur.keys {
+            list[j + 1] := list[j]
+            j -= 1
+        }
+        list[j + 1] := cur
+    }
+    g := WGui("+AlwaysOnTop", "Autocorrect words  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w560", "Your autocorrect words that expand, and what they saved. Only the letters a word adds count "
+        . "(shrd = Shred-it saves 4). Plain spelling fixes aren't counted. Counted from v3.36.1 on, in every program, the call pad and the forms.")
+    lv := g.AddListView("w560 r12 -Multi NoSortHdr", ["Word you type", "Last 30 days", "Keystrokes", "All", "Keystrokes", "Time saved (all)"])
+    report := "Watchlog autocorrect words on " A_ComputerName " (words that expand; keystrokes at 40 words a minute)`r`n"
+    total := 0, keys := 0
+    for a in list {
+        lv.Add(, a.name, a.n30, Commas(a.keys30), a.n, Commas(a.keys), SavedTime(a.keys))
+        report .= a.name ": " a.n " times, " Commas(a.keys) " keystrokes (" SavedTime(a.keys) "); last 30 days " a.n30 " times`r`n"
+        total += a.n, keys += a.keys
+    }
+    if !list.Length
+        lv.Add(, "(nothing counted yet)")
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 85), lv.ModifyCol(3, 80), lv.ModifyCol(4, 55), lv.ModifyCol(5, 80), lv.ModifyCol(6, 110)
+    sum := total " words, " Commas(keys) " keystrokes, " SavedTime(keys)
+    report .= "TOTAL: " sum "`r`n"
+    g.AddText("xm w560", "Total: " sum)
+    g.AddButton("xm+142 y+12 w120", "Edit the words").OnEvent("Click", (*) => (g.Destroy(), ShowAutoEditor()))
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w90", "Time saved").OnEvent("Click", (*) => (g.Destroy(), ShowTimeSaved()))
+    g.AddButton("x+8 yp w80 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := report
+        g.Destroy()
+        Tip("Report copied. Paste it with Ctrl+V.")
+    }
+}
 
 
 ; =====================================================================
@@ -6167,7 +6248,7 @@ ShowTimeSaved() {
 ItemKind(name) {
     if name = "Alert Grid clear"
         return "alert"
-    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new )")
+    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new |Autocorrect: )")
         return "other"
     return "log"
 }
@@ -10118,6 +10199,7 @@ AutoEverywhereSync() {
     on := AutoEverywhereOn && Cfg["Autocorrect"]
     if on
         LoadAutocorrect()
+    AutoCountSync(on)
     stamp := on ? AutoStamp "|" AutoMap.Count : "off"
     if stamp == AutoHotStamp
         return
@@ -10145,6 +10227,77 @@ AutoEverywhereSync() {
     }
     HotIf
     Activity("Autocorrect in every program: " (on ? AutoHot.Count " words" : "off"))
+}
+
+; ---- Autocorrect words in Time saved (v3.36.1) -----------------------
+; Jakob (Nov 12): "I have started adding my own custom words to the list to
+; save time and I would like that to be reflected". Only words that EXPAND
+; count (Jakob, Nov 12: "only expanding words"): the fix has to be at least
+; 3 letters longer than what you typed, and only the letters it adds count
+; (shrd = Shred-it saves 4 keystrokes). A plain spelling fix (ram = RAM,
+; shredit = Shred-it) adds nothing. Each word counts in Time saved and in
+; the Shift count as "Autocorrect: <the word you typed>" (the short word
+; only, never what you were writing).
+AutoGain(typed, rep) => StrLen(rep) - StrLen(typed) >= 3 ? StrLen(rep) - StrLen(typed) : 0
+
+AutoCount(typed, rep) {
+    gain := AutoGain(typed, rep)
+    if gain > 0
+        CountSaved("auto", gain, "Autocorrect: " StrLower(typed))
+    return gain
+}
+
+; In other programs Windows does the swap through the hotstrings above,
+; which can't report back. A quiet key watcher (it sees your own typing
+; only, blocks nothing, keeps the last 40 letters in memory and never saves
+; them) spots the same words: a word from the list, after a space, Tab,
+; Enter or punctuation, typed outside Watchlog's own windows.
+AutoCountSync(on) {
+    global AutoCountIH, AutoCountBuf
+    if on && !IsObject(AutoCountIH) {
+        try {
+            ih := InputHook("V I1 L0")
+            ih.KeyOpt("{Backspace}{Delete}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Escape}", "N")
+            ih.OnChar := AutoCountChar
+            ih.OnKeyDown := AutoCountKey
+            ih.Start()
+            AutoCountIH := ih
+        }
+    } else if !on && IsObject(AutoCountIH) {
+        try AutoCountIH.Stop()
+        AutoCountIH := "", AutoCountBuf := ""
+    }
+}
+
+; Backspace takes the last letter off (like the hotstrings do); moving the
+; cursor starts over, because the letters before it are no longer known
+AutoCountKey(ih, vk, sc) {
+    global AutoCountBuf
+    AutoCountBuf := vk = 8 ? SubStr(AutoCountBuf, 1, -1) : ""
+}
+
+AutoCountChar(ih, ch) {
+    global AutoCountBuf, AutoCountWin
+    w := 0
+    try w := WinExist("A")
+    if w != AutoCountWin
+        AutoCountWin := w, AutoCountBuf := ""
+    if ch = "`r"
+        ch := "`n"
+    ; Ctrl+key and the like: what's on screen is no longer known
+    if Ord(ch) < 32 && ch != "`t" && ch != "`n" {
+        AutoCountBuf := ""
+        return
+    }
+    static ends := "-()[]{}':;`"/\,.?! `t`n"
+    if InStr(ends, ch) && AutoCountBuf != "" && !A_IsSuspended && AutoHot.Count {
+        try {
+            if AutoEverywhereHere() && RegExMatch(AutoCountBuf, "([\p{L}\d]+)$", &m) && AutoHot.Has(m[1])
+                && (StrLen(AutoCountBuf) < 40 || StrLen(m[1]) < StrLen(AutoCountBuf))
+                AutoCount(m[1], AutoHot[m[1]])
+        }
+    }
+    AutoCountBuf := SubStr(AutoCountBuf ch, -40)
 }
 
 ToggleAutoEverywhere(*) {
