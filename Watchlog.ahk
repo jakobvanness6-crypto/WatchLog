@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.38.0"
+VERSION := "3.38.1"
 VERSION_DATE := "Nov 14, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -2023,7 +2023,10 @@ ClearTip() => ToolTip()
 ReturnTo(hwnd) {
     try WinActivate "ahk_id " hwnd
     ok := WinWaitActive("ahk_id " hwnd, , 2)
-    Sleep WinActive("ahk_exe wfica32.exe") ? 400 : 50
+    if WinActive("ahk_exe wfica32.exe")
+        SpeedWait(400, 150)         ; Citrix: scaled by tray > iTrak > Speed (v3.38.1)
+    else
+        Sleep 50
     return ok != 0
 }
 
@@ -2072,7 +2075,7 @@ Paste(text, keep := false) {
     ; Citrix copies the clipboard across to the session on its own
     ; schedule: give it a moment before pasting
     if citrix
-        Sleep 300
+        SpeedWait(300, 150)         ; never under 150 ms, or the old clipboard could paste (v3.38.1)
     SendInput "^v"
     if keep
         return
@@ -5104,8 +5107,8 @@ ITrakNewLog(count := true) {
         return false
     }
     if !wasActive
-        Sleep 300    ; Citrix needs a moment to take the keyboard and mouse
-    pause := Integer(CfgRead("ITrak", "Pause", "300"))
+        SpeedWait(300, 100)    ; Citrix needs a moment to take the keyboard and mouse
+    pause := SpeedMs("ITrak", "Pause", 300, 80)
     w0 := Integer(c["W"]), h0 := Integer(c["H"])
     WinGetClientPos , , &cw, &ch, "ahk_id " win
     if StrLower(Trim(CfgRead("ITrak", "RefuseIfResized", "no"))) ~= "^(yes|on|1|true)$" && (Abs(cw - w0) > 2 || Abs(ch - h0) > 2) {
@@ -5130,10 +5133,10 @@ ITrakNewLog(count := true) {
         if k > 1
             Sleep pause
         MouseMove x, y, 0
-        Sleep 60
+        SpeedWait(60, 20)
         Click
     }
-    Sleep 60
+    SpeedWait(60, 20)
     MouseMove ox, oy, 0
     if count
         Tip("New daily log", 1000)
@@ -5246,8 +5249,9 @@ ToggleSaveAfterFill(*) {
 ; True when it clicked.
 EntrySaveClick(win, f, name) {
     w0 := Integer(f["W"]), h0 := Integer(f["H"])
-    Tip("Saving the log in 2 seconds...  Esc stops it", 2000, true)
-    deadline := A_TickCount + 2000
+    warn := SpeedMs("ITrak", "SaveWarn", 2000, 800)      ; v3.38.1: 1.2 s at Fast, 0.8 s at Fastest
+    Tip("Saving the log in " Round(warn / 1000, 1) " s...  Esc stops it", warn, true)
+    deadline := A_TickCount + warn
     while A_TickCount < deadline {
         if GetKeyState("Esc", "P") {
             Tip("Not saved (Esc)", 1500, true)
@@ -5265,9 +5269,9 @@ EntrySaveClick(win, f, name) {
         return false
     }
     MouseMove x, y, 0
-    Sleep 60
+    SpeedWait(60, 20)
     Click
-    Sleep 120
+    SpeedWait(120, 40)
     Activity("Full-entry log " name ": Save clicked")
     return true
 }
@@ -5472,14 +5476,14 @@ RunEntry(e, useOpen := false) {
                 if !before.Has(h)
                     win := h
             if !win
-                Sleep 100
+                Sleep 30                ; (was 100: looks sooner, v3.38.1)
         }
         if !win {
             Tip("The new daily log window didn't open. Nothing was filled in.", 4000, true)
             Activity("Full-entry log " e.name ": no new Daily Log Entry window appeared within " wait " ms")
             return
         }
-        Sleep Integer(CfgRead("ITrak", "EntrySettle", "600"))      ; let it finish drawing
+        Sleep SpeedMs("ITrak", "EntrySettle", 600, 150)      ; let it finish drawing
     }
     tWin := A_TickCount - t0
     try WinActivate "ahk_id " win
@@ -5494,7 +5498,7 @@ RunEntry(e, useOpen := false) {
     vals := Map("Location", e.loc, "Topic", e.topic, "Reference", e.ref, "Synopsis", syn)
     LastRun := {e: e, syn: syn}
     EntryRefs[win] := e.ref        ; Custom 3 of an incident made from this log (v3.33.0)
-    pause := Integer(CfgRead("ITrak", "Pause", "300"))
+    pause := SpeedMs("ITrak", "Pause", 300, 80)
     keys := 0       ; (was 2 for the new log click: clicks are counted apart from v3.35.5)
     for k in EntryFields {
         if vals[k] = ""
@@ -5510,7 +5514,7 @@ RunEntry(e, useOpen := false) {
             return
         }
         MouseMove x, y, 0
-        Sleep 60
+        SpeedWait(60, 20)
         Click
         clicks += 1
         Sleep pause
@@ -5526,11 +5530,11 @@ RunEntry(e, useOpen := false) {
             keys += StrLen(vals[k]) + 1
         } else {
             EntryType vals[k]
-            Sleep 250           ; let the list narrow down to the one option
+            SpeedWait(250, 120)     ; let the list narrow down to the one option
             SendInput "{Enter}"
             keys += 5
         }
-        Sleep 120
+        SpeedWait(120, 40)
     }
     ; End Time's Now button, for logs that end with | end (the log is complete)
     if e.end {
@@ -5538,12 +5542,12 @@ RunEntry(e, useOpen := false) {
             Tip("End Time's Now button isn't taught yet: press Ctrl+Alt+Shift+F to teach it.", 5000, true)
             Activity("Full-entry log " e.name ": End Time Now not clicked (not taught; run Ctrl+Alt+Shift+F again)")
         } else if ITrakSpot(win, Integer(f["EndNowX"]), Integer(f["EndNowY"]), w0, h0, &x, &y) && AlertOnScreen(x, y) && WinActive("ahk_id " win) {
-            Sleep 300
+            SpeedWait(300, 100)
             MouseMove x, y, 0
-            Sleep 60
+            SpeedWait(60, 20)
             Click
             clicks += 1
-            Sleep 120
+            SpeedWait(120, 40)
         } else
             Activity("Full-entry log " e.name ": End Time Now not clicked (spot outside the window or window lost the front)")
     }
@@ -5562,14 +5566,15 @@ RunEntry(e, useOpen := false) {
         BreakBegin(win)
     Tip(saved ? "Filled in and saved: " e.name : "Filled in: " e.name, 1500)
     Activity("Full-entry log " e.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved; "
-        . Round((A_TickCount - t0) / 1000, 1) " s, of which " Round(tWin / 1000, 1) " s for the new log window)")
+        . Round((A_TickCount - t0) / 1000, 1) " s, of which " Round(tWin / 1000, 1) " s for the new log window; speed " SpeedLevel() ")")
     CountSaved("log", keys, "Full log: " e.name, clicks)
     Journal("Full log: " e.name, "Location: " e.loc "`n" "Topic: " e.topic "`n" "Reference: " e.ref "`n" "Synopsis: " syn, keys)
 }
 
 ; Types text key by key (what Citrix handles best), a little slower than normal
 EntryType(text) {
-    SetKeyDelay 20, 10
+    TypeDelays(&d, &p)      ; 20/10 at Normal, 12/6 at Fast, 8/4 at Fastest (v3.38.1)
+    SetKeyDelay d, p
     SendEvent "{Text}" text
 }
 
@@ -7358,6 +7363,61 @@ CfgRead(sec, key, def) {
             return v
     }
     return def
+}
+
+; ---- Speed (v3.38.1) ----------------------------------------------------
+; One knob for the waits on the per-log path (new daily log, the fields,
+; the paste into Citrix, incident and audit fills): tray > iTrak > Speed.
+;   normal  = every wait as it was in v3.38.0
+;   fast    = the built-in waits at 60%, typing a third quicker (the default)
+;   fastest = the built-in waits at 40%, typing twice as quick
+; Each wait has a floor it never goes under, so Citrix still gets the moment
+; it needs for the clipboard and for a list to narrow down. A number you set
+; yourself in settings.ini (or the team file) is used exactly as written at
+; every level, so Customize > Speed and timing still wins. The Alert Grid
+; clear isn't touched: it already watches the list instead of waiting.
+SpeedLevel() {
+    v := StrLower(Trim(CfgRead("Speed", "Level", "fast")))
+    return (v = "normal" || v = "fast" || v = "fastest") ? v : "fast"
+}
+
+SpeedFactor() {
+    lv := SpeedLevel()
+    return lv = "normal" ? 1.0 : lv = "fastest" ? 0.4 : 0.6
+}
+
+; Sleeps a built-in wait scaled by the speed level, never under floor ms
+SpeedWait(ms, floor := 10) {
+    Sleep Max(floor, Round(ms * SpeedFactor()))
+}
+
+; A wait that has a settings key: your own number is used as it is; the
+; built-in default is scaled by the speed level (never under floor ms)
+SpeedMs(sec, key, def, floor := 10) {
+    v := Trim(CfgRead(sec, key, ""))
+    if IsInteger(v) && v >= 0
+        return Integer(v)
+    return Max(floor, Round(def * SpeedFactor()))
+}
+
+; Key delays for EntryType (typing into iTrak over Citrix, key by key).
+; [Speed] TypeDelay= and TypePress= (ms) override the level.
+TypeDelays(&delay, &press) {
+    lv := SpeedLevel()
+    delay := lv = "normal" ? 20 : lv = "fastest" ? 8 : 12
+    press := lv = "normal" ? 10 : lv = "fastest" ? 4 : 6
+    d := Trim(CfgRead("Speed", "TypeDelay", "")), p := Trim(CfgRead("Speed", "TypePress", ""))
+    if IsInteger(d) && d >= 0
+        delay := Integer(d)
+    if IsInteger(p) && p >= 0
+        press := Integer(p)
+}
+
+SetSpeedLevel(lv) {
+    TryIniWrite(lv, SettingsFile, "Speed", "Level")
+    NoteOwnWrites()
+    Activity("Speed set to " lv)
+    Tip("Speed: " lv (lv = "normal" ? " (the v3.38.0 waits)" : lv = "fast" ? " (waits at 60%)" : " (waits at 40%)"), 2500, true)
 }
 
 ; True for someone whose settings.ini Watchlog made on this run or earlier
@@ -10299,7 +10359,7 @@ IncidentRun(r, out, ref, dl, incWin) {
         brief .= (A_Index > 1 ? "|" : "") parts[A_Index + 4]
     vals := Map("Type", Trim(parts[1]), "Specific", Trim(parts[2]), "Category", Trim(parts[3]), "Risk", Trim(parts[4])
         , "Custom3", ref, "Brief", Trim(brief))
-    pause := Integer(CfgRead("ITrak", "Pause", "300"))
+    pause := SpeedMs("ITrak", "Pause", 300, 80)
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
     keys := 0, clicks := 0      ; clicks saved (v3.35.5): Create Incident and each box
@@ -10309,7 +10369,7 @@ IncidentRun(r, out, ref, dl, incWin) {
             Tip("Couldn't bring the daily log to the front. Nothing was clicked.", 4000, true)
             return
         }
-        Sleep 200
+        SpeedWait(200, 80)
         if !ITrakSpot(dl, Integer(sp["CreateX"]), Integer(sp["CreateY"]), Integer(sp["DW"]), Integer(sp["DH"]), &x, &y) || !AlertOnScreen(x, y) {
             Tip("The daily log is too small for the Create Incident spot (or off the screen). Stopped.", 4000, true)
             Activity("Incident " r.name ": Create Incident spot outside the daily log window")
@@ -10317,7 +10377,7 @@ IncidentRun(r, out, ref, dl, incWin) {
         }
         before := IncidentWins()
         MouseMove x, y, 0
-        Sleep 60
+        SpeedWait(60, 20)
         Click
         clicks += 1
         wait := Integer(CfgRead("ITrak", "IncidentWait", "10000"))
@@ -10327,7 +10387,7 @@ IncidentRun(r, out, ref, dl, incWin) {
                 if !before.Has(h)
                     incWin := h
             if !incWin
-                Sleep 100
+                Sleep 30
         }
         if !incWin {
             MouseMove ox, oy, 0
@@ -10335,7 +10395,7 @@ IncidentRun(r, out, ref, dl, incWin) {
             Activity("Incident " r.name ": no new Incident File window within " wait " ms")
             return
         }
-        Sleep Integer(CfgRead("ITrak", "IncidentSettle", "900"))
+        Sleep SpeedMs("ITrak", "IncidentSettle", 900, 250)
     }
     try WinActivate "ahk_id " incWin
     if !WinWaitActive("ahk_id " incWin, , 3) {
@@ -10357,7 +10417,7 @@ IncidentRun(r, out, ref, dl, incWin) {
             return
         }
         MouseMove x, y, 0
-        Sleep 60
+        SpeedWait(60, 20)
         Click
         clicks += 1
         Sleep pause
@@ -10371,17 +10431,17 @@ IncidentRun(r, out, ref, dl, incWin) {
             keys += StrLen(vals[k]) + 1
         } else {
             EntryType vals[k]
-            Sleep 250                   ; let the list narrow down to the one option
+            SpeedWait(250, 120)         ; let the list narrow down to the one option
             SendInput "{Enter}"
             keys += 5
             if k = "Type"
-                Sleep 400               ; Specific's list follows the Incident Type
+                SpeedWait(400, 150)     ; Specific's list follows the Incident Type
         }
-        Sleep 150
+        SpeedWait(150, 50)
     }
     MouseMove ox, oy, 0
     Tip("Incident filled in: type your supervisor in Secondary Operator, set the dates, check it and Save.", 5000, true)
-    Activity("Incident " r.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved)")
+    Activity("Incident " r.name ": filled in (" keys " keystrokes and " clicks " clicks counted as saved; speed " SpeedLevel() ")")
     CountSaved("log", keys, "Incident: " r.name, clicks)
     Journal("Incident: " r.name, "Incident Type: " vals["Type"] "`nSpecific: " vals["Specific"] "`nCategory: " vals["Category"]
         . "`nRisk: " vals["Risk"] "`nCustom 3: " vals["Custom3"] "`nExecutive Brief: " vals["Brief"], keys)
@@ -10567,7 +10627,7 @@ AuditTypeTime(ts) {
         EntryType shown
         return shown
     }
-    gap := Integer(CfgRead("ITrak", "AuditTimePause", "80"))
+    gap := SpeedMs("ITrak", "AuditTimePause", 80, 30)
     for i, code in StrSplit(RegExReplace(parts, "\s+", " "), " ") {
         SendInput "{Left 8}"            ; to the month, whichever part a click or auto-advance left us on
         Sleep gap
@@ -10611,7 +10671,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         Tip("Couldn't bring the Audit window to the front. Nothing was filled in.", 4000, true)
         return true
     }
-    Sleep 200
+    SpeedWait(200, 80)
     ; Start and End: the form's From and To (seconds 00), so the Duration is
     ; exactly 20:00 with the usual From now / To now+20 (v3.35.0). An older
     ; templates.txt line without {From} types End only, from now.
@@ -10628,7 +10688,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         Activity("Audit: Start not typed (spot not taught yet)")
     }
     shownTimes := Map()
-    pause := Integer(CfgRead("ITrak", "Pause", "300"))
+    pause := SpeedMs("ITrak", "Pause", 300, 80)
     CoordMode "Mouse", "Screen"
     MouseGetPos &ox, &oy
     w0 := Integer(sp["W"]), h0 := Integer(sp["H"])
@@ -10647,13 +10707,13 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
             return true
         }
         MouseMove x, y, 0
-        Sleep 60
+        SpeedWait(60, 20)
         Click
         clicks += 1
         Sleep pause
         if k = "Detail" {
             ; you're still on the Audit tab after picking the employee (v3.34.1)
-            Sleep Integer(CfgRead("ITrak", "AuditTabWait", "500"))
+            Sleep SpeedMs("ITrak", "AuditTabWait", 500, 150)
             continue
         }
         if k = "Remarks" {
@@ -10671,7 +10731,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
             SendInput "^a"
             Sleep 60
             EntryType typed
-            Sleep Integer(CfgRead("ITrak", "AuditAreaWait", "800"))
+            Sleep SpeedMs("ITrak", "AuditAreaWait", 800, 300)     ; floor 300: Pit #1 for Pit #2 came from Enter too soon (v3.38.1)
             SendInput "{Enter}"
             Activity("Audit: Area Audited typed as " typed)
             keys += 5
@@ -10686,7 +10746,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
             keys += StrLen(vals[k]) + 1
         }
         done.Push(k)
-        Sleep 150
+        SpeedWait(150, 50)
     }
     ; Requested By: the taught route of clicks (they can land in pop-up windows)
     route := sp["route"]
@@ -10697,8 +10757,8 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         ; (the list may still be loading, and a fast double-click can be
         ; seen as one click). Each click waits AuditRoutePause after the one
         ; before; a double-click waits AuditDoubleWait more first.
-        rp := Integer(CfgRead("ITrak", "AuditRoutePause", "500"))
-        dw := Integer(CfgRead("ITrak", "AuditDoubleWait", "200"))
+        rp := SpeedMs("ITrak", "AuditRoutePause", 500, 200)
+        dw := SpeedMs("ITrak", "AuditDoubleWait", 200, 80)
         gap := Integer(CfgRead("ITrak", "AuditDoubleGap", "120"))
         WinGetClientPos &cx, &cy, , , "ahk_id " win
         for p in route {
@@ -10709,7 +10769,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
                 break
             }
             MouseMove x, y, 0
-            Sleep 150
+            SpeedWait(150, 50)
             if p.n = 2 {
                 Sleep dw
                 MouseMove x + 1, y, 0           ; a small move so Citrix sees the mouse over the row
@@ -10739,7 +10799,7 @@ AuditFill(title, syn, area, console, endTime, startTime := "") {
         MouseMove ox, oy, 0
     }
     Tip("Audit filled in: check it, then Save.", 4000, true)
-    Activity("Audit filled in (" keys " keystrokes and " clicks " clicks counted as saved; Requested By route " route.Length " clicks)")
+    Activity("Audit filled in (" keys " keystrokes and " clicks " clicks counted as saved; Requested By route " route.Length " clicks; speed " SpeedLevel() ")")
     CountSaved("log", keys, title, clicks)
     Journal(title, "Console #: " console "`nArea Audited: " area (shownTimes.Has("Start") ? "`nAudit Start: " shownTimes["Start"] : "") "`nAudit End: " (shownTimes.Has("End") ? shownTimes["End"] : "") "`nAudit Remarks: " syn, keys)
     return true
@@ -10776,9 +10836,9 @@ AuditAskStart(win, startTs) {
         return false
     CoordMode "Mouse", "Screen"
     MouseMove x, y, 0
-    Sleep 60
+    SpeedWait(60, 20)
     Click
-    Sleep Integer(CfgRead("ITrak", "Pause", "300"))
+    Sleep SpeedMs("ITrak", "Pause", 300, 80)
     shown := AuditTypeTime(startTs)
     Activity("Audit: Start typed after teaching (" shown ")")
     return true
@@ -11545,6 +11605,14 @@ BuildTrayMenu() {
     if SaveAfterFillOn()
         itm.Check("Save after fill  (clicks Save when the log is complete)")
     MenuItem(itm, "Teach the Save button", (*) => TeachSaveSpot(), 0xE7C9)
+    spd := Menu()
+    for lv in ["normal", "fast", "fastest"] {
+        label := (lv = "normal" ? "Normal  (the v3.38.0 waits)" : lv = "fast" ? "Fast  (waits at 60%, standard)" : "Fastest  (waits at 40%)")
+        spd.Add(label, ((l) => (*) => SetSpeedLevel(l))(lv))
+        if SpeedLevel() = lv
+            spd.Check(label)
+    }
+    MenuItem(itm, "Speed  (how quick the iTrak fills run)", spd, 0xEC4A)
     MenuItem(itm, "Incident report  (" HK("incident") ")", (*) => ShowIncidentPick(), 0xE8F1)
     MenuItem(itm, "Teach the incident report spots", (*) => TeachIncident(), 0xE7C9)
     MenuItem(itm, "Teach the audit spots", (*) => TeachAudit(), 0xE7C9)
@@ -12180,7 +12248,7 @@ ShowTimingEditor() {
     g.BackColor := "FFFFFF"
     g.SetFont("s10", "Segoe UI")
     g.MarginX := 18, g.MarginY := 14
-    g.AddText("w640", "All in milliseconds (1000 = one second). The standard values are right for most PCs; change one only if something misses a step. Lower is faster.")
+    g.AddText("w640", "All in milliseconds (1000 = one second). The standard values are right for most PCs; change one only if something misses a step. Lower is faster.`nSpeed is " SpeedLevel() " (tray > iTrak > Speed): at Fast and Fastest the standard iTrak waits are cut to 60% / 40% on their own. A number you type here is used exactly as written, whatever the speed.")
     edits := []
     for r in rows {
         cur := ""

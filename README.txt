@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.38.0  -  README
+  WATCHLOG  v3.38.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -842,6 +842,8 @@ CUSTOMIZE WATCHLOG  (v3.21.0: tray menu > Customize Watchlog, or the Customize b
   - Speed and timing: the waits for Alert Grid (between clicks, for Select All) and iTrak
     (between clicks, for a new log, after the form opens). Standard values are shown;
     "Back to the standard values" clears them. settings.ini [AlertGrid] and [ITrak].
+    The overall level (Normal / Fast / Fastest) is tray > iTrak > Speed (v3.38.1): a
+    number typed here is used as written at every level.
   - Logins and reminders, Caps Lock, journal, updates: open Settings on the right tab.
   Settings, the template editor and the autocorrect editor all still work as before.
 
@@ -1188,6 +1190,15 @@ Save it and it reloads itself.
   EntrySettle=     ms to let a new daily log finish drawing (default 600)
   RefuseIfResized= yes = don't click if iTrak is a different size than when
                    taught (default no)
+  SaveWarn=        ms of "Saving the log..." warning before Save after fill
+                   clicks Save (default 2000; Esc during it stops the save)
+
+[Speed]  (v3.38.1; tray > iTrak > Speed sets Level)
+  Level=           normal = the v3.38.0 waits, fast = built-in waits at 60%
+                   (default), fastest = at 40%. A number you set in [ITrak]
+                   is used as written at every level.
+  TypeDelay=       ms between keys when typing into iTrak (level: 20/12/8)
+  TypePress=       ms a key is held when typing into iTrak (level: 10/6/4)
 
 [SDS]
   ResignMinutes=   minutes after an SDS login before it signs back in
@@ -1466,8 +1477,43 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.37, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.38, newest first)
 -----------------------------------------------------------------------
+SPEED: THE ITRAK FILLS RUN QUICKER  (v3.38.1)
+  Jakob (Nov 14): "make sure everything that's automated and run for me is
+  being executed as quick as possible." Every wait on the per-log path now
+  follows one knob, tray > iTrak > Speed:
+  - Normal  = every wait exactly as it was in v3.38.0.
+  - Fast    = the built-in waits at 60% and typing into iTrak a third
+              quicker (the standard from v3.38.1).
+  - Fastest = the built-in waits at 40% and typing twice as quick.
+  What it covers: the clicks that open a new daily log, the wait once the
+  form is open (EntrySettle), the wait after each click (Pause), the
+  "let the list narrow down" wait before Enter in Location and Topic,
+  the pause before a paste into Citrix, End Time Now, the Save after fill
+  warning (2 s at Normal, 1.2 s at Fast, 0.8 s at Fastest), the incident
+  fill (IncidentSettle, the Specific wait) and the audit fill (tab, Area
+  Audited, the Requested By route, the time parts). Watchlog also looks
+  for the new window every 30 ms instead of every 100 ms.
+  What it does NOT touch: the Alert Grid clear (it already watches the list
+  turn blue instead of waiting), logins, start and end of shift (once a
+  shift), and anything you time yourself.
+  Floors: each wait has a lowest value it never goes under, whatever the
+  level, so Citrix still gets the moment it needs: 150 ms before a paste
+  (or the old clipboard could paste), 120 ms before Enter in a list,
+  300 ms before Enter in Area Audited (the Pit #1 for Pit #2 mix-up came
+  from Enter arriving too soon).
+  Your own numbers still win: a value you set in Customize > Speed and
+  timing, in settings.ini or in team-settings.ini is used exactly as
+  written at every level. New keys: [Speed] Level=normal|fast|fastest,
+  TypeDelay= and TypePress= (ms per key when typing into iTrak; the level
+  sets 20/10, 12/6 or 8/4), [ITrak] SaveWarn= (ms of Save after fill
+  warning, standard 2000).
+  If a log ever picks the wrong Location or Topic, or a field is missed,
+  go back to Normal in the tray (no new version needed) and tell Jakob
+  which step it was; the "Seconds each" column in Shift count shows what
+  each level actually saves. The activity log says the level on every fill.
+
 SHORTHAND FOR EVERY CODE WORD, SAVE AFTER FILL, NUMPAD, SECONDS  (v3.38.0)
   Batch 1 of the overhaul plan (docs/Watchlog - Overhaul plan.md): fewer
   forms, fewer clicks, and numbers that show where the time goes.
