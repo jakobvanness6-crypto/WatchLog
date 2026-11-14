@@ -3,6 +3,14 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
+## OVERHAUL PLAN (Nov 14, 2026; planning only, NOT built). Full write-up: docs/Watchlog - Overhaul plan.md
+Jakob (Nov 14): "bring it to its maximum potential. I need it to save as much time as possible throughout a shift and make the workflow effortless."
+Where a shift still costs time: a form for 29 of 37 code words (only fill/open/auto/jack/bv/mfill/account/oc have shorthand lines), a Save click per log, soft count = 9 forms with Location/Topic/Reference by hand (the count code words have no >>), nothing measures which steps are slow.
+Part A, ranked: (1) shorthand for EVERY code word by one rule (first word = code word or alias, the rest fill the boxes in order; missing = form opens prefilled); (2) Save after fill, opt-in switch OFF by default, only when every box was filled, Esc stops it; (3) soft count as one guided run with >> on the four count code words; (4) numpad mode while the pad/picker is open (Numpad 1-9 = pins, Numpad Enter = Ctrl+Enter); (5) time each log code word -> pasted (no content) and show slow steps in Shift count; (6) tune waits from those numbers, one at a time; (7) reminders with a Log it button (patrols, audit end) if he does these by the clock; (8) incident Checklist/Custom Forms when shown.
+BATCH 1 = v3.38.0: items 1, 3, 4, 5 + item 2 as a switch starting off, together with the v3.37.1 safe cleanup (3 dead functions, Activity() on silent saves, timers stop when a module is off).
+Part B (foundation, small safe versions): all 57 settings keys through CfgRead (today 32; team-settings.ini is ignored for the rest), Jakob's defaults out of code, iTrak spots measured from inside the window + paste-with-tip when untaught (RISKY, prerequisite for bay sharing), split Watchlog.ahk into ~12 #Include parts with file+line in the error box, break up the ten giant functions one at a time, docs: CHANGELOG out of README and Pending changes split Waiting/Built/Dropped.
+Waiting on Jakob: "build it" for batch 1; his Shift count list from 2-3 shifts and the three slowest things in a shift (sharpens the order).
+
 ## TEAM ROLLOUT SETUP (v4.0 direction, planned Nov 5, 2026; waiting on "build it")
 Jakob (Nov 5): chasing a promotion, so start the shared team version. Chosen order: rollout setup first, then the approval pack for the manager.
 What already exists (no new work): one shared templates.txt on SharePoint that reloads on every bay; exe self-update from the team folder; Alert Grid and iTrak spots shared through the team folder; my-templates.txt per person; Make a copy to share; backups and rollback; password safeguards (Credential Manager, per PC).

@@ -114,3 +114,5 @@ A supervisor sets phone reminders for the hourly login; the Remind feature is fo
 - Badge picker assumes badges 17-01 to 17-09.
 - Optional: "Start automatically at login" tray option; Spotify app hotkey; searchable template picker for new users.
 - Estimated savings: ~1,800 keystrokes / ~11 min per shift (30 logs, 10 logins), ~2¾ h per month at 15 shifts.
+
+OVERHAUL (Nov 14, 2026, planning only): Jakob wants maximum time saved per shift and an effortless workflow. docs/Watchlog - Overhaul plan.md: Part A ranked time-savers (shorthand for every code word by one positional rule + aliases, Save after fill as an opt-in switch, soft count as one guided run with >>, numpad mode on the pad, per-log timing to find slow steps, waits tuned from that, reminders with Log it, incident tabs); batch 1 = v3.38.0 (items 1,3,4,5 + Save switch off) with the v3.37.1 safe cleanup. Part B foundation: 3 dead functions (FindTemplates, AuditEndText, NoteOwnWrite), all settings through CfgRead (32 of 57 keys today), window-relative iTrak spots (risky), #Include split, giant-function breakup, docs split. Nothing built; waiting on "build it".
