@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.37.1  -  README
+  WATCHLOG  v3.38.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1468,6 +1468,46 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.37, newest first)
 -----------------------------------------------------------------------
+SHORTHAND FOR EVERY CODE WORD, SAVE AFTER FILL, NUMPAD, SECONDS  (v3.38.0)
+  Batch 1 of the overhaul plan (docs/Watchlog - Overhaul plan.md): fewer
+  forms, fewer clicks, and numbers that show where the time goes.
+  - Shorthand for EVERY code word on the call pad. Start the first line
+    with any code word (no ;) and the words after it fill that log's
+    boxes in order:  cards 205   medical guest buffet   interior sup
+    refuse 2   aml 123 b1410   badge 3 jsmith   destroy
+    Rules: a number picks the list item ending in it (205 = BJ205); the
+    start of an item, or of a word in it, is enough (sup = Supervisor);
+    2 = the second item; the last plain box takes all the words left
+    ("... main entrance"). Boxes that already have something (a time
+    that is now, the next soft count step, a copied number) are skipped.
+    Every box filled = the log goes in with no form. A word that doesn't
+    fit (a pick-only list, a money or time box) opens the form with what
+    fitted so far. The code word alone still opens the form, filled from
+    the pad as before. fill/open/auto/jack/bv/mfill/account/oc keep their
+    own smarter shorthand.
+  - @alias in templates.txt: your own short names, like
+    @alias = count=countstep | ct=counttables | cc=cards | med=medical
+    so "count" runs the next soft count step (time now, step picked, no
+    form) and "ct 5.5 10" makes the tables totals log. Change the list,
+    no new version needed.
+  - Save after fill (OFF until you switch it on: tray > iTrak > Save after
+    fill; team-settings.ini [ITrak] SaveAfterFill=yes for PCs that haven't
+    chosen). Teach the Save button once (tray > iTrak > Teach the Save
+    button). Then a daily log whose Location, Topic, Reference and
+    Synopsis were all filled in shows "Saving in 2 seconds... Esc stops
+    it" and clicks Save. A log that leaves a box for you (fill, jack, bv,
+    mfill: Reference) is never saved for you. Counted as a click saved.
+  - Numpad: in the finder (Ctrl+Alt+Space) with the box empty, the first
+    nine rows show a number and Numpad 1-9 runs that row (your pins first,
+    then recent). settings.ini [CallPad] NumpadEnterMakesLog=yes makes
+    Numpad Enter alone on the pad the same as Ctrl+Enter (off by default,
+    so a Numpad Enter while jotting still starts a new line).
+  - Seconds each: Shift count has a "Seconds each" column (average /
+    slowest) per item, from the code word, pad or finder to the log pasted
+    or filled in iTrak. The activity log line of a full-entry log says
+    how long it took and how much of that was waiting for the new log
+    window. Numbers only. Those numbers decide which waits get tuned next.
+
 FOUNDATION CLEANUP, EVERY SETTING CAN COME FROM THE TEAM  (v3.37.1)
   - Nothing you use changes. This version tidies the program for the
     team version and the time-saving work that follows (see docs/Watchlog
@@ -1893,7 +1933,7 @@ to switch it off. A saved change is used within a second (v3.14.1).
 programs: tray > Autocorrect in every program. From v3.36.1 words that expand
 count in Time saved: see TIME SAVED in section 10.)
 
-SHORTHAND LINES ON THE CALL PAD  (v3.26.0)
+SHORTHAND LINES ON THE CALL PAD  (v3.26.0; every code word from v3.38.0, see section 19)
   Start the first line on the pad with a code word (no ; needed), press Ctrl+Enter, and
   the log is made. If the line has everything it goes in with no form; if something is
   missing the form opens with what it found already filled in.
