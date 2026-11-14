@@ -1,5 +1,7 @@
 # Watchlog (formerly Log Templates): Next Steps and Ideas
 
+> **Historical (marked Nov 14, 2026).** Written against v2.1. Most of this was built between v2.2 and v3.37 (logins safe, Credential Manager, Bally `*` paths, soft count `next`, auto-reload, hourly reminder, shift journal, team templates, picker). The ideas still open (B guided procedures, E reminders with a Log it button) are carried in docs/Watchlog - Overhaul plan.md, Part A. Kept as it was for the record.
+
 Written 2026-10-14 against v2.1 (`Log Templates.ahk`, `templates.txt`, `settings.example.ini`, `LaunchWork.bat`).
 Line numbers refer to v2.1 of `Log Templates.ahk`. **Items 1–4 were built in v2.2 (Oct 14).**
 

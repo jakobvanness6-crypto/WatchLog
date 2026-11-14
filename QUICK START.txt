@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.37.0  -  QUICK START  (one page)
+  WATCHLOG  v3.38.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -54,6 +54,8 @@ USE IT
   Ctrl+Alt+H               Cheat sheet: every code, login and hotkey.
   Tab / Enter / Esc        In a form: next box / insert / cancel.
   Numpad +                 Call pad: jot a call, Ctrl+Enter makes the log
+                           (code word first, then the boxes in order:
+                           cards 205 / medical guest buffet / count)
                            (shorthand like  fill 205 5.5  makes it directly).
   Ctrl+Alt+F               Full-entry daily log (Break, Table Drop ...):
                            opens a new iTrak daily log and fills it in.

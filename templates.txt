@@ -15,7 +15,7 @@
 #    here too: any PC on an older one gets told to update.
 #
 # Wording version: Nov 9, 2026
-# Program version: 3.37.0
+# Program version: 3.38.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -95,6 +95,9 @@
 # Area Audited choices in iTrak's Audit window (;audit, v3.34.0)
 @areas = ATM | Bar | Buffet | Cage | Count Room | First aid room | Food & Beverage | Gaming Floor | Guest Services | Housekeeping | I.T. | Main Bank | Maintenance | NRT | Operations Management | Pit 2 | Pit 3 | Racebook | Security | Security Podium | Slot Section D | Windward | Slots
 @tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206 | RY301 | MP302 | BJ303 | BJ304 | BJ305 | RO306
+# Your own short names for code words on the call pad (v3.38.0): short=codeword.
+# "count" on the pad runs ;countstep, "ct 5.5 10" fills ;counttables' two boxes.
+@alias = count=countstep | ct=counttables | cs=countslots | cp=countpull | cc=cards | med=medical
 
 
 # ----- FORMS ---------------------------------------------------------
