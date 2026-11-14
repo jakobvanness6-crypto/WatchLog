@@ -13893,7 +13893,7 @@ MakeMineFile() {
 # =====================================================================
 
     )"
-    TryAppend(text, MyTemplatesFile)
+    try FileAppend text, MyTemplatesFile, "UTF-8"
     catch as e {
         MsgBox "Couldn't make my-templates.txt:`n" e.Message, "Watchlog", "Icon!"
         return false
