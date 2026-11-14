@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.38.1  -  README
+  WATCHLOG  v3.38.2  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1479,6 +1479,17 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.38, newest first)
 -----------------------------------------------------------------------
+MACHINE FILLS: SEVERAL MACHINES ON ONE PAD LINE  (v3.38.2)
+  Jakob (Nov 14) typed several machines on one call pad line and the log
+  came out as one garbled line. Now a line holding several machines is cut
+  up, one piece per machine, so each machine is its own line in the log:
+      mfill n1 100000 n2 50000 bvs a1 20000
+    makes NRT1 $100,000 / NRT2 $50,000 (BVs) / ATM1 $20,000, one per line.
+  Commas, "and", "&" or "+" between machines are fine (n1 100k, n2 50k and
+  a1 20000). One machine per line, as before, still works, and so does a
+  mix of both. A new machine starts at n1-n4, nrt1-4, a1-a5 or atm1-5
+  followed by an amount; anything else after an amount is its note.
+
 SPEED: THE ITRAK FILLS RUN QUICKER  (v3.38.1)
   Jakob (Nov 14): "make sure everything that's automated and run for me is
   being executed as quick as possible." Every wait on the per-log path now
@@ -1933,7 +1944,8 @@ the time of your first key, and keeps the text if you press Esc.
                     that kind. Two different machines leaves the box empty.
                     Lists you pick from are only set to an item that exists.
 
-SHORTHAND ON THE PAD  (v3.13.0), one per line:
+SHORTHAND ON THE PAD  (v3.13.0), one per line (v3.38.2: several machine
+fills on one line also work, each becomes its own line in the log):
   n3 190800 bvs         machine fill: NRT3 $190,800 (BVs)   (n1-n4 or nrt1-4)
   a1 100000             ATM1 $100,000                        (a1-a5 or atm1-5)
   n1 5000 bvs/divert    NRT1 $5,000 (BVs/Divert)   (any text with "div" in it)
@@ -1991,7 +2003,7 @@ SHORTHAND LINES ON THE CALL PAD  (v3.26.0; every code word from v3.38.0, see sec
                               time, optional; cash is the default wording; v3.33.1: an amount
                               under 10,000 means thousands, so jack c2102 12.5 w3 = $12,500)
       bv c2102 4471 full      emergency BV pull (full or def, for defective)
-      mfill n3 190800 bvs     machine fill (v3.26.3), one fill per line for several; the older
+      mfill n3 190800 bvs     machine fill (v3.26.3), one fill per line or several on one line; the older
                               n3 190800 bvs and c2102 11421.11 win 3 cash, with no code word,
                               now also make the log when you press Ctrl+Enter
       account 123456          account under review: fills the iTrak daily log (Guest

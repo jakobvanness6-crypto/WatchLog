@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.38.1"
+VERSION := "3.38.2"
 VERSION_DATE := "Nov 14, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -3142,10 +3142,16 @@ PadParse(text) {
         line := Trim(line)
         if line = ""
             continue
-        if RegExMatch(line, "i)^(n|nrt|a|atm)\s*(\d)\s+\$?(\d[\d,]*(?:\.\d+)?)(k?)(?![\w.])\s*(.*)$", &m) {
-            nrt := SubStr(StrLower(m[1]), 1, 1) = "n"
-            if m[2] >= 1 && m[2] <= (nrt ? 4 : 5)
-                fills.Push({machine: (nrt ? "NRT" : "ATM") m[2], amount: PadMoney(m[3], m[4]), note: PadNote(m[5])})
+        if RegExMatch(line, "i)^(n|nrt|a|atm)\s*(\d)\s+\$?\d") {
+            ; v3.38.2: several machines on one line (n1 100000 n2 50000 bvs a1 20000)
+            ; are split up, so each machine is its own fill line in the log
+            for part in PadSplitFills(line) {
+                if !RegExMatch(part, "i)^(n|nrt|a|atm)\s*(\d)\s+\$?(\d[\d,]*(?:\.\d+)?)(k?)(?![\w.])\s*(.*)$", &m)
+                    continue
+                nrt := SubStr(StrLower(m[1]), 1, 1) = "n"
+                if m[2] >= 1 && m[2] <= (nrt ? 4 : 5)
+                    fills.Push({machine: (nrt ? "NRT" : "ATM") m[2], amount: PadMoney(m[3], m[4]), note: PadNote(m[5])})
+            }
         } else if RegExMatch(line, "i)^([A-Za-z]\d{3,5})\s+\$?(\d[\d,]*(?:\.\d+)?)(k?)\s+w(?:in(?:dow)?)?\.?\s*#?(\d+)\b", &m) {
             jacks.Push({machine: StrUpper(m[1]), amount: Under10k(PadMoney(m[2], m[3])), window: m[4]})
         }
@@ -3306,6 +3312,30 @@ PadShortcut(text) {
         }
     }
     return {trig: trig, hints: hints}
+}
+
+; v3.38.2: one pad line holding several machine fills, cut into one piece
+; per machine: "n1 100000 bvs, n2 50000 and a1 20000" -> "n1 100000 bvs",
+; "n2 50000", "a1 20000". A new piece starts wherever a machine (n1-n4,
+; nrt1, a1-a5, atm1) is followed by an amount. Commas, "and", "&", "+" and
+; ";" between machines are dropped. One machine on the line = one piece.
+PadSplitFills(line) {
+    starts := [], pos := 1
+    while p := RegExMatch(line, "i)(?<![\w/$.])(?:nrt|atm|n|a)\s*\d\s+\$?\d", &m, pos) {
+        starts.Push(p)
+        pos := p + m.Len
+    }
+    parts := []
+    if !starts.Length || starts[1] != 1
+        starts.InsertAt(1, 1)
+    for i, st in starts {
+        piece := i < starts.Length ? SubStr(line, st, starts[i + 1] - st) : SubStr(line, st)
+        piece := RegExReplace(Trim(piece), "i)(?:\s*(?:,|;|&|\+|\band\b))+$", "")
+        piece := Trim(piece, " `t,;")
+        if piece != ""
+            parts.Push(piece)
+    }
+    return parts
 }
 
 ; "5.5" -> 5500, "5k" -> 5000, "11421.11" -> 11421.11. small = a plain number
