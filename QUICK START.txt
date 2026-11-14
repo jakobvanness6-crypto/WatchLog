@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.35.5  -  QUICK START  (one page)
+  WATCHLOG  v3.36.1  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -44,7 +44,9 @@ USE IT
   ;jack, ;audit, ;bv ...   Type a code anywhere. No Space or Enter
                            needed: it fires as soon as you finish it.
   Ctrl+Alt+Space           Can't remember a code? Type any word (like
-                           jackpot or medical) and press Enter.
+                           jackpot or medical) or first letters (cd)
+                           and press Enter. Pinned (Ctrl+P) and recent
+                           ones show first.
   Ctrl+Alt+H               Cheat sheet: every code, login and hotkey.
   Tab / Enter / Esc        In a form: next box / insert / cancel.
   Numpad +                 Call pad: jot a call, Ctrl+Enter makes the log

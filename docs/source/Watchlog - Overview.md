@@ -30,7 +30,7 @@ Security has its own section further down. In short: passwords are kept in Windo
 
 ## What it does
 
-It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.35.5 now.
+It's a small Windows program. It's written in AutoHotkey, a free automation tool that has been around for years, and comes as a single Watchlog.exe with everything built in, so nothing else needs installing. It sits by the clock as a small teal icon and starts with Windows. I've been building and testing it myself since October 13. Version 3.0 was the first one set up for the team, and it's on 3.36.1 now.
 
 <!-- fig: image4.png 1.7 | The Watchlog icon sits by the clock. Right-clicking it opens this menu. -->
 
@@ -48,7 +48,7 @@ There are 36 templates so far. Every code starts with a semicolon so it never go
 | Soft count | `;countstep` step by step · `;counttables` · `;countslots` · `;countpull` |
 | Other | `;destroy` card destruction · `;badge` contractor pass or interview pass |
 
-If you can't remember a code, Ctrl+Alt+Space opens a search. Type a word like trespass or ambulance, look at the wording, and press Enter. Ctrl+Alt+H brings up a cheat sheet with every code on it.
+If you can't remember a code, Ctrl+Alt+Space opens a search. Type a word like trespass or ambulance, or the first letters of a name, look at the wording, and press Enter. The ones I pin and the last ten I used show at the top before I type anything, and the full daily logs are in the same list. Ctrl+Alt+H brings up a cheat sheet with every code on it.
 
 <!-- fig: image5.png 3.5, image6.png 2.4 | Ctrl+Alt+Space finds a template by any word, and Ctrl+Alt+H shows every code. I covered my login names on the cheat sheet. -->
 
@@ -176,7 +176,7 @@ It could look better than it really is for anyone who already copies and pastes 
 
 ### Tracking it for real
 
-The tool keeps its own count, so these estimates can be replaced with real numbers. For each entry it works out how much went in compared with how much I typed. An empty box counts as nothing saved, so the numbers aren't inflated. Logins and time stamps are counted too. Since version 3.35.5 it also counts the clicks and menu picks it does for me, like the five to seven clicks in each Alert Grid clear or the clicks into each box of a daily log. Each click counts as half a second, which is about half the usual research figure for pointing and clicking, so it stays on the low side. Days from before then got a cautious estimate from the counts it already kept. The typing time comes from 40 words a minute. Tray menu > Time saved shows logs, logins, keystrokes, clicks and time saved for this shift, today, the last 7 days, the last 30 days and the total, and Copy report puts it on the clipboard. It only stores numbers, never the text of a log.
+The tool keeps its own count, so these estimates can be replaced with real numbers. For each entry it works out how much went in compared with how much I typed. An empty box counts as nothing saved, so the numbers aren't inflated. Logins and time stamps are counted too. Since version 3.35.5 it also counts the clicks and menu picks it does for me, like the five to seven clicks in each Alert Grid clear or the clicks into each box of a daily log. Each click counts as half a second, which is about half the usual research figure for pointing and clicking, so it stays on the low side. Days from before then got a cautious estimate from the counts it already kept. Since version 3.36.1 my own short autocorrect words count too, but only ones that expand into a longer word, and only the letters they add. Plain spelling fixes count for nothing. The typing time comes from 40 words a minute. Tray menu > Time saved shows logs, logins, keystrokes, clicks and time saved for this shift, today, the last 7 days, the last 30 days and the total, and Copy report puts it on the clipboard. It only stores numbers, never the text of a log.
 
 <!-- fig: image16.png 4.2 | The time saved so far this shift, shown at the top of the shift journal. Tray menu > Time saved has the full breakdown. -->
 
@@ -247,7 +247,7 @@ What IT would need to approve:
 
 ## Next steps
 
-Version 3.35.5 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
+Version 3.36.1 is built and I've been using it on my own shifts. If it's approved, this is how I'd see it going:
 
 1. Management and IT sign off.
 2. The supervisors go through and approve the wording of each template.

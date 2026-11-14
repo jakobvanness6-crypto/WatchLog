@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.35.5"
-VERSION_DATE := "Nov 8, 2026"
+VERSION := "3.36.1"
+VERSION_DATE := "Nov 12, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -66,6 +66,7 @@ RegKey := "HKCU\Software\Watchlog"
 ActivityFile := DataDir "\activity.log"
 TeamCopyFile := DataDir "\team templates (last good copy).txt"
 LastUsedFile := DataDir "\last used.ini"   ; boxes that remember (bay), this PC only
+PickerFile := DataDir "\picker.ini"         ; the finder's recent list and how often (names only), this PC only
 SavedFile := DataDir "\time saved.ini"      ; the time saved tracker (numbers only)
 AlertFile := DataDir "\alertgrid.ini"      ; where the Alert Grid clicks go (numbers only), this PC only
 ITrakFile := DataDir "\itrak.ini"           ; where the iTrak new-daily-log click goes (numbers only), this PC only
@@ -82,10 +83,13 @@ ClockOn := IniRead(LastUsedFile, "Clock", "Show", "1") != "0"     ; taskbar cloc
 ClockGui := "", ClockTime := "", ClockDate := "", ClockLast := "", ClockGeo := "", ClockDark := -1, ClockHidden := false
 PreviewHideOn := IniRead(LastUsedFile, "Taskbar", "HidePreviews", "1") != "0"   ; hide taskbar previews, this PC (v3.32.0)
 PreviewHook := 0, PreviewCB := 0, PreviewSeen := Map()
+PinsFile := HomeDir "\picker pins.txt"     ; pinned templates in the finder (v3.36.0), beside templates.txt
 IncidentFile := HomeDir "\incidents.txt"   ; incident reports (v3.33.0), kept beside templates.txt
 EntryRefs := Map()       ; daily log window -> the Reference Watchlog typed in it (Custom 3 of an incident)
 AutoEverywhereOn := IniRead(LastUsedFile, "Autocorrect", "Everywhere", "1") != "0"   ; autocorrect in every program, this PC (v3.33.0)
 AutoHot := Map(), AutoHotStamp := "-"
+AutoHot.CaseSense := false   ; hotstrings fire whatever case you type, so the count looks words up the same way
+AutoCountIH := "", AutoCountBuf := "", AutoCountWin := 0   ; autocorrect words counted in Time saved (v3.36.1)
 CapsGui := ""
 CopyMemory := Map()   ; facial rec copies, in memory only (see NoteCopy)
 Cfg := Map()
@@ -1607,6 +1611,13 @@ RunTemplate(text, title, repeat := false, trig := "", fill := false) {
     ; template in the window you were typing in
     if PickerActive()
         ClosePicker(true)
+    ; the finder's recent list (v3.36.0): the shortcut only
+    if trig != ""
+        for i, t in TemplateList
+            if t.trig = trig {
+                NotePick({kind: "t", i: i})
+                break
+            }
     fields := ParseFields(text)
     if fields.Length = 0 {
         out := FixArticles(text)
@@ -3519,6 +3530,10 @@ AutoFixEdit(ctrl, *) {
         SendMessage 0xB1, after, after, hw
     }
     busy := false
+    ; Time saved (v3.36.1): only a word that expands counts, and only the
+    ; letters it adds. The form and the call pad count the box as typed, so
+    ; this is the part they leave out: nothing is counted twice.
+    AutoCount(word, rep)
 }
 
 EditAutocorrect() {
@@ -5081,6 +5096,9 @@ RunEntry(e, useOpen := false) {
         MsgBox "The daily log fields haven't been taught on this PC yet.`n`nOpen a new daily log in iTrak, then press Ctrl+Alt+Shift+F and follow the steps.", "Full-entry daily log", "Icon!"
         return
     }
+    ; the finder's recent list (v3.36.0): a full-entry log by name (not a code word's own log)
+    if !e.HasOwnProp("src") || e.src != "code"
+        NotePick({kind: "e", e: e})
     syn := e.syn
     ; {Bay?}: always asks which bay (start of shift), offering the last one,
     ; and keeps the answer for the rest of the shift (v3.20.3)
@@ -5620,7 +5638,7 @@ RepeatLastLog() {
 ; taught on this PC (no passwords: those live in Windows' Credential Manager)
 BackupSources() {
     list := []
-    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt"]
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt", "picker pins.txt"]
         if FileExist(HomeDir "\" n)
             list.Push([HomeDir "\" n, "home - " n])
     if DirExist(DataDir)
@@ -5894,7 +5912,9 @@ UpdateFrom(f, v) {
 ;  Grid clears, iTrak new log, the daily log / incident / audit boxes,
 ;  Requested By route, app switches), at [TimeSaved] SecondsPerClick=
 ;  (default 0.5) each. Only the clicks you'd make by hand: not retries,
-;  not waiting for windows, not the mouse going back. Kept per day in time saved.ini in
+;  not waiting for windows, not the mouse going back. From v3.36.1 the
+;  autocorrect words that expand count too (only the letters they add; see
+;  AutoCount). Kept per day in time saved.ini in
 ;  %LOCALAPPDATA%\Watchlog: numbers only, never log text or passwords.
 ;  A shift starts with the first count after End of shift or after 6
 ;  hours with nothing counted.
@@ -5943,16 +5963,18 @@ ItemRow(str) {
     return {n: num(1), keys: num(2), clicks: num(3)}
 }
 
-; "logs,logins,stamps,keystrokes,clicks" -> an object (older lines have no
-; clicks: 0. Clicks are counted from v3.35.5 on, never guessed for before)
+; "logs,logins,stamps,keystrokes,clicks,autocorrect words" -> an object
+; (older lines have no clicks or words: 0. Clicks are counted from v3.35.5
+; on, autocorrect words from v3.36.1 on; neither is guessed for before.
+; The words' keystrokes are already inside keystrokes)
 SavedRow(str) {
     p := StrSplit(str, ",")
     num(i) => p.Length >= i && IsInteger(p[i]) ? Integer(p[i]) : 0
-    return {log: num(1), login: num(2), stamp: num(3), keys: num(4), clicks: num(5)}
+    return {log: num(1), login: num(2), stamp: num(3), keys: num(4), clicks: num(5), auto: num(6)}
 }
 
-; an object -> "logs,logins,stamps,keystrokes,clicks"
-RowStr(d) => d.log "," d.login "," d.stamp "," d.keys "," d.clicks
+; an object -> "logs,logins,stamps,keystrokes,clicks,autocorrect words"
+RowStr(d) => d.log "," d.login "," d.stamp "," d.keys "," d.clicks "," d.auto
 
 ; This shift's counts (all zero when the last shift has ended)
 SavedShift() {
@@ -5976,7 +5998,7 @@ SavedSince(from) {
         if from != "" && StrCompare(SubStr(line, 1, eq - 1), from) < 0
             continue
         d := SavedRow(SubStr(line, eq + 1))
-        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.clicks += d.clicks, t.days += 1
+        t.log += d.log, t.login += d.login, t.stamp += d.stamp, t.keys += d.keys, t.clicks += d.clicks, t.auto += d.auto, t.days += 1
     }
     return t
 }
@@ -6110,18 +6132,19 @@ ShowTimeSaved() {
     cs := ClickSecsText()
     g.AddText("w640", "Keystrokes Watchlog saved you (what went in, minus what you typed) and the clicks and menu picks it did for you. "
         . "Time is keystrokes at 40 words a minute, plus " cs " for each click. Waiting for windows isn't counted. "
-        . "Clicks are counted from v3.35.5 on.")
-    lv := g.AddListView("w640 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Keystrokes", "Clicks", "Time saved"])
-    report := "Watchlog time saved on " A_ComputerName " (keystrokes at 40 words a minute, plus " cs " a click; clicks counted from v3.35.5 on)`r`n"
+        . "Clicks are counted from v3.35.5 on. Autocorrect = words that expand (from v3.36.1 on); only the letters they add are in Keystrokes.")
+    lv := g.AddListView("w720 r5 -Multi NoSortHdr", ["", "Logs", "Logins", "Stamps", "Autocorrect", "Keystrokes", "Clicks", "Time saved"])
+    report := "Watchlog time saved on " A_ComputerName " (keystrokes at 40 words a minute, plus " cs " a click; clicks counted from v3.35.5 on, autocorrect words from v3.36.1 on)`r`n"
     for r in rows {
         t := r[2]
-        lv.Add(, r[1], t.log, t.login, t.stamp, Commas(t.keys), Commas(t.clicks), SavedTime(t.keys, t.clicks))
-        report .= r[1] ": " t.log " logs, " t.login " logins, " Commas(t.keys) " keystrokes (" SavedTime(t.keys) "), "
+        lv.Add(, r[1], t.log, t.login, t.stamp, t.auto, Commas(t.keys), Commas(t.clicks), SavedTime(t.keys, t.clicks))
+        report .= r[1] ": " t.log " logs, " t.login " logins, " t.auto " autocorrect words, " Commas(t.keys) " keystrokes (" SavedTime(t.keys) "), "
             . Commas(t.clicks) " clicks (" SavedTime(0, t.clicks) "), " SavedTime(t.keys, t.clicks) " in all"
             . (A_Index = rows.Length ? " (" t.days " days used)" : "") "`r`n"
     }
-    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 90), lv.ModifyCol(6, 70), lv.ModifyCol(7, 120)
-    g.AddButton("xm+222 y+12 w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 50), lv.ModifyCol(3, 55), lv.ModifyCol(4, 60), lv.ModifyCol(5, 80), lv.ModifyCol(6, 90), lv.ModifyCol(7, 70), lv.ModifyCol(8, 120)
+    g.AddButton("xm+184 y+12 w130", "Autocorrect words").OnEvent("Click", (*) => (g.Destroy(), ShowAutoSaved()))
+    g.AddButton("x+8 yp w110", "Shift count").OnEvent("Click", (*) => (g.Destroy(), ShowShiftCount()))
     g.AddButton("x+8 yp w110", "Dashboard").OnEvent("Click", (*) => (g.Destroy(), ShowDashboard()))
     g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
     g.AddButton("x+8 yp w100 Default", "Close").OnEvent("Click", (*) => g.Destroy())
@@ -6135,6 +6158,76 @@ ShowTimeSaved() {
     }
 }
 
+
+; Which autocorrect words pay off (v3.36.1): each word you typed that
+; expanded, how many times and the keystrokes it saved, for the last 30
+; days and since v3.36.1. From the per-day counts in time saved.ini.
+ShowAutoSaved() {
+    from30 := FormatTime(DateAdd(A_Now, -29, "Days"), "yyyy-MM-dd")
+    words := Map()
+    try {
+        section := IniRead(SavedFile, "DayItems")
+        for line in StrSplit(section, "`n", "`r") {
+            bar := InStr(line, "|"), eq := InStr(line, "=")
+            if !bar || !eq || bar > eq
+                continue
+            name := SubStr(line, bar + 1, eq - bar - 1)
+            if SubStr(name, 1, 13) != "Autocorrect: "
+                continue
+            w := SubStr(name, 14), it := ItemRow(SubStr(line, eq + 1))
+            if !words.Has(w)
+                words[w] := {name: w, n: 0, keys: 0, n30: 0, keys30: 0}
+            a := words[w]
+            a.n += it.n, a.keys += it.keys
+            if StrCompare(SubStr(line, 1, bar - 1), from30) >= 0
+                a.n30 += it.n, a.keys30 += it.keys
+        }
+    }
+    list := []
+    for w, a in words
+        list.Push(a)
+    ; most keystrokes saved first
+    Loop list.Length - 1 {
+        i := A_Index + 1
+        cur := list[i], j := i - 1
+        while j >= 1 && list[j].keys < cur.keys {
+            list[j + 1] := list[j]
+            j -= 1
+        }
+        list[j + 1] := cur
+    }
+    g := WGui("+AlwaysOnTop", "Autocorrect words  -  v" VERSION)
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w560", "Your autocorrect words that expand, and what they saved. Only the letters a word adds count "
+        . "(shrd = Shred-it saves 4). Plain spelling fixes aren't counted. Counted from v3.36.1 on, in every program, the call pad and the forms.")
+    lv := g.AddListView("w560 r12 -Multi NoSortHdr", ["Word you type", "Last 30 days", "Keystrokes", "All", "Keystrokes", "Time saved (all)"])
+    report := "Watchlog autocorrect words on " A_ComputerName " (words that expand; keystrokes at 40 words a minute)`r`n"
+    total := 0, keys := 0
+    for a in list {
+        lv.Add(, a.name, a.n30, Commas(a.keys30), a.n, Commas(a.keys), SavedTime(a.keys))
+        report .= a.name ": " a.n " times, " Commas(a.keys) " keystrokes (" SavedTime(a.keys) "); last 30 days " a.n30 " times`r`n"
+        total += a.n, keys += a.keys
+    }
+    if !list.Length
+        lv.Add(, "(nothing counted yet)")
+    lv.ModifyCol(1, 130), lv.ModifyCol(2, 85), lv.ModifyCol(3, 80), lv.ModifyCol(4, 55), lv.ModifyCol(5, 80), lv.ModifyCol(6, 110)
+    sum := total " words, " Commas(keys) " keystrokes, " SavedTime(keys)
+    report .= "TOTAL: " sum "`r`n"
+    g.AddText("xm w560", "Total: " sum)
+    g.AddButton("xm+142 y+12 w120", "Edit the words").OnEvent("Click", (*) => (g.Destroy(), ShowAutoEditor()))
+    g.AddButton("x+8 yp w100", "Copy report").OnEvent("Click", CopyIt)
+    g.AddButton("x+8 yp w90", "Time saved").OnEvent("Click", (*) => (g.Destroy(), ShowTimeSaved()))
+    g.AddButton("x+8 yp w80 Default", "Close").OnEvent("Click", (*) => g.Destroy())
+    g.OnEvent("Escape", (*) => g.Destroy())
+    g.Show()
+
+    CopyIt(*) {
+        A_Clipboard := report
+        g.Destroy()
+        Tip("Report copied. Paste it with Ctrl+V.")
+    }
+}
 
 
 ; =====================================================================
@@ -6155,7 +6248,7 @@ ShowTimeSaved() {
 ItemKind(name) {
     if name = "Alert Grid clear"
         return "alert"
-    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new )")
+    if RegExMatch(name, "^(Login |Stamp |Switch to |iTrak new |Autocorrect: )")
         return "other"
     return "log"
 }
@@ -7156,15 +7249,29 @@ EditFile(path) {
 
 ; =====================================================================
 ;  TEMPLATE FINDER  -  Ctrl+Alt+Space   (also tray menu > Find a template)
-;  Type part of a name, a trigger, or any word from the wording, and the
-;  matching templates show up with a preview. Enter runs the one picked
-;  in the window you were typing in. Up/Down choose, Esc closes.
+;  Type part of a name, a trigger, the first letters of a name ("cd" =
+;  Card Destruction) or any word from the wording, and the matching
+;  templates and full-entry daily logs show up with a preview. Enter runs
+;  the one picked in the window you were typing in. Up/Down choose, Esc
+;  closes.
+;  v3.36.0 (quick picker): with the box empty, your pinned ones come first
+;  (Ctrl+P pins or unpins the picked row, a star marks them), then the
+;  last 10 you ran from anywhere (code word, finder, call pad, Ctrl+Alt+F),
+;  then the full-entry daily logs, then the code word templates. The ones you use most get a small boost when you
+;  type. Full-entry daily logs (the Ctrl+Alt+F list) are in the same list.
+;  A Compact tick hides the preview.
+;  Pins: "picker pins.txt" beside templates.txt (OneDrive shares it with
+;  your other bays). Recent and how often: picker.ini in
+;  %LOCALAPPDATA%\Watchlog, this PC only. Both hold names only: never the
+;  filled-in text, never passwords. Logins are never listed, and Watchlog
+;  never types into the search box.
 ; =====================================================================
 ; (set up by RegisterHotkeys, see HotkeyDefs)
 
 PickerActive() => IsObject(Picker) && WinActive("ahk_id " Picker.hwnd)
 
-ShowPicker() {
+; query / target: used when the Compact tick reopens the finder
+ShowPicker(query := "", target := 0) {
     global Picker
     if IsObject(Picker) {
         ; Pressed again: close it (or bring it back if it's behind)
@@ -7179,44 +7286,67 @@ ShowPicker() {
         try WinActivate "ahk_id " CurForm.hwnd
         return
     }
-    if !TemplateList.Length {
+    if !TemplateList.Length && !Entries.Length {
         MsgBox "No templates are loaded. Check templates.txt (Ctrl+Alt+E).", "Find a template", "Icon!"
         return
     }
-    target := WinExist("A")
-    found := {rows: []}         ; template numbers in the order they're listed
+    if !target
+        target := WinExist("A")
+    found := {rows: []}         ; what's listed, in order: {kind, i or e, tag}
+    uses := PickUsesAll()       ; read once: how often each one was run on this PC
+    compact := PickerCompact()
 
     g := WGui("+AlwaysOnTop", "Find a template  -  v" VERSION)
     g.SetFont("s10", "Segoe UI")
-    g.AddText("w560", "Type part of a name, a shortcut, or any word from the log:")
+    if !compact
+        g.AddText("w560", "Type part of a name, its first letters, a shortcut, or any word from the log:")
     box := g.AddEdit("w560")
-    lv := g.AddListView("w560 r12 -Multi NoSortHdr", ["Shortcut", "Template", "Type"])
-    lv.ModifyCol(1, 110), lv.ModifyCol(2, 316), lv.ModifyCol(3, 110)
-    g.AddText("w560", "What it writes:")
-    prev := g.AddEdit("w560 r5 ReadOnly -TabStop")
-    tip := g.AddText("w560 r2", "")
-    g.AddButton("w120 Default", "Insert").OnEvent("Click", Go)
-    g.AddButton("x+6 w120", "Close").OnEvent("Click", (*) => ClosePicker(true))
-    g.AddText("x+14 yp+5", "Up/Down = choose    Enter = insert    Esc = close")
+    lv := g.AddListView("w560 r" (compact ? 10 : 12) " -Multi NoSortHdr", ["Shortcut", "Template", "Type"])
+    lv.ModifyCol(1, 110), lv.ModifyCol(2, 300), lv.ModifyCol(3, 126)
+    prev := "", tipTxt := ""
+    if !compact {
+        g.AddText("w560", "What it writes:")
+        prev := g.AddEdit("w560 r5 ReadOnly -TabStop")
+        tipTxt := g.AddText("w560 r2", "")
+        g.AddButton("w120 Default", "Insert").OnEvent("Click", Go)
+        g.AddButton("x+6 w120", "Close").OnEvent("Click", (*) => ClosePicker(true))
+        g.AddText("x+14 yp+5", "Enter = insert   Ctrl+P = pin   Esc = close")
+    } else {
+        g.AddButton("w0 h0 Default Hidden", "Insert").OnEvent("Click", Go)
+        g.AddText("xm", "Enter = insert   Ctrl+P = pin   Esc = close")
+    }
+    cb := g.AddCheckbox((compact ? "x+20" : "xm y+8") " -TabStop", "Compact (no preview)")
+    cb.Value := compact
+    cb.OnEvent("Click", ToggleCompact)
     box.OnEvent("Change", Filter)
     lv.OnEvent("ItemSelect", Preview)
     lv.OnEvent("DoubleClick", (ctl, row) => row ? Go() : 0)
     g.OnEvent("Escape", (*) => ClosePicker(true))
     g.OnEvent("Close", (*) => ClosePicker(true))
-    Picker := {hwnd: g.Hwnd, gui: g, box: box, lv: lv, target: target, go: Go, preview: Preview}
+    Picker := {hwnd: g.Hwnd, gui: g, box: box, lv: lv, target: target, go: Go, preview: Preview, pin: Pin}
+    box.Value := query
     Filter()
     g.Show()
     WinActivate "ahk_id " g.Hwnd
     box.Focus()
+    if query != ""
+        Send "{End}"
 
-    ; Lists the templates that match what's typed, best match first
+    ; Lists what matches what's typed, best match first. Nothing typed:
+    ; pinned, then recent, then the rest.
     Filter(*) {
-        found.rows := FindTemplates(box.Value)
+        found.rows := PickerFind(box.Value, uses)
+        star := Chr(0x2605) " "
         lv.Opt("-Redraw")
         lv.Delete()
-        for i in found.rows {
-            t := TemplateList[i]
-            lv.Add(, TrigKey(t.trig), t.name != "" ? t.name : t.trig, (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : ""))
+        for it in found.rows {
+            if it.kind = "e" {
+                lv.Add(, "", (it.pinned ? star : "") it.e.name, (it.tag = "recent" ? "Recent: " : "") "Full daily log")
+                continue
+            }
+            t := TemplateList[it.i]
+            kind := (t.repeat ? "Form, several" : t.form ? "Form" : "Instant") (t.src = "mine" ? " (mine)" : "")
+            lv.Add(, TrigKey(t.trig), (it.pinned ? star : "") (t.name != "" ? t.name : t.trig), (it.tag = "recent" ? "Recent: " : "") kind)
         }
         lv.Opt("+Redraw")
         if found.rows.Length
@@ -7224,19 +7354,31 @@ ShowPicker() {
         Preview()
     }
 
-    ; The wording of the picked template, with its blanks in [brackets]
+    ; The wording of the picked one, with its blanks in [brackets]
     Preview(*) {
+        if compact
+            return
         row := lv.GetNext()
         if !row {
             prev.Value := 'Nothing matches "' Trim(box.Value) '". Try one word, like jackpot or medical.'
-            tip.Text := ""
+            tipTxt.Text := ""
             return
         }
-        t := TemplateList[found.rows[row]]
+        it := found.rows[row]
+        if it.kind = "e" {
+            e := it.e
+            prev.Value := "Location: " e.loc "`r`nTopic: " e.topic "`r`nReference: " e.ref
+                . "`r`nSynopsis: " RegExReplace(e.syn, "\{([^{}]+?)\??\}", "[$1]") (e.end ? "`r`nEnd Time: now" : "")
+            tipTxt.Text := "A full-entry daily log: it opens a new daily log in iTrak and fills it in (the same as " HK("entrypick") ")."
+                . (it.pinned ? "  Pinned (Ctrl+P to unpin)." : "")
+            return
+        }
+        t := TemplateList[it.i]
         prev.Value := RegExReplace(t.text, "\{([^{}:]+)(:[^{}]*)?\}", "[$1]")
-        tip.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
+        tipTxt.Text := "Next time you can type  " TrigKey(t.trig) "  anywhere instead of opening this. "
             . (t.repeat ? "It opens a form, and Ctrl+Enter adds another." : t.form ? "It opens a form to fill in." : "It goes in straight away.")
             . (t.src = "mine" ? " (One of yours, from my-templates.txt.)" : "")
+            . (it.pinned ? "  Pinned (Ctrl+P to unpin)." : "")
     }
 
     Go(*) {
@@ -7245,9 +7387,52 @@ ShowPicker() {
             box.Focus()
             return
         }
-        t := TemplateList[found.rows[row]]
+        it := found.rows[row]
         ClosePicker(true)
+        if it.kind = "e" {
+            RunEntry(it.e)
+            return
+        }
+        t := TemplateList[it.i]
         RunTemplate(t.text, t.name != "" ? t.name : t.trig, t.repeat, t.trig, t.fill)
+    }
+
+    ; Ctrl+P: pins the picked row, or unpins it. The list keeps its place.
+    Pin(*) {
+        row := lv.GetNext()
+        if !row
+            return
+        it := found.rows[row]
+        key := PickKey(it)
+        pins := PinList()
+        if n := IndexOf(pins, key)
+            pins.RemoveAt(n)
+        else
+            pins.Push(key)
+        if !SavePins(pins) {
+            Tip("Couldn't save the pins (picker pins.txt beside templates.txt).", 3000, true)
+            return
+        }
+        name := it.kind = "e" ? it.e.name : (TemplateList[it.i].name != "" ? TemplateList[it.i].name : TemplateList[it.i].trig)
+        Activity("Finder: " (n ? "unpinned " : "pinned ") name)
+        Filter()
+        ; put the highlight back on the same one
+        for j, other in found.rows
+            if PickKey(other) = key {
+                lv.Modify(0, "-Select")
+                lv.Modify(j, "Select Focus Vis")
+                Preview()
+                break
+            }
+        Tip(n ? "Unpinned: " name : "Pinned: " name "  (shows at the top when the box is empty)", 1800)
+    }
+
+    ; The Compact tick: remembered on this PC, the finder reopens in that look
+    ToggleCompact(*) {
+        try IniWrite cb.Value ? 1 : 0, LastUsedFile, "Picker", "Compact"
+        q := box.Value
+        ClosePicker(false)
+        ShowPicker(q, target)
     }
 }
 
@@ -7265,22 +7450,162 @@ ClosePicker(back := false) {
     }
 }
 
-; Every word typed has to be in the shortcut, the name or the wording.
-; Shortcut matches come first, then name matches, then wording matches.
-; With nothing typed, every template shows, in templates.txt order.
-FindTemplates(query) {
+PickerCompact() {
+    try return IniRead(LastUsedFile, "Picker", "Compact", "0") = "1"
+    return false
+}
+
+; ---- Pins, recent and how often (v3.36.0) -----------------------------
+; The name a pick is remembered by: "t:" + its shortcut (;card), or
+; "e:" + the full-entry log's name. Lower case, no | or = in it.
+PickKey(it) {
+    k := it.kind = "e" ? "e:" it.e.name : "t:" TemplateList[it.i].trig
+    return StrLower(Trim(StrReplace(StrReplace(k, "|", " "), "=", "-")))
+}
+
+; Pinned ones, in the order they were pinned (picker pins.txt, beside
+; templates.txt, so OneDrive takes them to your other bays)
+PinList() {
+    pins := []
+    try {
+        if FileExist(PinsFile)
+            Loop Parse FileRead(PinsFile, "UTF-8"), "`n", "`r" {
+                k := StrLower(Trim(A_LoopField))
+                if k != "" && SubStr(k, 1, 1) != "#" && !IndexOf(pins, k)
+                    pins.Push(k)
+            }
+    }
+    return pins
+}
+
+SavePins(pins) {
+    out := "# Watchlog: pinned templates for the finder (Ctrl+Alt+Space).`r`n"
+        . "# Ctrl+P in the finder pins or unpins. t: = a code word, e: = a full-entry daily log.`r`n"
+    for k in pins
+        out .= k "`r`n"
+    try {
+        f := FileOpen(PinsFile, "w", "UTF-8")
+        f.Write(out)
+        f.Close()
+        return true
+    }
+    return false
+}
+
+; The last 10 run, newest first (picker.ini, this PC only)
+RecentPicks() {
+    keys := []
+    try {
+        for k in StrSplit(IniRead(PickerFile, "Recent", "List", ""), "|")
+            if Trim(k) != "" && !IndexOf(keys, Trim(k))
+                keys.Push(Trim(k))
+    }
+    return keys
+}
+
+; How often each was run on this PC: key -> times
+PickUsesAll() {
+    uses := Map()
+    uses.CaseSense := false
+    try {
+        Loop Parse IniRead(PickerFile, "Uses"), "`n", "`r" {
+            eq := InStr(A_LoopField, "=", , -1)
+            if eq && IsInteger(SubStr(A_LoopField, eq + 1))
+                uses[SubStr(A_LoopField, 1, eq - 1)] := Integer(SubStr(A_LoopField, eq + 1))
+        }
+    }
+    return uses
+}
+
+; Remembers a template or full-entry log that just ran, from anywhere
+; (code word, finder, call pad, Ctrl+Alt+F). The name only.
+NotePick(it) {
+    if IsObject(TutorialWin)
+        return
+    try {
+        key := PickKey(it)
+        if key = "t:" || key = "e:"
+            return
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        list := key
+        for k in RecentPicks()
+            if k != key && A_Index <= 10 && StrSplit(list, "|").Length < 10
+                list .= "|" k
+        IniWrite list, PickerFile, "Recent", "List"
+        n := 0
+        try n := Integer(IniRead(PickerFile, "Uses", key, "0"))
+        IniWrite n + 1, PickerFile, "Uses", key
+    }
+}
+
+; The template (by shortcut) or full-entry log (by name) for a key, or ""
+PickFromKey(key) {
+    if SubStr(key, 1, 2) = "t:" {
+        for i, t in TemplateList
+            if StrLower(t.trig) = SubStr(key, 3)
+                return {kind: "t", i: i}
+    } else if SubStr(key, 1, 2) = "e:" {
+        for e in Entries
+            if StrLower(e.name) = SubStr(key, 3)
+                return {kind: "e", e: e}
+    }
+    return ""
+}
+
+; Every word typed has to be in the shortcut, the name, its first letters
+; or the wording. Shortcut matches come first, then first letters, then
+; name matches, then wording matches; the ones run most get a small boost.
+; Nothing typed: pinned, then recent, then the full-entry logs, then the
+; templates in templates.txt order. Equal scores: full-entry logs first.
+PickerFind(query, uses := "") {
+    if !IsObject(uses)
+        uses := Map()
+    pins := PinList()
     words := []
     for w in StrSplit(RegExReplace(StrLower(query), "[^a-z0-9#]+", " "), " ")
         if w != ""
             words.Push(w)
+    ; full-entry daily logs first, then the code word templates (Jakob, Nov 11)
+    all := []
+    for e in Entries
+        all.Push({kind: "e", e: e})
+    for i, t in TemplateList
+        all.Push({kind: "t", i: i})
+    rows := []
+    if !words.Length {
+        shown := Map()
+        for k in pins
+            if IsObject(it := PickFromKey(k)) && !shown.Has(k)
+                it.pinned := true, it.tag := "pin", rows.Push(it), shown[k] := 1
+        for k in RecentPicks()
+            if IsObject(it := PickFromKey(k)) && !shown.Has(k)
+                it.pinned := false, it.tag := "recent", rows.Push(it), shown[k] := 1
+        for it in all
+            if !shown.Has(PickKey(it))
+                it.pinned := false, it.tag := "", rows.Push(it)
+        return rows
+    }
     sorted := []
-    for i, t in TemplateList {
-        trig := RegExReplace(StrLower(t.trig), "[^a-z0-9#]+")
-        name := " " RegExReplace(StrLower(t.name), "[^a-z0-9#]+", " ")
-        body := " " RegExReplace(StrLower(t.text), "[^a-z0-9#]+", " ")
+    for it in all {
+        if it.kind = "e" {
+            e := it.e
+            trig := ""
+            name := " " RegExReplace(StrLower(e.name), "[^a-z0-9#]+", " ")
+            body := " " RegExReplace(StrLower(e.loc " " e.topic " " e.ref " " e.syn), "[^a-z0-9#]+", " ")
+        } else {
+            t := TemplateList[it.i]
+            trig := RegExReplace(StrLower(t.trig), "[^a-z0-9#]+")
+            name := " " RegExReplace(StrLower(t.name != "" ? t.name : t.trig), "[^a-z0-9#]+", " ")
+            body := " " RegExReplace(StrLower(t.text), "[^a-z0-9#]+", " ")
+        }
+        inits := ""
+        for nw in StrSplit(Trim(name), " ")
+            if nw != ""
+                inits .= SubStr(nw, 1, 1)
         score := 0
         for w in words {
-            s := WordScore(w, trig, name, body)
+            s := WordScore(w, trig, name, body, inits)
             if !s {
                 score := -1
                 break
@@ -7289,23 +7614,42 @@ FindTemplates(query) {
         }
         if score < 0
             continue
-        ; Higher scores go first; equal scores keep their templates.txt order
+        key := PickKey(it)
+        it.pinned := IndexOf(pins, key) > 0
+        it.tag := ""
+        ; a small boost for the ones used most (at most 6), and for pins
+        score += Min(uses.Has(key) ? uses[key] : 0, 30) // 5 + (it.pinned ? 3 : 0)
+        ; Higher scores go first; equal scores keep the list order (full logs first)
         pos := sorted.Length + 1
         while pos > 1 && sorted[pos - 1].score < score
             pos--
-        sorted.InsertAt(pos, {i: i, score: score})
+        sorted.InsertAt(pos, {it: it, score: score})
     }
-    rows := []
     for m in sorted
-        rows.Push(m.i)
+        rows.Push(m.it)
     return rows
 }
 
-WordScore(w, trig, name, body) {
+; The matching templates only, as numbers in TemplateList (kept for
+; anything that still asks for the old list)
+FindTemplates(query) {
+    rows := []
+    for it in PickerFind(query)
+        if it.kind = "t"
+            rows.Push(it.i)
+    return rows
+}
+
+; inits = the first letter of each word of the name ("cd" = Card Destruction)
+WordScore(w, trig, name, body, inits := "") {
     if trig = w
         return 100
+    if StrLen(w) >= 2 && StrLen(inits) >= 2 && inits = w
+        return 70
     if InStr(trig, w) = 1
         return 60
+    if StrLen(w) >= 2 && StrLen(inits) >= 2 && InStr(inits, w) = 1
+        return 45
     if InStr(name, " " w)
         return 40
     if InStr(trig, w) || InStr(name, w)
@@ -7336,6 +7680,7 @@ PgUp:: PickerMove(-10)
 PgDn:: PickerMove(10)
 Enter:: Picker.go()
 NumpadEnter:: Picker.go()
+^p:: Picker.pin()
 #HotIf
 
 
@@ -8296,7 +8641,7 @@ ShowCheatSheet() {
     g.SetFont("s20 bold c" teal, "Segoe UI")
     g.AddText("x20 y10 w700", "Watchlog shortcuts")
     g.SetFont("s10 norm c" muted, "Segoe UI")
-    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name or any word.   Forms: Tab = next box, Enter = insert, Esc = cancel.")
+    g.AddText("x20 y+0 w900", "Can't remember one?  Ctrl+Alt+Space finds a template by name, first letters or any word (Ctrl+P pins).   Forms: Tab = next box, Enter = insert, Esc = cancel.")
     top := 78
     x1 := 20, x2 := x1 + colW + gap, x3 := x2 + colW + gap
     y1 := Section(x1, top, "FORMS", forms, 92)
@@ -9854,6 +10199,7 @@ AutoEverywhereSync() {
     on := AutoEverywhereOn && Cfg["Autocorrect"]
     if on
         LoadAutocorrect()
+    AutoCountSync(on)
     stamp := on ? AutoStamp "|" AutoMap.Count : "off"
     if stamp == AutoHotStamp
         return
@@ -9881,6 +10227,77 @@ AutoEverywhereSync() {
     }
     HotIf
     Activity("Autocorrect in every program: " (on ? AutoHot.Count " words" : "off"))
+}
+
+; ---- Autocorrect words in Time saved (v3.36.1) -----------------------
+; Jakob (Nov 12): "I have started adding my own custom words to the list to
+; save time and I would like that to be reflected". Only words that EXPAND
+; count (Jakob, Nov 12: "only expanding words"): the fix has to be at least
+; 3 letters longer than what you typed, and only the letters it adds count
+; (shrd = Shred-it saves 4 keystrokes). A plain spelling fix (ram = RAM,
+; shredit = Shred-it) adds nothing. Each word counts in Time saved and in
+; the Shift count as "Autocorrect: <the word you typed>" (the short word
+; only, never what you were writing).
+AutoGain(typed, rep) => StrLen(rep) - StrLen(typed) >= 3 ? StrLen(rep) - StrLen(typed) : 0
+
+AutoCount(typed, rep) {
+    gain := AutoGain(typed, rep)
+    if gain > 0
+        CountSaved("auto", gain, "Autocorrect: " StrLower(typed))
+    return gain
+}
+
+; In other programs Windows does the swap through the hotstrings above,
+; which can't report back. A quiet key watcher (it sees your own typing
+; only, blocks nothing, keeps the last 40 letters in memory and never saves
+; them) spots the same words: a word from the list, after a space, Tab,
+; Enter or punctuation, typed outside Watchlog's own windows.
+AutoCountSync(on) {
+    global AutoCountIH, AutoCountBuf
+    if on && !IsObject(AutoCountIH) {
+        try {
+            ih := InputHook("V I1 L0")
+            ih.KeyOpt("{Backspace}{Delete}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Escape}", "N")
+            ih.OnChar := AutoCountChar
+            ih.OnKeyDown := AutoCountKey
+            ih.Start()
+            AutoCountIH := ih
+        }
+    } else if !on && IsObject(AutoCountIH) {
+        try AutoCountIH.Stop()
+        AutoCountIH := "", AutoCountBuf := ""
+    }
+}
+
+; Backspace takes the last letter off (like the hotstrings do); moving the
+; cursor starts over, because the letters before it are no longer known
+AutoCountKey(ih, vk, sc) {
+    global AutoCountBuf
+    AutoCountBuf := vk = 8 ? SubStr(AutoCountBuf, 1, -1) : ""
+}
+
+AutoCountChar(ih, ch) {
+    global AutoCountBuf, AutoCountWin
+    w := 0
+    try w := WinExist("A")
+    if w != AutoCountWin
+        AutoCountWin := w, AutoCountBuf := ""
+    if ch = "`r"
+        ch := "`n"
+    ; Ctrl+key and the like: what's on screen is no longer known
+    if Ord(ch) < 32 && ch != "`t" && ch != "`n" {
+        AutoCountBuf := ""
+        return
+    }
+    static ends := "-()[]{}':;`"/\,.?! `t`n"
+    if InStr(ends, ch) && AutoCountBuf != "" && !A_IsSuspended && AutoHot.Count {
+        try {
+            if AutoEverywhereHere() && RegExMatch(AutoCountBuf, "([\p{L}\d]+)$", &m) && AutoHot.Has(m[1])
+                && (StrLen(AutoCountBuf) < 40 || StrLen(m[1]) < StrLen(AutoCountBuf))
+                AutoCount(m[1], AutoHot[m[1]])
+        }
+    }
+    AutoCountBuf := SubStr(AutoCountBuf ch, -40)
 }
 
 ToggleAutoEverywhere(*) {
