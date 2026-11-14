@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.37.0  -  README
+  WATCHLOG  v3.37.1  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1062,7 +1062,10 @@ TEAM SETUP AND team-settings.ini  (v3.37.0)
     the same for the whole team: [Paths] Browser (edge or chrome),
     FaceUrl, CitrixUrl, CitrixTab, LaunchWait; [StartOfShift] Run1 to
     Run9; [EndOfShift] Close; [SDS] ResignMinutes; [Break] Minutes; the
-    waits and date formats in [ITrak] and [AlertGrid]; and [Modules]. A
+    waits and date formats in [ITrak] and [AlertGrid]; and [Modules].
+    From v3.37.1 also [Journal], [Triggers] Prefix, [Layout], [Look],
+    [Forms], [CallPad], [Reminder], [TimeSaved], [Clock], [Taskbar] and
+    the [App1] to [App9] hotkeys (used when you have none of your own). A
     line in your own settings.ini always wins over the team's, and a
     value left out uses the one built into Watchlog.
   - [Modules] (yes or no): CapsLockClears, NumpadCall, AutoEverywhere,
@@ -1465,6 +1468,34 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.37, newest first)
 -----------------------------------------------------------------------
+FOUNDATION CLEANUP, EVERY SETTING CAN COME FROM THE TEAM  (v3.37.1)
+  - Nothing you use changes. This version tidies the program for the
+    team version and the time-saving work that follows (see docs/Watchlog
+    - Overhaul plan.md).
+  - team-settings.ini can now set every site-type setting, not only the
+    ones listed under v3.37.0: [Paths] LaunchWork, [Journal] Save and
+    KeepDays, [Triggers] Prefix, [Layout] SdsWatchSeconds and SdsSpot,
+    [StartOfShift] SignIn, [Look] Dark, [Forms] QuickInsert, [CallPad]
+    Autocorrect, [Reminder] Beep, [TimeSaved] SecondsPerClick, [Clock]
+    Seconds, Date, Monitor, OffsetX, OffsetY, and [Taskbar]
+    PreviewClasses. The order is the same for all of them: a line in your
+    own settings.ini, then the team's, then the value built in. Someone
+    with the setting already in their own file sees no change.
+  - App hotkeys ([App1] to [App9], Ctrl+Alt + a letter) come from
+    team-settings.ini when your own settings.ini has none, so a new
+    operator gets the Bally apps without typing the paths.
+  - A save that fails (settings, layout, spots, time saved, the Caps Lock
+    or clock switch) now writes one line to the activity log instead of
+    disappearing. Before, a OneDrive hiccup could lose a setting without
+    a trace.
+  - The Caps Lock check and the taskbar-preview check only run while
+    their switch is on (they used to tick every 150 ms regardless).
+  - Three leftovers removed that nothing used any more (the old finder
+    list, the old Audit End text, a duplicate of the "I wrote this
+    myself" note for the file watcher).
+  - Logins, passwords, the team folder pointer, your update folder and
+    your hotkeys stay personal-only; the team file can't set them.
+
 TEAM FOLDER, TEAM SETTINGS AND A SAFE START FOR NEW OPERATORS  (v3.37.0)
   - Tray > Advanced > Team setup: pick the team folder (offered when found
     in OneDrive), set up a new team folder (supervisor), and a status

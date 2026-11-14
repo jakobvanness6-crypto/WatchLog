@@ -103,4 +103,7 @@ AutoHotkey v2 `#Include` works and the compiled exe is identical. About 12 parts
 | 7 | v3.40.0 | Docs: CHANGELOG out of README, PROJECT-NOTES trimmed to a table, Pending changes split Waiting / Built / Dropped, manager docs rebuilt. | Docs only | Read-through. |
 | 8 | v3.40.x | Reminders with Log it (if wanted), incidents tabs, Team readiness steps 2-3, pilot with Michael. | New features | Pilot. |
 
-Default if Jakob picks nothing: this order. "Build it" on batch 1 starts step 1 and 2 together (one zip, two versions is pointless).
+Jakob (Nov 14) picked **Foundation cleanup first**, so Part B goes before Part A. Done so far:
+
+- **v3.37.1 (Nov 14, built NOT run):** step 1 plus the settings half of step 3. Three dead functions out; failed saves logged (TryIniWrite/TryAppend); Caps Lock and preview timers only while on; 17 more settings keys through CfgRead and the team [AppN] list; starter team-settings.ini and settings.example.ini list them; Next Steps and Ideas marked historical. Logins, team folder pointer, update folder and hotkeys stay personal-only on purpose.
+- Next, each its own version after the previous one is confirmed on his bay: #Include split (step 6), window-relative iTrak spots (step 5), giant-function breakup, docs split; then Part A batch 1.
