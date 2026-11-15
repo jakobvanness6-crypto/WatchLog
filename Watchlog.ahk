@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.38.2"
-VERSION_DATE := "Nov 14, 2026"
+VERSION := "3.40.0"
+VERSION_DATE := "Nov 15, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -120,6 +120,8 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
     , {id: "incident", key: "^!+n", label: "incident report from the open daily log", fn: (*) => ShowIncidentPick()}
     , {id: "endnow", key: "^!+e", label: "End Time Now in the open daily log", fn: (*) => EntryEndNow()}
+    , {id: "count", key: "^!t", label: "count sheet: stamp the next line", fn: (*) => ScKey()}
+    , {id: "countsheet", key: "^!+t", label: "count sheet: show it", fn: (*) => ShowCountSheet()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
 
@@ -1858,9 +1860,17 @@ ParseField(spec, last := Map()) {
         } else if low = "fromcopy" {
             f.fromCopy := true
 
+        } else if RegExMatch(opt, "i)^recall\s+(.+)$", &rm) {
+            ; remembers its answer for each value of the box named after it (v3.40.0)
+            f.recall := Trim(rm[1]), hint := "  (remembered for each " Trim(rm[1]) ")"
+        } else if low = "openfirst" || low = "closedfirst" {
+            f.tableOrder := low         ; tables logged open this shift first, or last (v3.40.0)
         } else if low = "last" {
             f.remember := true
             f.def := last.Has(key) ? last[key] : ""
+            ; the bay of this PC is known: not asked (v3.40.0)
+            if key = "Bay" && PcBay() != ""
+                f.def := PcBay(), f.savedVal := PcBay()
         } else if low = "saved" {
             ; like last, but when a value was entered in the last 14 hours
             ; (the bay at the start of shift) it is used without asking (v3.20.2)
@@ -1868,6 +1878,8 @@ ParseField(spec, last := Map()) {
             f.def := last.Has(key) ? last[key] : ""
             if f.def != "" && last.Has(key ".at") && IsTimeStamp(last[key ".at"]) && DateDiff(A_Now, last[key ".at"], "Hours") < 14
                 f.savedVal := f.def
+            if key = "Bay" && PcBay() != ""
+                f.def := PcBay(), f.savedVal := PcBay()
         } else if low = "next" {
             f.remember := true, f.nextStep := true
         } else if low = "pick" {
@@ -1900,6 +1912,33 @@ ParseField(spec, last := Map()) {
             f.numPrefix := SubStr(opt, 14)
         } else {
             items.Push(opt)
+        }
+    }
+    ; openfirst / closedfirst (v3.40.0): the tables logged open this shift go
+    ; first (or last). A "several" box that closes tables also gets one
+    ; choice for all of them.
+    if items.Length && f.HasOwnProp("tableOrder") {
+        st := TablesState()
+        if st.open.Length {
+            known := [], others := []
+            for it in items {
+                if HasVal(st.open, it)
+                    known.Push(it)
+                else
+                    others.Push(it)
+            }
+            items := []
+            for it in (f.tableOrder = "openfirst" ? known : others)
+                items.Push(it)
+            for it in (f.tableOrder = "openfirst" ? others : known)
+                items.Push(it)
+            if f.tableOrder = "openfirst" && f.HasOwnProp("several") && known.Length > 1 {
+                shownList := ""
+                for it in known
+                    shownList .= (shownList = "" ? "" : ", ") it
+                f.allOpen := {text: "All open (" shownList ")", list: known}
+                items.InsertAt(1, f.allOpen.text)
+            }
         }
     }
     if items.Length {
@@ -2098,7 +2137,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
     g.MarginX := 14, g.MarginY := 12
     ctrls := [], starts := [], labs := []
     for f in fields {
-        labs.Push(g.AddText(A_Index > 1 ? "y+10" : "", f.label))
+        labs.Push(g.AddText(A_Index > 1 ? "y+10 w420" : "w420", f.label))
         kind := f.HasOwnProp("kind") ? f.kind : ""
         n := f.HasOwnProp("choose") ? f.choose : 1
         ; Lists open showing up to 12 choices at once
@@ -2159,6 +2198,11 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
     done := []          ; finished entries so far, when "Add another" is used
     typed := 0          ; keystrokes typed into the form, for the time saved tracker
     autoVals := Map()   ; boxes filled in by an "if" option, and with what
+    recallVals := Map() ; boxes filled in from memory (recall), and with what (v3.40.0)
+    tblState := ""      ; open and closed tables, when a box lists them (v3.40.0)
+    for f in fields
+        if f.HasOwnProp("tableOrder") && !IsObject(tblState)
+            tblState := TablesState()
     ; How the log will come out, updated as you type
     g.SetFont("s9")
     g.AddText("y+14 c707070", "How it will look:")
@@ -2261,7 +2305,67 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
 
     Changed(*) {
         AutoFill()
+        RecallFill()
+        TableNotes()
         ShowPreview()
+    }
+
+    ; Which box a recall box goes by (0 = none, or a "several" box)
+    RecallPartner(rcOf) {
+        loop fields.Length {
+            if A_Index != rcOf && fields[A_Index].key = fields[rcOf].recall && !multi.Has(A_Index)
+                return A_Index
+        }
+        return 0
+    }
+
+    ; recall boxes (v3.40.0): filled with what was typed last time for the
+    ; table, machine or place in the other box, unless you typed your own.
+    ; (Own variable names on purpose: Collect uses i, f, c and v.)
+    RecallFill() {
+        rcAny := false
+        loop fields.Length {
+            if fields[A_Index].HasOwnProp("recall")
+                rcAny := true
+        }
+        if !rcAny
+            return
+        rcVals := Collect(false)
+        loop fields.Length {
+            rcI := A_Index
+            if !fields[rcI].HasOwnProp("recall")
+                continue
+            rcJ := RecallPartner(rcI)
+            if !rcJ
+                continue
+            rcBox := ctrls[rcI]
+            rcHad := recallVals.Has(rcI) ? recallVals[rcI] : ""
+            if rcBox.Text != "" && rcBox.Text != rcHad
+                continue
+            rcWant := Trim(ctrls[rcJ].Text) = "" ? "" : RecallGet(fields[rcI].key, rcVals[rcJ])
+            if rcBox.Text != rcWant {
+                if rcBox.Type = "Edit"
+                    rcBox.Value := rcWant
+                else
+                    try rcBox.Text := rcWant
+            }
+            recallVals[rcI] := rcWant
+        }
+    }
+
+    ; a table you logged closed this shift, picked in a fill or card change: a note, not a block
+    TableNotes() {
+        if !IsObject(tblState) || !tblState.closed.Count
+            return
+        tnVals := Collect(false)
+        loop fields.Length {
+            tnI := A_Index
+            if !fields[tnI].HasOwnProp("tableOrder") || fields[tnI].tableOrder != "openfirst" || multi.Has(tnI) || padMarks.Has(tnI)
+                continue
+            tnWant := fields[tnI].label (tblState.closed.Has(tnVals[tnI]) ? "  (you logged " tnVals[tnI] " closed at " tblState.closed[tnVals[tnI]] ")" : "")
+            if labs[tnI].Text != tnWant
+                labs[tnI].Text := tnWant
+        }
     }
 
     ; "if" options: fill a box when another box starts with the given text,
@@ -2344,6 +2448,9 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
             f := fields[i]
             kind := f.HasOwnProp("kind") ? f.kind : ""
             v := Trim(c.Text)
+            ; "All open (BJ205, RO204)" in a box that closes tables = all of them (v3.40.0)
+            if f.HasOwnProp("allOpen") && v = f.allOpen.text
+                v := JoinList(f.allOpen.list)
             ; Just a number typed in a list box: the list item ending in it
             ; (202 -> FB202 when FB202 is in the list)
             if RegExMatch(v, "^\d+$") && f.HasOwnProp("items") {
@@ -2397,12 +2504,25 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
                     IniWrite v, LastUsedFile, "LastUsed", f.key
                     IniWrite A_Now, LastUsedFile, "LastUsed", f.key ".at"
                 }
+                if f.key = "Bay"
+                    SetPcBay(v)         ; this PC's bay, so it isn't asked again (v3.40.0)
             }
             if save && f.HasOwnProp("alertCopy")
                 ForgetCopy("alert")
             if save && f.HasOwnProp("matchCopy")
                 ForgetCopy("match")
             vals.Push(v)
+        }
+        ; recall boxes: what is in the box now is kept for that table / machine / place
+        if save {
+            loop fields.Length {
+                rcI := A_Index
+                if !fields[rcI].HasOwnProp("recall")
+                    continue
+                rcJ := RecallPartner(rcI)
+                if rcJ && Trim(ctrls[rcI].Text) != "" && Trim(ctrls[rcJ].Text) != ""
+                    RecallPut(fields[rcI].key, vals[rcJ], Trim(ctrls[rcI].Text))
+            }
         }
         return vals
     }
@@ -2434,7 +2554,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
                 n += StrLen(fields[i].ph)
                 continue
             }
-            if v = starts[i].text || (autoVals.Has(i) && v = autoVals[i])
+            if v = starts[i].text || (autoVals.Has(i) && v = autoVals[i]) || (recallVals.Has(i) && v = recallVals[i])
                 continue
             n += fields[i].HasOwnProp("items") && HasVal(fields[i].items, v) ? 1 : StrLen(v)
         }
@@ -2479,6 +2599,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
             first.Focus()
             return
         }
+        RecallFill()
         typed += TypedNow()
         done.Push(build(Collect()))
         ; Clear the boxes for the next one
@@ -2489,6 +2610,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
                 c.Value := starts[i].text
         }
         autoVals.Clear()
+        recallVals.Clear()
         Changed()
         g.Title := title "  (" done.Length " added)"
         first.Focus()
@@ -2496,6 +2618,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
 
     Submit(*) {
         out := ""
+        RecallFill()
         if multi.Count {
             ; "several" boxes: one log, the list on one line
             typed += TypedNow()
@@ -2511,6 +2634,7 @@ FormPaste(title, fields, build, repeat := false, trigLen := 0, fill := false) {
         }
         SetForm("")
         g.Destroy()
+        TablesNote(out)         ; tables this log opened or closed (v3.40.0)
         if fill {
             if TemplateFill(out, title)
                 return
@@ -2967,6 +3091,17 @@ CallPadMakeLog() {
         CallPadWin.Hide()
     if CallPadTarget
         ReturnTo(CallPadTarget)
+    ; "count" alone on the pad stamps the next count sheet line (v3.39.0)
+    if RegExMatch(Trim(PadText, " `t`r`n"), "i)^count$") {
+        padTarget := CallPadTarget
+        CallPadUsed()
+        ScLoad()
+        if ScLines.Length && ScNext()
+            ScStamp(0, padTarget)
+        else
+            ShowCountSheet()
+        return
+    }
     ; a code word first on the pad (fill 205 5.5) runs that log now (v3.26.0)
     global PadShort
     sc := PadShortcut(PadText)
@@ -3573,6 +3708,8 @@ PadWords(fields, ctrls, labs, words, marks) {
 ; a time that is "now", a copied alert # or match %, a "next"/"saved"/"last"
 ; box with a value, a list with one item or one found in the copied text.
 PadSkipBox(f, c) {
+    if f.HasOwnProp("recall")
+        return true         ; filled from memory, or left for you: never a shorthand word (v3.40.0)
     kind := f.HasOwnProp("kind") ? f.kind : ""
     if f.HasOwnProp("items") {
         if f.items.Length = 1 || f.HasOwnProp("nextStep") || f.HasOwnProp("savedVal")
@@ -5419,6 +5556,8 @@ EntryPickMove(d) {
 
 ; The bay entered at the start of this shift (last 14 hours), or "" when none
 SavedBay() {
+    if PcBay() != ""
+        return PcBay()      ; the bay of this PC (v3.40.0)
     try {
         v := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
         at := IniRead(LastUsedFile, "LastUsed", "Bay.at", "")
@@ -5451,10 +5590,14 @@ RunEntry(e, useOpen := false) {
     if InStr(syn, "{Bay?}") {
         last := ""
         try last := Trim(IniRead(LastUsedFile, "LastUsed", "Bay", ""))
-        ib := InputBox("Which bay are you on?`n`nKept for the rest of the shift.", "Watchlog - " e.name, "w320 h160", last)
-        if ib.Result != "OK" || Trim(ib.Value) = ""
-            return
-        bay := Trim(ib.Value)
+        bay := PcBay()      ; the bay of this PC: not asked (v3.40.0)
+        if bay = "" {
+            ib := InputBox("Which bay is this PC?`n`nKept for this PC, so it is only asked once.", "Watchlog - " e.name, "w320 h160", last)
+            if ib.Result != "OK" || Trim(ib.Value) = ""
+                return
+            bay := Trim(ib.Value)
+            SetPcBay(bay)
+        }
         try {
             if !DirExist(DataDir)
                 DirCreate DataDir
@@ -5470,6 +5613,7 @@ RunEntry(e, useOpen := false) {
             if ib.Result != "OK" || Trim(ib.Value) = ""
                 return
             bay := Trim(ib.Value)
+            SetPcBay(bay)
             try {
                 if !DirExist(DataDir)
                     DirCreate DataDir
@@ -5800,16 +5944,21 @@ BreakUsedSecs() {
 
 BreakLeftSecs() => BreakAllowed() - BreakUsedSecs()
 
-; "Break left: 42 min (18 of 60 used)" or "On break 12 min, 30 min left"
+; Seconds as minutes and seconds: 725 -> "12 m 05 s" (v3.38.3)
+BreakFmt(secs) {
+    secs := Max(Integer(secs), 0)
+    return (secs // 60) " m " Format("{:02}", Mod(secs, 60)) " s"
+}
+
+; "Break: 41 m 05 s left (18 m 55 s of 60 m used)" or "On break 12 m 05 s, 30 m 00 s left"
 BreakText() {
     left := BreakLeftSecs()
     openAt := ""
     try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
-    mins := (left >= 0 ? left : -left) // 60
-    tail := left >= 0 ? mins " min left" : "over by " mins " min"
+    tail := left >= 0 ? BreakFmt(left) " left" : "over by " BreakFmt(-left)
     if openAt != ""
-        return "On break " DateDiff(A_Now, openAt, "Seconds") // 60 " min, " tail
-    return "Break: " tail " (" BreakUsedSecs() // 60 " of " BreakAllowed() // 60 " used)"
+        return "On break " BreakFmt(DateDiff(A_Now, openAt, "Seconds")) ", " tail
+    return "Break: " tail " (" BreakFmt(BreakUsedSecs()) " of " BreakAllowed() // 60 " m used)"
 }
 
 ; Clears a tally from an earlier shift (14 hours after the first break)
@@ -5850,36 +5999,37 @@ BreakBegin(win) {
 ; now, it keeps counting on from the new number.
 BreakEdit(*) {
     allowed := BreakAllowed() // 60
-    before := BreakUsedSecs() // 60
+    before := BreakUsedSecs()
     openAt := ""
     try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
-    ib := InputBox("Minutes of break used so far this shift (you get " allowed ")."
-        . "`nOr type the minutes left, like  15 left"
+    ib := InputBox("Break time used so far this shift (you get " allowed " minutes)."
+        . "`nType minutes, like  45  or minutes and seconds, like  45:30"
+        . "`nOr type the time left, like  15 left  or  14:55 left"
         . (openAt != "" ? "`n`nYou're on break now: it keeps counting on from this number." : "")
-        . "`n`n0 starts the shift's break time fresh.", "Watchlog - Break time", "w400 h" (openAt != "" ? 230 : 200), String(before))
+        . "`n`n0 starts the shift's break time fresh.", "Watchlog - Break time", "w400 h" (openAt != "" ? 230 : 200), before // 60 ":" Format("{:02}", Mod(before, 60)))
     if ib.Result != "OK"
         return false
     v := StrLower(Trim(ib.Value))
-    if !RegExMatch(v, "^(\d{1,3})\s*(min|mins|minutes)?\s*(left)?$", &m) {
-        MsgBox "Type a number of minutes, like  45  (used) or  15 left.", "Watchlog - Break time", "Icon!"
+    if !RegExMatch(v, "^(\d{1,3})(?:\s*:\s*(\d{1,2}))?\s*(min|mins|minutes)?\s*(left)?$", &m) {
+        MsgBox "Type minutes, like  45  (used), minutes and seconds, like  45:30  or  15 left.", "Watchlog - Break time", "Icon!"
         return false
     }
-    mins := Integer(m[1])
-    if m[3] != ""
-        mins := Max(allowed - mins, 0)
+    newSecs := Integer(m[1]) * 60 + (m[2] != "" ? Min(Integer(m[2]), 59) : 0)
+    if m[4] != ""
+        newSecs := Max(allowed * 60 - newSecs, 0)
     try {
         if !DirExist(DataDir)
             DirCreate DataDir
         if IniRead(LastUsedFile, "Break", "Since", "") = ""
             IniWrite A_Now, LastUsedFile, "Break", "Since"
-        IniWrite mins * 60, LastUsedFile, "Break", "Used"
+        IniWrite newSecs, LastUsedFile, "Break", "Used"
         if openAt != ""
             IniWrite A_Now, LastUsedFile, "Break", "OpenSince"
     } catch as e {
         MsgBox "Couldn't save the break time:`n" e.Message, "Watchlog - Break time", "Icon!"
         return false
     }
-    Activity("Break time changed by hand: " before " -> " mins " min used (" BreakText() ")")
+    Activity("Break time changed by hand: " BreakFmt(before) " -> " BreakFmt(newSecs) " used (" BreakText() ")")
     SetIconTip()
     Tip(BreakText(), 3000)
     return true
@@ -5921,19 +6071,689 @@ BreakEnd() {
         IniDelete LastUsedFile, "Break", "Win"
     }
     SetTimer BreakWatch, 0
-    Activity("Break ended after " secs // 60 " min (" BreakText() ")")
-    Tip("Break " secs // 60 " min. " BreakText(), 4000)
+    Activity("Break ended after " BreakFmt(secs) " (" BreakText() ")")
+    Tip("Break " BreakFmt(secs) ". " BreakText(), 4000)
     SetIconTip()
 }
 
-; The tray icon's hover text: version, and break time once a break was taken
+; =====================================================================
+;  COUNT SHEET (v3.39.0)
+;  The soft count as one checklist instead of four code words. A new
+;  count asks two things (tables today? which pod first?) and builds the
+;  day's lines. Ctrl+Alt+T stamps the next line with the time now and
+;  types it where the cursor is (the reopened count log's Synopsis);
+;  lines with a total ask for the amount only. Ctrl+Alt+Shift+T shows the
+;  sheet: skip, undo, edit, Tables Buy, emergency pull, note, copy all.
+;  Wording: @count-tables / @count-slots / @count-tablesbuy lists in
+;  templates.txt ([first] [second] [date], $___ = amount), else built in.
+;  Kept in count sheet.ini on this PC so a reload doesn't lose it;
+;  cleared by New count, after 14 hours, or by Start of shift 8 hours on.
+; =====================================================================
+ScFile := DataDir "\count sheet.ini"
+ScLines := []           ; {state: p pending | d done | s skipped, time: "10:03", text}
+ScStarted := ""
+ScLoaded := false
+ScWin := ""
+ScSetupWin := ""
+
+ScWording(kind) {
+    if Lists.Has("count-" kind) && Lists["count-" kind].Length
+        return Lists["count-" kind]
+    if kind = "tables"
+        return ["Count Team entered Count Room for Soft Count start."
+            , "Tables Soft Count started."
+            , "[date]; $___. Starting Pod [first] Soft Count."
+            , "Pod [first] Total; $___. Calling Main Banker for Partial Buy."
+            , "Main Banker entered for Partial Buy."
+            , "Partial complete, totals confirmed. Count Team on break."
+            , "Count Team back from break. Pod [second] Soft Count started."
+            , "Pod [second] Total; $___. Calling Main Banker for Buy."
+            , "Main Banker entered for Buy."
+            , "Buy complete, totals confirmed. Calling Security for Sweep."
+            , "Security Officer entered Count Room for Sweep."
+            , "Sweep complete."]
+    if kind = "slots"
+        return ["Count Team entered Count Room for Soft Count start. Pod [first] Soft Count started."
+            , "Pod [first] complete. Count Team on break."
+            , "Count Team back from break. Pod [second] Soft Count started."
+            , "Pod 1 and 2 Total; $___. Calling Main Banker for Buy."
+            , "Main Banker entered for Buy."
+            , "Buy complete, totals confirmed. Calling Security for Sweep."
+            , "Security Officer entered Count Room for Sweep."
+            , "Sweep complete."]
+    return ["Calling Main Banker for Tables Buy."
+        , "Main Banker entered for Tables Buy."
+        , "Tables Buy complete, totals confirmed."]
+}
+
+; 13 -> 13th
+ScOrdinal(num) {
+    if Mod(num, 100) >= 11 && Mod(num, 100) <= 13
+        return num "th"
+    last := Mod(num, 10)
+    return num (last = 1 ? "st" : last = 2 ? "nd" : last = 3 ? "rd" : "th")
+}
+
+ScFillIn(text, firstPod) {
+    text := StrReplace(text, "[first]", firstPod)
+    text := StrReplace(text, "[second]", firstPod = 1 ? 2 : 1)
+    text := StrReplace(text, "[date]", FormatTime(, "MMM") ", " ScOrdinal(Integer(FormatTime(, "d"))))
+    return StrReplace(text, "|", "/")
+}
+
+ScFirstPod() {
+    pod := "2"
+    try pod := IniRead(ScFile, "Sheet", "First", "2")
+    return pod = "1" ? 1 : 2
+}
+
+ScLoad() {
+    global ScLines, ScStarted, ScLoaded
+    if !ScLoaded {
+        ScLoaded := true
+        ScLines := [], ScStarted := ""
+        try ScStarted := IniRead(ScFile, "Sheet", "Started", "")
+        total := 0
+        try total := Integer(IniRead(ScFile, "Sheet", "N", "0"))
+        loop total {
+            row := ""
+            try row := IniRead(ScFile, "Lines", String(A_Index), "")
+            parts := StrSplit(row, "|", , 3)
+            if parts.Length = 3 && parts[3] != ""
+                ScLines.Push({state: parts[1], time: parts[2], text: parts[3]})
+        }
+    }
+    old := 0
+    if ScStarted != ""
+        try old := DateDiff(A_Now, ScStarted, "Hours")
+    if old >= 14
+        ScReset()
+}
+
+ScSave() {
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        try IniDelete ScFile, "Lines"
+        IniWrite ScStarted, ScFile, "Sheet", "Started"
+        IniWrite ScLines.Length, ScFile, "Sheet", "N"
+        for ln in ScLines
+            IniWrite ln.state "|" ln.time "|" ln.text, ScFile, "Lines", String(A_Index)
+    } catch as e {
+        Activity("Count sheet couldn't be saved: " e.Message)
+    }
+}
+
+ScReset() {
+    global ScLines, ScStarted, ScWin
+    ScLines := [], ScStarted := ""
+    try FileDelete ScFile
+    if IsObject(ScWin) {
+        try ScWin.gui.Destroy()
+        ScWin := ""
+    }
+}
+
+; Start of shift clears a sheet left from an earlier shift (8 hours or more)
+ScShiftReset() {
+    ScLoad()
+    old := 0
+    if ScStarted != ""
+        try old := DateDiff(A_Now, ScStarted, "Hours")
+    if old >= 8
+        ScReset()
+}
+
+ScBegin(tables, firstPod) {
+    global ScLines, ScStarted
+    ScLines := []
+    for text in ScWording(tables ? "tables" : "slots")
+        ScLines.Push({state: "p", time: "", text: ScFillIn(text, firstPod)})
+    ScStarted := A_Now
+    ScSave()
+    try {
+        IniWrite firstPod, ScFile, "Sheet", "First"
+        IniWrite tables ? 1 : 0, LastUsedFile, "Count", "Tables"
+        IniWrite firstPod, LastUsedFile, "Count", "First"
+    }
+    Activity("Count sheet started (" (tables ? "tables and slots" : "slots only") ", Pod " firstPod " first, " ScLines.Length " lines)")
+}
+
+; The first line still to do, 0 when the sheet is finished
+ScNext() {
+    for ln in ScLines
+        if ln.state = "p"
+            return A_Index
+    return 0
+}
+
+ScLastDone() {
+    pos := 0
+    for ln in ScLines
+        if ln.state = "d"
+            pos := A_Index
+    return pos
+}
+
+; 70385 -> 70,385   1144.005k -> 1,144,005   1.2m -> 1,200,000
+ScMoney(typed) {
+    clean := StrLower(StrReplace(StrReplace(StrReplace(Trim(typed), "$"), ","), " "))
+    if !RegExMatch(clean, "^(\d+(?:\.\d+)?|\.\d+)(k|m)?$", &mt)
+        return Trim(typed)
+    amt := Float(mt[1])
+    if mt[2] = "k"
+        amt *= 1000
+    else if mt[2] = "m"
+        amt *= 1000000
+    return FixMoney(Abs(amt - Round(amt)) < 0.005 ? String(Integer(Round(amt))) : Format("{:.2f}", amt))
+}
+
+; A line with $___ asks for the amount. False = cancelled.
+ScAskAmount(text, &filled) {
+    filled := text
+    if !InStr(text, "$___")
+        return true
+    if IsObject(ScWin)
+        try ScWin.gui.Opt("+OwnDialogs")
+    ib := InputBox(text "`n`nType the amount, like  70385  or  1144.005k`nLeave it empty to fill it in later.", "Watchlog - Count sheet", "w460 h190")
+    if ib.Result != "OK"
+        return false
+    amt := ScMoney(ib.Value)
+    filled := StrReplace(text, "$___", "$" (amt != "" ? amt : "XXX,XXX"), , , 1)
+    return true
+}
+
+; True when the window belongs to Watchlog itself (never paste there)
+ScOwnWindow(hwnd) {
+    if !hwnd
+        return true
+    own := true
+    try own := WinGetPID("ahk_id " hwnd) = DllCall("GetCurrentProcessId", "UInt")
+    return own
+}
+
+; Stamps a line with the time now. which = 0 means the next one. With a
+; target window the line is typed there (on a new line after the first);
+; without one it goes on the clipboard.
+ScStamp(which := 0, target := 0) {
+    global LeftOnClip
+    ScLoad()
+    if !which
+        which := ScNext()
+    if !which || which > ScLines.Length
+        return false
+    ln := ScLines[which]
+    filled := ""
+    if !ScAskAmount(ln.text, &filled)
+        return false
+    ln.text := filled, ln.time := FormatTime(, "HH:mm"), ln.state := "d"
+    ; a line done early moves up behind the last done one, so the log reads in time order
+    ScLines.RemoveAt(which)
+    ScLines.InsertAt(ScLastDone() + 1, ln)
+    ScSave()
+    full := ln.time " - " ln.text
+    saved := Max(StrLen(full) - 3, 0)
+    Journal("Soft count step", full, saved)
+    CountSaved("log", saved, "Soft count step")
+    Activity("Count sheet: line " ScLastDone() " of " ScLines.Length " stamped")
+    ScRefresh()
+    nx := ScNext()
+    after := nx ? "Next: " ScLines[nx].text : "That was the last line."
+    if target && !ScOwnWindow(target) {
+        if !WinActive("ahk_id " target) && !ScReturn(target) {
+            KeepOnClip(full)
+            return true
+        }
+        first := ScLastDone() = 1
+        Paste((first || CfgRead("Count", "NewLine", "before") = "none" ? "" : "`n") full, true)
+        Tip(full "`n" after, 4000)
+    } else {
+        A_Clipboard := full
+        LeftOnClip := full
+        Tip(full "`nCopied: click at the end of the log and press Ctrl+V.`n" after, 5000)
+    }
+    return true
+}
+
+ScReturn(target) {
+    if !WinExist("ahk_id " target)
+        return false
+    return ReturnTo(target)
+}
+
+; Ctrl+Alt+T: stamp the next line where the cursor is (a new count asks first)
+ScKey(*) {
+    ScLoad()
+    target := WinExist("A")
+    if !ScLines.Length {
+        ScSetup()
+        return
+    }
+    if !ScNext() {
+        ShowCountSheet()
+        Tip("The count sheet is finished. New count starts the next one.", 3500)
+        return
+    }
+    ScStamp(0, target)
+}
+
+; New count: the two questions
+ScSetup() {
+    global ScSetupWin
+    if IsObject(ScSetupWin) {
+        try WinActivate "ahk_id " ScSetupWin.Hwnd
+        return
+    }
+    target := WinExist("A")
+    lastT := "1", lastF := "2"
+    try lastT := IniRead(LastUsedFile, "Count", "Tables", "1")
+    try lastF := IniRead(LastUsedFile, "Count", "First", "2")
+    g := WGui("+AlwaysOnTop +ToolWindow", "Count sheet - new count")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText(, "What are they counting today?")
+    rTables := g.AddRadio("Group" (lastT = "0" ? "" : " Checked"), "&Tables and slots")
+    g.AddRadio(lastT = "0" ? "Checked" : "", "&Slots only")
+    g.AddText("y+14", "Which pod do they start with?")
+    rPod1 := g.AddRadio("Group" (lastF = "1" ? " Checked" : ""), "Pod &1 first")
+    g.AddRadio(lastF = "1" ? "" : "Checked", "Pod &2 first")
+    g.AddButton("Default w120 y+16", "Start").OnEvent("Click", Go)
+    g.AddButton("x+8 yp w100", "Cancel").OnEvent("Click", Cancel)
+    g.OnEvent("Escape", Cancel)
+    g.OnEvent("Close", Cancel)
+    ScSetupWin := g
+    g.Show()
+
+    Cancel(*) {
+        global ScSetupWin
+        ScSetupWin := ""
+        g.Destroy()
+    }
+    Go(*) {
+        global ScSetupWin
+        tables := rTables.Value, firstPod := rPod1.Value ? 1 : 2
+        ScSetupWin := ""
+        g.Destroy()
+        ScBegin(tables, firstPod)
+        ShowCountSheet()
+        Tip("Count sheet ready. In the count log, click at the end and press " HK("count") " for each line.", 5000)
+    }
+}
+
+ScLogText() {
+    out := ""
+    for ln in ScLines
+        if ln.state = "d"
+            out .= (out = "" ? "" : "`r`n") ln.time " - " ln.text
+    return out
+}
+
+ScRefresh() {
+    if !IsObject(ScWin)
+        return
+    lv := ScWin.lv
+    nx := ScNext()
+    try {
+        lv.Opt("-Redraw")
+        lv.Delete()
+        for ln in ScLines
+            lv.Add(, ln.state = "d" ? "done" : ln.state = "s" ? "skipped" : A_Index = nx ? "NEXT" : "", ln.time, ln.text)
+        if nx
+            lv.Modify(nx, "Select Focus Vis")
+        lv.Opt("+Redraw")
+    }
+}
+
+; Ctrl+Alt+Shift+T: the sheet itself
+ShowCountSheet(*) {
+    global ScWin
+    ScLoad()
+    if !ScLines.Length {
+        ScSetup()
+        return
+    }
+    if IsObject(ScWin) {
+        ScRefresh()
+        try ScWin.gui.Show()
+        return
+    }
+    g := WGui("+ToolWindow", "Count sheet")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w600", "In iTrak: reopen the count log, click at the end of the Synopsis and press " HK("count") ". The next line is typed there with the time now. Here, Enter stamps the picked line and copies it.")
+    lv := g.AddListView("w600 r15 -Multi NoSortHdr", ["", "Time", "Line"])
+    lv.ModifyCol(1, 65), lv.ModifyCol(2, 55), lv.ModifyCol(3, 455)
+    g.AddButton("xm y+10 w110 Default", "Stamp").OnEvent("Click", StampIt)
+    g.AddButton("x+6 yp w110", "Skip / unskip").OnEvent("Click", SkipIt)
+    g.AddButton("x+6 yp w100", "Undo last").OnEvent("Click", UndoIt)
+    g.AddButton("x+6 yp w80", "Edit...").OnEvent("Click", EditIt)
+    g.AddButton("x+6 yp w120", "Copy whole log").OnEvent("Click", CopyAll)
+    g.AddText("xm y+14", "Add:")
+    g.AddButton("x+8 yp-4 w100", "Tables Buy").OnEvent("Click", AddBuy)
+    g.AddButton("x+6 yp w120", "Emergency pull").OnEvent("Click", AddPull)
+    g.AddButton("x+6 yp w80", "Note...").OnEvent("Click", AddNote)
+    g.AddButton("x+60 yp w100", "New count").OnEvent("Click", NewOne)
+    g.AddButton("x+6 yp w70", "Close").OnEvent("Click", HideIt)
+    g.OnEvent("Escape", HideIt)
+    g.OnEvent("Close", HideIt)
+    ScWin := {gui: g, lv: lv}
+    ScRefresh()
+    g.Show()
+
+    HideIt(*) {
+        g.Hide()
+    }
+    Picked() {
+        row := lv.GetNext()
+        return row && row <= ScLines.Length ? row : 0
+    }
+    StampIt(*) {
+        row := Picked()
+        if row && ScLines[row].state != "p"
+            row := 0
+        if !row && !ScNext() {
+            Tip("Every line is done. Copy whole log, or New count.", 3000)
+            return
+        }
+        ScStamp(row, 0)
+    }
+    SkipIt(*) {
+        row := Picked()
+        if !row || ScLines[row].state = "d"
+            row := ScNext()
+        if !row
+            return
+        ScLines[row].state := ScLines[row].state = "s" ? "p" : "s"
+        ScSave()
+        ScRefresh()
+    }
+    UndoIt(*) {
+        row := ScLastDone()
+        if !row
+            return
+        was := ScLines[row].time " - " ScLines[row].text
+        ScLines[row].state := "p", ScLines[row].time := ""
+        ScSave()
+        ScRefresh()
+        Activity("Count sheet: last stamp undone")
+        Tip("Undone here: " was "`nIf it's already in the log, take it out there too.", 5000)
+    }
+    EditIt(*) {
+        row := Picked()
+        if !row
+            return
+        ln := ScLines[row]
+        g.Opt("+OwnDialogs")
+        ib := InputBox(ln.state = "d" ? "Change the time or the wording of this line:" : "Change the wording of this line ($___ asks for the amount):", "Watchlog - Count sheet", "w560 h140", ln.state = "d" ? ln.time " - " ln.text : ln.text)
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        val := StrReplace(Trim(ib.Value), "|", "/")
+        if ln.state = "d" && RegExMatch(val, "^(\d{1,2}:\d{2})\s*-\s*(.+)$", &mt)
+            ln.time := mt[1], ln.text := mt[2]
+        else
+            ln.text := val
+        ScSave()
+        ScRefresh()
+        try lv.Modify(row, "Select Focus Vis")
+    }
+    CopyAll(*) {
+        global LeftOnClip
+        all := ScLogText()
+        if all = "" {
+            Tip("Nothing is stamped yet.")
+            return
+        }
+        A_Clipboard := all
+        LeftOnClip := all
+        Tip("The whole count log is copied. Paste it with Ctrl+V.", 3000)
+    }
+    AddAt(texts) {
+        pos := ScNext()
+        if !pos
+            pos := ScLines.Length + 1
+        for text in texts
+            ScLines.InsertAt(pos + A_Index - 1, {state: "p", time: "", text: StrReplace(text, "|", "/")})
+        ScSave()
+        ScRefresh()
+        return pos
+    }
+    AddBuy(*) {
+        texts := []
+        for text in ScWording("tablesbuy")
+            texts.Push(ScFillIn(text, ScFirstPod()))
+        AddAt(texts)
+        Tip("Tables Buy lines added as the next ones.", 3000)
+    }
+    AddPull(*) {
+        g.Opt("+OwnDialogs")
+        ib := InputBox("Machine of the emergency pull:", "Watchlog - Count sheet", "w360 h120")
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        ScStamp(AddAt(["Completed emergency pull for " StrUpper(Trim(ib.Value)) "."]), 0)
+    }
+    AddNote(*) {
+        g.Opt("+OwnDialogs")
+        ib := InputBox("A line of your own, stamped with the time now:", "Watchlog - Count sheet", "w560 h120")
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        ScStamp(AddAt([Trim(ib.Value)]), 0)
+    }
+    NewOne(*) {
+        g.Opt("+OwnDialogs")
+        if MsgBox("Clear this count sheet and start a new count?", "Watchlog - Count sheet", "YesNo Icon? Default2") != "Yes"
+            return
+        ScReset()
+        ScSetup()
+    }
+}
+
+; =====================================================================
+;  CONTEXT: boxes filled from what Watchlog already knows (v3.40.0)
+;  1. recall: a box that remembers its answer for each value of another
+;     box. {Reference: recall Table} keeps one Reference per table,
+;     {Asset #: recall Machine} one asset # per machine. Kept in
+;     remembered.ini beside templates.txt (OneDrive takes it to every
+;     bay); a remembered.ini in the team folder is read when yours has
+;     nothing for it. Tables, machines and cameras only: no people.
+;  2. The bay of this PC: settings.ini (or team-settings.ini) [Bays]
+;     PCNAME=2. Start and End of shift use it without asking.
+;  3. Open tables: every log that says a table Opened or Closed updates
+;     the list for the shift (last used.ini [Tables]). Boxes marked
+;     openfirst / closedfirst list them in that order.
+; =====================================================================
+RecallFile := HomeDir "\remembered.ini"
+
+RecallKey(partner) {
+    k := Trim(RegExReplace(partner, "[=\r\n\[\]]", " "))
+    return StrLen(k) > 60 || SubStr(k, 1, 1) = ";" ? "" : k
+}
+
+; What was last typed in the box called box when the other box held partner
+RecallGet(box, partner) {
+    k := RecallKey(partner)
+    if k = ""
+        return ""
+    v := ""
+    try v := IniRead(RecallFile, box, k, "")
+    if v = "" {
+        d := TeamDir()
+        if d != "" && FileExist(d "\remembered.ini")
+            try v := IniRead(d "\remembered.ini", box, k, "")
+    }
+    return v
+}
+
+RecallPut(box, partner, val) {
+    k := RecallKey(partner)
+    if k = "" || val = "" || StrLen(val) > 200
+        return
+    old := ""
+    try old := IniRead(RecallFile, box, k, "")
+    if old == val
+        return
+    TryIniWrite(val, RecallFile, box, k)
+    Activity("Remembered " box " for " k)
+}
+
+; tray > Advanced > Remembered boxes: the file itself, to fix or remove a line
+RecallEdit(*) {
+    if !FileExist(RecallFile)
+        TryAppend("; Watchlog: what the recall boxes remember (v3.40.0).`r`n; [Box name] then one line for each table, machine or place:  BJ205=M3 (355)`r`n; Change or delete a line here; Watchlog reads it fresh every time.`r`n", RecallFile)
+    EditFile(RecallFile)
+}
+
+; ---- The bay of this PC ------------------------------------------------
+PcBay() => Trim(CfgRead("Bays", A_ComputerName, ""))
+
+SetPcBay(bay) {
+    bay := Trim(bay)
+    if bay = "" || bay = PcBay()
+        return
+    TryIniWrite(bay, SettingsFile, "Bays", A_ComputerName)
+    NoteOwnWrites()
+    Activity("This PC (" A_ComputerName ") is Bay " bay)
+    Tip("This PC is now Bay " bay ": Start and End of shift won't ask again.`nChange it: tray > Advanced > This PC's bay.", 6000)
+}
+
+PcBayEdit(*) {
+    ib := InputBox("Which bay is this PC (" A_ComputerName ")?`n`nStart and End of shift use it without asking.`nLeave it empty to be asked each shift again.", "Watchlog - This PC's bay", "w380 h190", PcBay())
+    if ib.Result != "OK"
+        return
+    bay := Trim(ib.Value)
+    if bay = "" {
+        TryIniWrite("", SettingsFile, "Bays", A_ComputerName)
+        NoteOwnWrites()
+        Tip("This PC has no bay now: Start of shift asks again.", 3500)
+    } else
+        SetPcBay(bay)
+}
+
+; ---- Open tables --------------------------------------------------------
+; {open: [tables], closed: Map(table -> time it was logged closed)}
+TablesState() {
+    st := {open: [], closed: Map()}
+    st.closed.CaseSense := false
+    since := "", openList := "", closedList := ""
+    try since := IniRead(LastUsedFile, "Tables", "Since", "")
+    if since = ""
+        return st
+    old := 0
+    try old := DateDiff(A_Now, since, "Hours")
+    if old >= 14 {
+        try IniDelete LastUsedFile, "Tables"
+        return st
+    }
+    try openList := IniRead(LastUsedFile, "Tables", "Open", "")
+    try closedList := IniRead(LastUsedFile, "Tables", "Closed", "")
+    for t in StrSplit(openList, "|")
+        if Trim(t) != ""
+            st.open.Push(Trim(t))
+    for t in StrSplit(closedList, "|") {
+        p := InStr(t, "@")
+        if p > 1
+            st.closed[SubStr(t, 1, p - 1)] := SubStr(t, p + 1)
+    }
+    return st
+}
+
+TablesSave(st) {
+    openList := "", closedList := ""
+    if Lists.Has("tables")
+        for it in Lists["tables"]
+            if HasVal(st.open, it)
+                openList .= (openList = "" ? "" : "|") it
+    for t, at in st.closed
+        closedList .= (closedList = "" ? "" : "|") t "@" at
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        if IniRead(LastUsedFile, "Tables", "Since", "") = ""
+            IniWrite A_Now, LastUsedFile, "Tables", "Since"
+        IniWrite openList, LastUsedFile, "Tables", "Open"
+        IniWrite closedList, LastUsedFile, "Tables", "Closed"
+    }
+    SetIconTip()
+}
+
+; A finished log: a sentence with "Opened" opens the tables named in it, one
+; with "Closed" closes them ([Tables] OpenWord / CloseWord in settings.ini)
+TablesNote(out) {
+    if !Lists.Has("tables")
+        return
+    openWord := Trim(CfgRead("Tables", "OpenWord", "Opened")), closeWord := Trim(CfgRead("Tables", "CloseWord", "Closed"))
+    st := "", names := ""
+    for line in StrSplit(out, "`n", "`r") {
+        p := InStr(line, " >> ")
+        if p
+            line := SubStr(line, 1, p - 1)
+        for sentence in StrSplit(line, ".") {
+            isOpen := openWord != "" && RegExMatch(sentence, "\b\Q" openWord "\E\b") > 0
+            isClose := closeWord != "" && RegExMatch(sentence, "\b\Q" closeWord "\E\b") > 0
+            if isOpen = isClose
+                continue
+            for it in Lists["tables"] {
+                if !RegExMatch(sentence, "i)(?<![A-Za-z0-9])\Q" it "\E(?![A-Za-z0-9])")
+                    continue
+                if !IsObject(st)
+                    st := TablesState()
+                at := 0
+                for j, name in st.open
+                    if name = it
+                        at := j
+                if isOpen {
+                    if !at
+                        st.open.Push(it)
+                    if st.closed.Has(it)
+                        st.closed.Delete(it)
+                } else {
+                    if at
+                        st.open.RemoveAt(at)
+                    st.closed[it] := FormatTime(, "HH:mm")
+                }
+                names .= (names = "" ? "" : ", ") it (isOpen ? " open" : " closed")
+            }
+        }
+    }
+    if IsObject(st) {
+        TablesSave(st)
+        Activity("Open tables: " names)
+    }
+}
+
+; "Open tables: BJ205, RO204" ("" when none are known)
+TablesText() {
+    st := TablesState()
+    if !st.open.Length
+        return ""
+    txt := ""
+    for it in st.open
+        txt .= (txt = "" ? "" : ", ") it
+    return "Open tables: " txt
+}
+
+; Start of shift clears a list left from an earlier shift (8 hours or more)
+TablesShiftReset() {
+    since := ""
+    try since := IniRead(LastUsedFile, "Tables", "Since", "")
+    old := 0
+    if since != ""
+        try old := DateDiff(A_Now, since, "Hours")
+    if old >= 8
+        try IniDelete LastUsedFile, "Tables"
+    SetIconTip()
+}
+
+; The tray icon's hover text: version, break time once a break was taken, open tables
 SetIconTip() {
     iconTxt := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
     since := ""
     try since := IniRead(LastUsedFile, "Break", "Since", "")
     if since != ""
         iconTxt .= "`n" BreakText()
-    A_IconTip := iconTxt
+    tbl := TablesText()
+    if tbl != ""
+        iconTxt .= "`n" tbl
+    A_IconTip := SubStr(iconTxt, 1, 127)
 }
 
 ; Clicks End Time's Now button in the Daily Log Entry in front (or the
@@ -5997,7 +6817,7 @@ RepeatLastLog() {
 ; taught on this PC (no passwords: those live in Windows' Credential Manager)
 BackupSources() {
     list := []
-    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt", "picker pins.txt"]
+    for n in ["templates.txt", "my-templates.txt", "settings.ini", "autocorrect.txt", "picker pins.txt", "remembered.ini"]
         if FileExist(HomeDir "\" n)
             list.Push([HomeDir "\" n, "home - " n])
     if DirExist(DataDir)
@@ -6887,8 +7707,13 @@ ShowDashboard(tab := 1) {
     g.AddText("xm+12 y" y " w470 BackgroundTrans", BreakText())
     g.AddButton("xm+490 y" (y - 4) " w90 h26", "Change...").OnEvent("Click", (*) => (g.Opt("+OwnDialogs"), BreakEdit() && ShowDashboard()))
     y += 24
+    tblLine := TablesText()     ; open tables this shift (v3.40.0)
+    if tblLine != "" {
+        g.AddText("xm+12 y" y " w560 BackgroundTrans", tblLine)
+        y += 22
+    }
     g.AddText("xm+12 y" y " w560 BackgroundTrans", "Logs by type (" f.span ")")
-    lv := g.AddListView("xm+12 y+6 w570 r11 -Multi NoSortHdr", ["Log type", "Times", ""])
+    lv := g.AddListView("xm+12 y+6 w570 r" (tblLine != "" ? 10 : 11) " -Multi NoSortHdr", ["Log type", "Times", ""])
     top := f.types.Length ? f.types[1].n : 0
     for it in f.types
         lv.Add(, it.name, it.n, Bar(it.n, top))
@@ -6993,6 +7818,14 @@ RegisterStamps() {
     Hotstring(":*:" TrigKey(";t"), StampTime)
     Hotstring(":*:" TrigKey(";dd"), StampDate)
     Hotstring(":*:" TrigKey(";dt"), StampDateTime)
+    ; ;count opens the count sheet (v3.39.0), unless an older templates.txt
+    ; still has code words that start with it (;countstep ...)
+    clash := false
+    for t in TemplateList
+        if InStr(StrLower(t.trig), ";count") = 1
+            clash := true
+    if !clash
+        Hotstring(":*:" TrigKey(";count"), (*) => ShowCountSheet())
     HotIf
 }
 
@@ -7238,6 +8071,8 @@ BrowserOpen() {
 
 StartOfShift() {
     BreakReset()
+    ScShiftReset()
+    TablesShiftReset()
     sites := true
     if BrowserOpen()
         sites := MsgBox("Edge is already open, so the Citrix page is probably open too.`n`n"
@@ -11616,6 +12451,7 @@ BuildTrayMenu() {
     MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
     MenuItem(tm, "Shift dashboard  (" HK("dashboard") ")", (*) => ShowDashboard(), 0xE9D9)
     MenuItem(tm, "Change break time...", (*) => BreakEdit(), 0xE916)
+    MenuItem(tm, "Count sheet  (" HK("countsheet") ")", (*) => ShowCountSheet(), 0xE9D5)
     tm.Add()
     MenuItem(tm, "Start of shift  (" HK("start") ")", (*) => StartOfShift(), 0xE768)
     MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
@@ -11690,6 +12526,8 @@ BuildTrayMenu() {
     MenuItem(more, "Edit my templates in Notepad", (*) => EditMine(), 0xE8A5)
     MenuItem(more, "Edit settings file", (*) => EditFile(SettingsFile), 0xE8A5)
     MenuItem(more, "Edit the autocorrect list", (*) => EditAutocorrect(), 0xE8A5)
+    MenuItem(more, "Remembered boxes (Reference, Asset #...)", (*) => RecallEdit(), 0xE8A5)
+    MenuItem(more, "This PC's bay...", (*) => PcBayEdit(), 0xE7F4)
     MenuItem(more, "Open Watchlog folder", (*) => Run(HomeDir), 0xE8B7)
     MenuItem(more, "Check start with Windows", (*) => CheckStartWithWindows(), 0xE7E8)
     MenuItem(more, "Choose my own update folder", (*) => ChooseUpdateFolder(), 0xE896)
@@ -12671,6 +13509,8 @@ ShowHome() {
         : it = "team" ? "iTrak new daily log: using the team's shared setup"
         : "iTrak new daily log isn't taught on this PC yet (Ctrl+Alt+Shift+I)")
     Status(BreakLeftSecs() < 0 ? "C62828" : "0E746E", BreakText())
+    if TablesText() != ""
+        Status("0E746E", TablesText())
     sh := SavedShift()
     Status("0E746E", "This shift: " sh.log " log" (sh.log = 1 ? "" : "s") ", " sh.login " login" (sh.login = 1 ? "" : "s")
         . ", " SavedTime(sh.keys, sh.clicks) " saved")
@@ -13039,7 +13879,7 @@ BoxParse(spec) {
             b.caps := true
         else if low = "upper"
             b.upper := true
-        else if low = "tidy" || low = "several" || low = "saved" || low = "under10k"
+        else if low = "tidy" || low = "several" || low = "saved" || low = "under10k" || low = "openfirst" || low = "closedfirst" || RegExMatch(low, "^recall\s")
             b.keep.Push(opt)       ; bvs -> BVs, several (no tick box for them): kept as they are
         else if SubStr(opt, 1, 1) = "@" && b.list = ""
             b.list := SubStr(opt, 2)

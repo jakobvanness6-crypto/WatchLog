@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Nov 9, 2026
-# Program version: 3.38.2
+# Wording version: Nov 15, 2026
+# Program version: 3.40.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -72,6 +72,11 @@
 #      {Table: @tables}               uses the @tables list below
 #      {Amount: if ATM=100000}        fills in 100000 when another box
 #                                     starts with ATM (you can change it)
+#      {Reference: recall Table}      remembers what you typed for each
+#                                     Table (the box named after recall)
+#                                     and fills it in next time (v3.40.0)
+#      {Table: @tables | openfirst}   tables you logged open this shift come
+#                                     first in the list (closedfirst = last)
 #    In a box with a list, typing just the number picks the item that
 #    ends in it: 202 becomes FB202.
 #    Combine options with | like {Employee #: clip | blank=XXXXXXX}
@@ -96,17 +101,17 @@
 @areas = ATM | Bar | Buffet | Cage | Count Room | First aid room | Food & Beverage | Gaming Floor | Guest Services | Housekeeping | I.T. | Main Bank | Maintenance | NRT | Operations Management | Pit 2 | Pit 3 | Racebook | Security | Security Podium | Slot Section D | Windward | Slots
 @tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206 | RY301 | MP302 | BJ303 | BJ304 | BJ305 | RO306
 # Your own short names for code words on the call pad (v3.38.0): short=codeword.
-# "count" on the pad runs ;countstep, "ct 5.5 10" fills ;counttables' two boxes.
-@alias = count=countstep | ct=counttables | cs=countslots | cp=countpull | cc=cards | med=medical
+# "cc" on the pad runs ;cards. ("count" on the pad stamps the next count sheet line.)
+@alias = cc=cards | med=medical
 
 
 # ----- FORMS ---------------------------------------------------------
 
-;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money | under10k} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid {Paid: all cash | by cheque} at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot |
+;jack (Jackpot) = Operations Supervisor advised of a ${Amount: money | under10k} Supervisor Jackpot @{Machine: caps | blank=AXXXX}. Review confirmed winner. Patron requested to be paid {Paid: all cash | by cheque} at window #{Window #: blank=X}. Slot Attendant was observed paying patron @{Time paid: time}. >> %slots% | Jackpot | {Reference: recall Machine | blank=}
 
 ;audit (Audit) = Surveillance observed {Employee type: fromcopy | Dealer | Security Officer | Security Supervisor | Operations Supervisor | Operations Manager | Pit Supervisor | Pit Manager | Cage Cashier | F&B Server | F&B Bartender | F&B Dishwasher | F&B Commis Chef | F&B Sous Chef | F&B Chef de Partie | F&B Supervisor | F&B Manager | General Manager | Count Team Attendant | Count Team Supervisor | Audit Supervisor | Auditor | Slot Attendant | Slot Technician | Main Banker | EVS Attendant | General Maintenance | Facilities Manager} {Employee #: clip | prefix=# | blank=#XXXXXXX} from {From: now} - {To: now+20} on {Location: caps | blank=MX}. Nothing suspicious observed. >> audit | {Area audited: @areas | if Dealer=Pit 2 | if Pit=Pit 2 | if Security=Security | if Operations=Operations Management | if General Manager=Operations Management | if Cage=Cage | if Main Bank=Main Bank | if F&B=Food & Beverage | if Count Team=Count Room | if Slot=Slots | if EVS=Housekeeping | if General Maintenance=Maintenance | if Facilities=Maintenance} | {Location} | {To} | {From}
 
-;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results. >> | Medical |
+;medical (Medical) = Security Supervisor notified Surveillance of a/an {Who: employee | guest} medical at {Location: Kitchen | Main Entrance}. A review was conducted and observed {What the review showed}. Security administered first aid and contacted EMS. {Outcome: pick | EMS arrived on site and took the individual off-site via ambulance. | EMS arrived on site and the individual returned to the gaming floor, no further action taken.} Security Supervisor notified of the review results. >> {Daily log Location: recall Location | blank=} | Medical | {Reference: recall Location | blank=}
 
 ;evict (Trespass) = Report opened on behalf of Security. The Security Supervisor approached a guest at {Location: Main Entrance} for {Reason: showing signs of intoxication | being verbally abusive towards staff | being in violation of their trespass}. The guest was escorted off the gaming floor and given a/an {Length: 24 hour | indefinite} Trespass. The guest left without further incident. >> Security Desk - Main Lobby | Trespass |
 
@@ -168,32 +173,36 @@
 # ----- TABLES --------------------------------------------------------
 
 ;close (Table closing) = Pit Manager advised checking table tray lids and Dealers collecting tokes. >> %pit% | Table Opening/Closing | NA
-;oc (Open and close tables) = [{Opened: @tables | several | blank=} Opened.][ {Closed: @tables | several | blank=} Closed and Auto-Close started.] >> %pit% | Table Opening/Closing | NA
-;open (Table opening) = {Table: @tables | several | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
-;auto (Auto-close) = {Table: @tables | several | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
-;cards (Card change) = Card change on {Table: @tables}. >> %pit% | Card Change | NA
+;oc (Open and close tables) = [{Opened: @tables | several | closedfirst | blank=} Opened.][ {Closed: @tables | several | openfirst | blank=} Closed and Auto-Close started.] >> %pit% | Table Opening/Closing | NA
+;open (Table opening) = {Table: @tables | several | closedfirst | blank=XXXXX} Opened. {repeat} >> %pit% | Table Opening/Closing | NA
+;auto (Auto-close) = {Table: @tables | several | openfirst | blank=XXXXX} Closed and Auto-Close started. {repeat} >> %pit% | Table Opening/Closing | NA
+;cards (Card change) = Card change on {Table: @tables | openfirst}. >> %pit% | Card Change | NA
 ;break (Break) = Break >> Surveillance | Duty | NA
-;fill (Table fill) = {Table: @tables} ${Amount: money} {repeat} >> %pit% | Table Fill |
-;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat} >> ABM/NRT | ATM/NRT/CTR fill |
-;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=} >> %pit% | Player Update | NA
+;fill (Table fill) = {Table: @tables | openfirst} ${Amount: money} {repeat} >> %pit% | Table Fill | {Reference: recall Table | blank=}
+;mfill (Machine fill) = {Machine: pick | NRT1 | NRT2 | NRT3 | NRT4 | ATM1 | ATM2 | ATM3 | ATM4 | ATM5} ${Amount: money | if ATM=100000} {Note: tidy | prefix=( | suffix=) | blank=} {repeat} >> ABM/NRT | ATM/NRT/CTR fill | {Reference: recall Machine | blank=}
+;player (Player log) = {Player #: numberprefix=Player # | upper | blank=Player #XXXXXX} playing Spot {Spot: blank=X}, {Table: @tables | openfirst | blank=TableX}, In ${Buy-in: money | thousands}, {Down/Up: Down | Up} ${Amount: money | thousands}. {Reason (only if up): blank=} >> %pit% | Player Update | NA
 
 
 # ----- SLOTS ---------------------------------------------------------
 
-;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency Pull |
-;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money}) >> %slots% | Request for Review |
-;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found. >> %slots% | Lost & Found |
-;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious. >> %slots% | AML Alert |
+;bv (Emergency BV pull) = {Machine: caps | blank=XXXXX} {Asset #: recall Machine | prefix=# | blank=} ({Reason: Full | Defective}) {repeat} >> %slots% | Emergency Pull | {Reference: recall Machine | blank=}
+;abandon (Abandoned credits) = Operations Supervisor requested a review to determine the owner of abandoned credits found at {Found at: caps | blank=XXXXX}. A review was conducted and observed the last patron gaming there leave without appearing to cash out. Patron was found live gaming at {Patron found at: caps | blank=XXXXX}. Operations Supervisor advised, approach made and funds returned. TITO value (${TITO value: money}) >> %slots% | Request for Review | {Reference: recall Found at | blank=}
+;found (Abandoned credits - taken to Security) = Operations Supervisor advised printing off abandoned credits in the amount of ${Amount: money} from {Machine: caps | blank=XXXXX}. Funds taken to Security as found. >> %slots% | Lost & Found | {Reference: recall Machine | blank=}
+;aml (AML alert) = AML Alert #{Alert #: blank=XXX} populated at {Machine: caps | blank=XXXXX} ({Time: now}). Review showed nothing suspicious. >> %slots% | AML Alert | {Reference: recall Machine | blank=}
 ;maint (Maintenance) = {Machines: caps | NRT2 and NRT4} Maintenance. >> ABM/NRT | AJM/CTR Fill |
 ;firm (NRT firmware check) = {Department/Title: Operations Supervisor | blank=XXXXX} notified Surveillance that they will be conducting an NRT Firmware check at {Location/NRT#: caps | blank=NRTX}.\nDUB#{DUB #: blank=XXXXX} (Should have fixed shot taken)
 
 
-# ----- SOFT COUNT  (time fills in as now, step opens on the next one) -
+# ----- SOFT COUNT: THE COUNT SHEET  (v3.39.0) ------------------------
+# The count is one checklist now: Ctrl+Alt+T stamps the next line with
+# the time, Ctrl+Alt+Shift+T (or ;count) shows the sheet. A new count asks
+# "tables today?" and "which pod first?" and uses the list that fits.
+# [first] [second] = the pod numbers, [date] = today like Nov, 13th,
+# $___ = Watchlog asks for the amount. One line per item, | between them.
 
-;countstep (Soft count step) = {Time: now} - {Step: next | Count Team entered Count Room. Tables soft count started. | Main Banker entered Count Room for tables Buy. | Buy confirmed, Pod #1 Soft Count started. | Money secured, Count Team on break. | Pod 2 Soft Count started. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security entered for Sweep. | Sweep complete.}
-;counttables (Soft count - table totals) = {Time: now} - Tables totals: 1st; ${1st: money}, 2nd; ${2nd: money}, called Main banker for Table buy.
-;countslots (Soft count - slots total) = {Time: now} - Pod 2 completed. Slots Total: ${Slots total: money}. Called Main Banker for Buy.
-;countpull (Soft count - emergency pull) = {Time: now} - completed emergency pull for {Machine: caps | blank=XXXXX}.
+@count-tables = Count Team entered Count Room for Soft Count start. | Tables Soft Count started. | [date]; $___. Starting Pod [first] Soft Count. | Pod [first] Total; $___. Calling Main Banker for Partial Buy. | Main Banker entered for Partial Buy. | Partial complete, totals confirmed. Count Team on break. | Count Team back from break. Pod [second] Soft Count started. | Pod [second] Total; $___. Calling Main Banker for Buy. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security Officer entered Count Room for Sweep. | Sweep complete.
+@count-slots = Count Team entered Count Room for Soft Count start. Pod [first] Soft Count started. | Pod [first] complete. Count Team on break. | Count Team back from break. Pod [second] Soft Count started. | Pod 1 and 2 Total; $___. Calling Main Banker for Buy. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security Officer entered Count Room for Sweep. | Sweep complete.
+@count-tablesbuy = Calling Main Banker for Tables Buy. | Main Banker entered for Tables Buy. | Tables Buy complete, totals confirmed.
 
 
 # ----- OTHER ---------------------------------------------------------
