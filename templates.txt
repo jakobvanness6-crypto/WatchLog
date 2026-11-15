@@ -14,8 +14,8 @@
 #    be running. When you hand out a new Watchlog.ahk, change it
 #    here too: any PC on an older one gets told to update.
 #
-# Wording version: Nov 9, 2026
-# Program version: 3.38.3
+# Wording version: Nov 15, 2026
+# Program version: 3.39.0
 #
 #  EASIER: the template editor (Ctrl+Alt+E, or click the tray icon >
 #  Template editor) changes all of this for you, boxes included.
@@ -96,8 +96,8 @@
 @areas = ATM | Bar | Buffet | Cage | Count Room | First aid room | Food & Beverage | Gaming Floor | Guest Services | Housekeeping | I.T. | Main Bank | Maintenance | NRT | Operations Management | Pit 2 | Pit 3 | Racebook | Security | Security Podium | Slot Section D | Windward | Slots
 @tables = UT201 | FB202 | UT203 | RO204 | BJ205 | BJ206 | RY301 | MP302 | BJ303 | BJ304 | BJ305 | RO306
 # Your own short names for code words on the call pad (v3.38.0): short=codeword.
-# "count" on the pad runs ;countstep, "ct 5.5 10" fills ;counttables' two boxes.
-@alias = count=countstep | ct=counttables | cs=countslots | cp=countpull | cc=cards | med=medical
+# "cc" on the pad runs ;cards. ("count" on the pad stamps the next count sheet line.)
+@alias = cc=cards | med=medical
 
 
 # ----- FORMS ---------------------------------------------------------
@@ -188,12 +188,16 @@
 ;firm (NRT firmware check) = {Department/Title: Operations Supervisor | blank=XXXXX} notified Surveillance that they will be conducting an NRT Firmware check at {Location/NRT#: caps | blank=NRTX}.\nDUB#{DUB #: blank=XXXXX} (Should have fixed shot taken)
 
 
-# ----- SOFT COUNT  (time fills in as now, step opens on the next one) -
+# ----- SOFT COUNT: THE COUNT SHEET  (v3.39.0) ------------------------
+# The count is one checklist now: Ctrl+Alt+T stamps the next line with
+# the time, Ctrl+Alt+Shift+T (or ;count) shows the sheet. A new count asks
+# "tables today?" and "which pod first?" and uses the list that fits.
+# [first] [second] = the pod numbers, [date] = today like Nov, 13th,
+# $___ = Watchlog asks for the amount. One line per item, | between them.
 
-;countstep (Soft count step) = {Time: now} - {Step: next | Count Team entered Count Room. Tables soft count started. | Main Banker entered Count Room for tables Buy. | Buy confirmed, Pod #1 Soft Count started. | Money secured, Count Team on break. | Pod 2 Soft Count started. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security entered for Sweep. | Sweep complete.}
-;counttables (Soft count - table totals) = {Time: now} - Tables totals: 1st; ${1st: money}, 2nd; ${2nd: money}, called Main banker for Table buy.
-;countslots (Soft count - slots total) = {Time: now} - Pod 2 completed. Slots Total: ${Slots total: money}. Called Main Banker for Buy.
-;countpull (Soft count - emergency pull) = {Time: now} - completed emergency pull for {Machine: caps | blank=XXXXX}.
+@count-tables = Count Team entered Count Room for Soft Count start. | Tables Soft Count started. | [date]; $___. Starting Pod [first] Soft Count. | Pod [first] Total; $___. Calling Main Banker for Partial Buy. | Main Banker entered for Partial Buy. | Partial complete, totals confirmed. Count Team on break. | Count Team back from break. Pod [second] Soft Count started. | Pod [second] Total; $___. Calling Main Banker for Buy. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security Officer entered Count Room for Sweep. | Sweep complete.
+@count-slots = Count Team entered Count Room for Soft Count start. Pod [first] Soft Count started. | Pod [first] complete. Count Team on break. | Count Team back from break. Pod [second] Soft Count started. | Pod 1 and 2 Total; $___. Calling Main Banker for Buy. | Main Banker entered for Buy. | Buy complete, totals confirmed. Calling Security for Sweep. | Security Officer entered Count Room for Sweep. | Sweep complete.
+@count-tablesbuy = Calling Main Banker for Tables Buy. | Main Banker entered for Tables Buy. | Tables Buy complete, totals confirmed.
 
 
 # ----- OTHER ---------------------------------------------------------

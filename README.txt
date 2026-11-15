@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.38.3  -  README
+  WATCHLOG  v3.39.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -242,6 +242,9 @@ couple of seconds. No need to press anything.
                     synopsis is the bay entered at the start of shift (v3.20.2); {Bay?} always
                     asks which bay and keeps the answer for the shift (v3.20.3).
   Ctrl+Alt+Shift+E  Click End Time Now in the daily log in front (v3.29.0)
+  Ctrl+Alt+T        (v3.39.0) COUNT SHEET: stamp the next soft count line with the time
+                    now, typed where the cursor is. Ctrl+Alt+Shift+T shows the sheet.
+                    See COUNT SHEET in section 19.
   Ctrl+Alt+Shift+N  Incident report from the open daily log (v3.33.0, section 19)
   Ctrl+Alt+Shift+R  Repeat the last full-entry log (new daily log, same boxes) (v3.28.0)
   Ctrl+Alt+Shift+F  Teach the four spots once per PC: open a new, empty daily log in iTrak,
@@ -409,8 +412,6 @@ were typing.
       ATM amount      (;mfill) fills in 100,000 when you pick an ATM;
                       type over it if it's different
       Bay box         remembers the bay you typed last time
-      Step box        (;countstep) opens on the step after the last one
-                      you used, and wraps back to the start
   - "a/an" in a template picks the right word for what follows it
     ("an employee", "a guest").
   - Several in one log (;bv): fill in the first machine and press
@@ -459,10 +460,8 @@ Forms (open a form):
   ;aml          AML alert: alert #, machine, time (now)
   ;firm         NRT firmware check: department/title (starts as Operations Supervisor), location/NRT # (n2 becomes NRT2), DUB # (with the fixed shot note)
   ;maint        Machine maintenance
-  ;countstep    Soft count step (time now, opens on the next step)
-  ;counttables  Soft count: table totals
-  ;countslots   Soft count: slots total
-  ;countpull    Soft count: emergency pull
+  ;count        Soft count: opens the count sheet (v3.39.0; Ctrl+Alt+T stamps the
+                next line). Replaces ;countstep ;counttables ;countslots ;countpull.
   ;badge        Pass 17-01 to 17-09: contractor employee (type the company over XXXXX) or interview
   ;account      Account review: account # (the # stays if left empty)
   ;refuse       Refused entry: how many patrons (one to 5, or type
@@ -773,6 +772,7 @@ and the less-used items sit in sub-menus):
   Shift count                   Exact tally of this shift, item by item
                                 (see SHIFT COUNT in section 10)
   Shift dashboard               Same as Ctrl+Alt+Shift+D (v3.16.0)
+  Count sheet                   Same as Ctrl+Alt+Shift+T (v3.39.0)
   Change break time...          Set the break minutes used this shift by
                                 hand (v3.33.2). See BREAK TIME TRACKER.
   Start of shift                Same as Ctrl+Alt+L
@@ -949,7 +949,7 @@ instructions; the short version:
   - Start every trigger with ; and use no spaces in it.
   - No trigger can be the start of another one, because it would fire
     before you finish typing the longer one (that's why the soft count
-    step is ;countstep, not ;count). The script tells you if two clash.
+    step used to be ;countstep, not ;count). The script tells you if two clash.
   - Don't start a trigger with ;t ;dd or ;dt (those are the stamps).
     The script skips such lines and tells you.
   - (Name) is optional. It shows on the form and the cheat sheet.
@@ -1203,6 +1203,10 @@ Save it and it reloads itself.
 [SDS]
   ResignMinutes=   minutes after an SDS login before it signs back in
                    (default 62, 0 = off)
+
+[Count]
+  NewLine=         before (default: a new line before each count sheet line
+                   but the first) or none. See COUNT SHEET in section 19.
 
 [Break]
   Minutes=         break time allowed per shift (default 60). See BREAK TIME
@@ -1477,8 +1481,56 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.38, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.39, newest first)
 -----------------------------------------------------------------------
+COUNT SHEET: THE SOFT COUNT AS ONE CHECKLIST  (v3.39.0)
+  Jakob (Nov 15): the four count code words were messy to use. They are
+  gone (;countstep ;counttables ;countslots ;countpull); the count is one
+  sheet now, built around a real count day.
+  - New count: press Ctrl+Alt+T (or Ctrl+Alt+Shift+T, ;count, tray > Count
+    sheet). Two questions: Tables and slots, or Slots only? Pod 1 or Pod 2
+    first? (Alt+T / Alt+S, Alt+1 / Alt+2, Enter.) It remembers your last
+    answers. The sheet then holds the day's lines in order:
+      Tables day (12 lines): entered, Tables Soft Count started, the tables
+      total ("Nov, 13th; $70,385. Starting Pod 2 Soft Count."), first pod
+      total and Partial Buy, banker in, partial complete and break, back
+      from break and second pod, its total and Buy, banker in, buy complete
+      and calling for sweep, officer in, sweep complete.
+      Slots only (8 lines): no tables lines, no partial buy, the break after
+      the first pod, then ONE total: "Pod 1 and 2 Total; $...".
+  - Each line: reopen the count log in iTrak, click at the end of the
+    Synopsis, press Ctrl+Alt+T. The next line is typed there on a new line
+    as "10:03 - Tables Soft Count started." A line with a total asks only
+    for the amount: 70385, 70,385, 1144.005k and 1.2m all work; empty
+    leaves $XXX,XXX to fill in later. Esc in that box stamps nothing.
+    "count" alone on the call pad (Ctrl+Enter) does the same.
+  - The sheet (Ctrl+Alt+Shift+T): every line with its time, NEXT marked.
+      Stamp           (Enter) stamps the picked line, or the next one, and
+                      copies it (Ctrl+V into the log). Pick a later line to
+                      do it early: it moves up so the log stays in time order.
+      Skip / unskip   leaves a line out today, or brings it back
+      Undo last       un-stamps the last line (take it out of iTrak yourself)
+      Edit...         change a line's time or wording
+      Copy whole log  every stamped line, to paste in one go
+      Add: Tables Buy (the rare tables-only buy: three lines added as the
+      next ones), Emergency pull (asks the machine, stamped now), Note...
+      (a line of your own, stamped now)
+      New count       clears the sheet and asks the two questions again
+  - The sheet is kept on this PC (count sheet.ini, next to last used.ini),
+    so a reload or restart mid-count loses nothing. It clears with New
+    count, 14 hours after it was started, or at Start of shift when it is
+    8 hours old or more.
+  - Wording: the @count-tables, @count-slots and @count-tablesbuy lines in
+    templates.txt. [first] [second] = the pod numbers, [date] = today like
+    Nov, 13th, $___ = ask for the amount. No new version needed to change
+    them. Without those lines the built-in wording (the same) is used.
+  - settings.ini [Count] NewLine=none if you'd rather start the new line
+    yourself (default: Watchlog starts a new line before every line but
+    the first). Both keys can be changed in Customize > Shortcut keys.
+  - Each stamped line goes in the shift journal and Time saved as "Soft
+    count step", as before.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 BREAK TIME TRACKER SHOWS SECONDS  (v3.38.3)
   - Break time is now shown as minutes and seconds, like "12 m 05 s", on the home window,
     the shift dashboard, the tray icon hover text, the Break started/ended pop-ups and the
@@ -1553,10 +1605,9 @@ SHORTHAND FOR EVERY CODE WORD, SAVE AFTER FILL, NUMPAD, SECONDS  (v3.38.0)
     the pad as before. fill/open/auto/jack/bv/mfill/account/oc keep their
     own smarter shorthand.
   - @alias in templates.txt: your own short names, like
-    @alias = count=countstep | ct=counttables | cc=cards | med=medical
-    so "count" runs the next soft count step (time now, step picked, no
-    form) and "ct 5.5 10" makes the tables totals log. Change the list,
-    no new version needed.
+    @alias = cc=cards | med=medical
+    so "cc" runs ;cards. Change the list, no new version needed.
+    (Since v3.39.0 "count" on the pad stamps the next count sheet line.)
   - Save after fill (OFF until you switch it on: tray > iTrak > Save after
     fill; team-settings.ini [ITrak] SaveAfterFill=yes for PCs that haven't
     chosen). Teach the Save button once (tray > iTrak > Teach the Save

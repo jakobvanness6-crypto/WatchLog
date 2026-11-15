@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.38.3  -  QUICK START  (one page)
+  WATCHLOG  v3.39.0  -  QUICK START  (one page)
   Shortcuts that type finished surveillance log entries for you
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -60,6 +60,9 @@ USE IT
   Ctrl+Alt+F               Full-entry daily log (Break, Table Drop ...):
                            opens a new iTrak daily log and fills it in.
   Caps Lock / Ctrl+Alt+A   Clear all Alert Grid alerts (look them over first).
+  Ctrl+Alt+T               Count sheet: stamps the next soft count line with
+                           the time, where the cursor is. Ctrl+Alt+Shift+T
+                           shows the sheet (skip, undo, edit, extras).
   Ctrl+Alt+J               This shift's log counts, with Copy summary.
   Ctrl+Alt+L               Start of shift: opens the work apps and
                            Edge (facial rec, Citrix).  Ctrl+Alt+Shift+L closes them.

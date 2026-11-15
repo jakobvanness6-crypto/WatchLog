@@ -32,7 +32,7 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.38.3"
+VERSION := "3.39.0"
 VERSION_DATE := "Nov 15, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
@@ -120,6 +120,8 @@ HotkeyDefs := [{id: "find", key: "^!Space", label: "find a template", fn: (*) =>
     , {id: "repeatlog", key: "$^!+r", label: "repeat the last full-entry log", fn: (*) => RepeatLastLog()}
     , {id: "incident", key: "^!+n", label: "incident report from the open daily log", fn: (*) => ShowIncidentPick()}
     , {id: "endnow", key: "^!+e", label: "End Time Now in the open daily log", fn: (*) => EntryEndNow()}
+    , {id: "count", key: "^!t", label: "count sheet: stamp the next line", fn: (*) => ScKey()}
+    , {id: "countsheet", key: "^!+t", label: "count sheet: show it", fn: (*) => ShowCountSheet()}
     , {id: "dashboard", key: "^!+d", label: "shift dashboard", fn: (*) => ShowDashboard()}
     , {id: "cheat", key: "^!h", label: "this sheet", fn: (*) => ShowCheatSheet()}]
 
@@ -2967,6 +2969,17 @@ CallPadMakeLog() {
         CallPadWin.Hide()
     if CallPadTarget
         ReturnTo(CallPadTarget)
+    ; "count" alone on the pad stamps the next count sheet line (v3.39.0)
+    if RegExMatch(Trim(PadText, " `t`r`n"), "i)^count$") {
+        padTarget := CallPadTarget
+        CallPadUsed()
+        ScLoad()
+        if ScLines.Length && ScNext()
+            ScStamp(0, padTarget)
+        else
+            ShowCountSheet()
+        return
+    }
     ; a code word first on the pad (fill 205 5.5) runs that log now (v3.26.0)
     global PadShort
     sc := PadShortcut(PadText)
@@ -5932,6 +5945,477 @@ BreakEnd() {
     SetIconTip()
 }
 
+; =====================================================================
+;  COUNT SHEET (v3.39.0)
+;  The soft count as one checklist instead of four code words. A new
+;  count asks two things (tables today? which pod first?) and builds the
+;  day's lines. Ctrl+Alt+T stamps the next line with the time now and
+;  types it where the cursor is (the reopened count log's Synopsis);
+;  lines with a total ask for the amount only. Ctrl+Alt+Shift+T shows the
+;  sheet: skip, undo, edit, Tables Buy, emergency pull, note, copy all.
+;  Wording: @count-tables / @count-slots / @count-tablesbuy lists in
+;  templates.txt ([first] [second] [date], $___ = amount), else built in.
+;  Kept in count sheet.ini on this PC so a reload doesn't lose it;
+;  cleared by New count, after 14 hours, or by Start of shift 8 hours on.
+; =====================================================================
+ScFile := DataDir "\count sheet.ini"
+ScLines := []           ; {state: p pending | d done | s skipped, time: "10:03", text}
+ScStarted := ""
+ScLoaded := false
+ScWin := ""
+ScSetupWin := ""
+
+ScWording(kind) {
+    if Lists.Has("count-" kind) && Lists["count-" kind].Length
+        return Lists["count-" kind]
+    if kind = "tables"
+        return ["Count Team entered Count Room for Soft Count start."
+            , "Tables Soft Count started."
+            , "[date]; $___. Starting Pod [first] Soft Count."
+            , "Pod [first] Total; $___. Calling Main Banker for Partial Buy."
+            , "Main Banker entered for Partial Buy."
+            , "Partial complete, totals confirmed. Count Team on break."
+            , "Count Team back from break. Pod [second] Soft Count started."
+            , "Pod [second] Total; $___. Calling Main Banker for Buy."
+            , "Main Banker entered for Buy."
+            , "Buy complete, totals confirmed. Calling Security for Sweep."
+            , "Security Officer entered Count Room for Sweep."
+            , "Sweep complete."]
+    if kind = "slots"
+        return ["Count Team entered Count Room for Soft Count start. Pod [first] Soft Count started."
+            , "Pod [first] complete. Count Team on break."
+            , "Count Team back from break. Pod [second] Soft Count started."
+            , "Pod 1 and 2 Total; $___. Calling Main Banker for Buy."
+            , "Main Banker entered for Buy."
+            , "Buy complete, totals confirmed. Calling Security for Sweep."
+            , "Security Officer entered Count Room for Sweep."
+            , "Sweep complete."]
+    return ["Calling Main Banker for Tables Buy."
+        , "Main Banker entered for Tables Buy."
+        , "Tables Buy complete, totals confirmed."]
+}
+
+; 13 -> 13th
+ScOrdinal(num) {
+    if Mod(num, 100) >= 11 && Mod(num, 100) <= 13
+        return num "th"
+    last := Mod(num, 10)
+    return num (last = 1 ? "st" : last = 2 ? "nd" : last = 3 ? "rd" : "th")
+}
+
+ScFillIn(text, firstPod) {
+    text := StrReplace(text, "[first]", firstPod)
+    text := StrReplace(text, "[second]", firstPod = 1 ? 2 : 1)
+    text := StrReplace(text, "[date]", FormatTime(, "MMM") ", " ScOrdinal(Integer(FormatTime(, "d"))))
+    return StrReplace(text, "|", "/")
+}
+
+ScFirstPod() {
+    pod := "2"
+    try pod := IniRead(ScFile, "Sheet", "First", "2")
+    return pod = "1" ? 1 : 2
+}
+
+ScLoad() {
+    global ScLines, ScStarted, ScLoaded
+    if !ScLoaded {
+        ScLoaded := true
+        ScLines := [], ScStarted := ""
+        try ScStarted := IniRead(ScFile, "Sheet", "Started", "")
+        total := 0
+        try total := Integer(IniRead(ScFile, "Sheet", "N", "0"))
+        loop total {
+            row := ""
+            try row := IniRead(ScFile, "Lines", String(A_Index), "")
+            parts := StrSplit(row, "|", , 3)
+            if parts.Length = 3 && parts[3] != ""
+                ScLines.Push({state: parts[1], time: parts[2], text: parts[3]})
+        }
+    }
+    old := 0
+    if ScStarted != ""
+        try old := DateDiff(A_Now, ScStarted, "Hours")
+    if old >= 14
+        ScReset()
+}
+
+ScSave() {
+    try {
+        if !DirExist(DataDir)
+            DirCreate DataDir
+        try IniDelete ScFile, "Lines"
+        IniWrite ScStarted, ScFile, "Sheet", "Started"
+        IniWrite ScLines.Length, ScFile, "Sheet", "N"
+        for ln in ScLines
+            IniWrite ln.state "|" ln.time "|" ln.text, ScFile, "Lines", String(A_Index)
+    } catch as e {
+        Activity("Count sheet couldn't be saved: " e.Message)
+    }
+}
+
+ScReset() {
+    global ScLines, ScStarted, ScWin
+    ScLines := [], ScStarted := ""
+    try FileDelete ScFile
+    if IsObject(ScWin) {
+        try ScWin.gui.Destroy()
+        ScWin := ""
+    }
+}
+
+; Start of shift clears a sheet left from an earlier shift (8 hours or more)
+ScShiftReset() {
+    ScLoad()
+    old := 0
+    if ScStarted != ""
+        try old := DateDiff(A_Now, ScStarted, "Hours")
+    if old >= 8
+        ScReset()
+}
+
+ScBegin(tables, firstPod) {
+    global ScLines, ScStarted
+    ScLines := []
+    for text in ScWording(tables ? "tables" : "slots")
+        ScLines.Push({state: "p", time: "", text: ScFillIn(text, firstPod)})
+    ScStarted := A_Now
+    ScSave()
+    try {
+        IniWrite firstPod, ScFile, "Sheet", "First"
+        IniWrite tables ? 1 : 0, LastUsedFile, "Count", "Tables"
+        IniWrite firstPod, LastUsedFile, "Count", "First"
+    }
+    Activity("Count sheet started (" (tables ? "tables and slots" : "slots only") ", Pod " firstPod " first, " ScLines.Length " lines)")
+}
+
+; The first line still to do, 0 when the sheet is finished
+ScNext() {
+    for ln in ScLines
+        if ln.state = "p"
+            return A_Index
+    return 0
+}
+
+ScLastDone() {
+    pos := 0
+    for ln in ScLines
+        if ln.state = "d"
+            pos := A_Index
+    return pos
+}
+
+; 70385 -> 70,385   1144.005k -> 1,144,005   1.2m -> 1,200,000
+ScMoney(typed) {
+    clean := StrLower(StrReplace(StrReplace(StrReplace(Trim(typed), "$"), ","), " "))
+    if !RegExMatch(clean, "^(\d+(?:\.\d+)?|\.\d+)(k|m)?$", &mt)
+        return Trim(typed)
+    amt := Float(mt[1])
+    if mt[2] = "k"
+        amt *= 1000
+    else if mt[2] = "m"
+        amt *= 1000000
+    return FixMoney(Abs(amt - Round(amt)) < 0.005 ? String(Integer(Round(amt))) : Format("{:.2f}", amt))
+}
+
+; A line with $___ asks for the amount. False = cancelled.
+ScAskAmount(text, &filled) {
+    filled := text
+    if !InStr(text, "$___")
+        return true
+    if IsObject(ScWin)
+        try ScWin.gui.Opt("+OwnDialogs")
+    ib := InputBox(text "`n`nType the amount, like  70385  or  1144.005k`nLeave it empty to fill it in later.", "Watchlog - Count sheet", "w460 h190")
+    if ib.Result != "OK"
+        return false
+    amt := ScMoney(ib.Value)
+    filled := StrReplace(text, "$___", "$" (amt != "" ? amt : "XXX,XXX"), , , 1)
+    return true
+}
+
+; True when the window belongs to Watchlog itself (never paste there)
+ScOwnWindow(hwnd) {
+    if !hwnd
+        return true
+    own := true
+    try own := WinGetPID("ahk_id " hwnd) = DllCall("GetCurrentProcessId", "UInt")
+    return own
+}
+
+; Stamps a line with the time now. which = 0 means the next one. With a
+; target window the line is typed there (on a new line after the first);
+; without one it goes on the clipboard.
+ScStamp(which := 0, target := 0) {
+    global LeftOnClip
+    ScLoad()
+    if !which
+        which := ScNext()
+    if !which || which > ScLines.Length
+        return false
+    ln := ScLines[which]
+    filled := ""
+    if !ScAskAmount(ln.text, &filled)
+        return false
+    ln.text := filled, ln.time := FormatTime(, "HH:mm"), ln.state := "d"
+    ; a line done early moves up behind the last done one, so the log reads in time order
+    ScLines.RemoveAt(which)
+    ScLines.InsertAt(ScLastDone() + 1, ln)
+    ScSave()
+    full := ln.time " - " ln.text
+    saved := Max(StrLen(full) - 3, 0)
+    Journal("Soft count step", full, saved)
+    CountSaved("log", saved, "Soft count step")
+    Activity("Count sheet: line " ScLastDone() " of " ScLines.Length " stamped")
+    ScRefresh()
+    nx := ScNext()
+    after := nx ? "Next: " ScLines[nx].text : "That was the last line."
+    if target && !ScOwnWindow(target) {
+        if !WinActive("ahk_id " target) && !ScReturn(target) {
+            KeepOnClip(full)
+            return true
+        }
+        first := ScLastDone() = 1
+        Paste((first || CfgRead("Count", "NewLine", "before") = "none" ? "" : "`n") full, true)
+        Tip(full "`n" after, 4000)
+    } else {
+        A_Clipboard := full
+        LeftOnClip := full
+        Tip(full "`nCopied: click at the end of the log and press Ctrl+V.`n" after, 5000)
+    }
+    return true
+}
+
+ScReturn(target) {
+    if !WinExist("ahk_id " target)
+        return false
+    return ReturnTo(target)
+}
+
+; Ctrl+Alt+T: stamp the next line where the cursor is (a new count asks first)
+ScKey(*) {
+    ScLoad()
+    target := WinExist("A")
+    if !ScLines.Length {
+        ScSetup()
+        return
+    }
+    if !ScNext() {
+        ShowCountSheet()
+        Tip("The count sheet is finished. New count starts the next one.", 3500)
+        return
+    }
+    ScStamp(0, target)
+}
+
+; New count: the two questions
+ScSetup() {
+    global ScSetupWin
+    if IsObject(ScSetupWin) {
+        try WinActivate "ahk_id " ScSetupWin.Hwnd
+        return
+    }
+    target := WinExist("A")
+    lastT := "1", lastF := "2"
+    try lastT := IniRead(LastUsedFile, "Count", "Tables", "1")
+    try lastF := IniRead(LastUsedFile, "Count", "First", "2")
+    g := WGui("+AlwaysOnTop +ToolWindow", "Count sheet - new count")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText(, "What are they counting today?")
+    rTables := g.AddRadio("Group" (lastT = "0" ? "" : " Checked"), "&Tables and slots")
+    g.AddRadio(lastT = "0" ? "Checked" : "", "&Slots only")
+    g.AddText("y+14", "Which pod do they start with?")
+    rPod1 := g.AddRadio("Group" (lastF = "1" ? " Checked" : ""), "Pod &1 first")
+    g.AddRadio(lastF = "1" ? "" : "Checked", "Pod &2 first")
+    g.AddButton("Default w120 y+16", "Start").OnEvent("Click", Go)
+    g.AddButton("x+8 yp w100", "Cancel").OnEvent("Click", Cancel)
+    g.OnEvent("Escape", Cancel)
+    g.OnEvent("Close", Cancel)
+    ScSetupWin := g
+    g.Show()
+
+    Cancel(*) {
+        global ScSetupWin
+        ScSetupWin := ""
+        g.Destroy()
+    }
+    Go(*) {
+        global ScSetupWin
+        tables := rTables.Value, firstPod := rPod1.Value ? 1 : 2
+        ScSetupWin := ""
+        g.Destroy()
+        ScBegin(tables, firstPod)
+        ShowCountSheet()
+        Tip("Count sheet ready. In the count log, click at the end and press " HK("count") " for each line.", 5000)
+    }
+}
+
+ScLogText() {
+    out := ""
+    for ln in ScLines
+        if ln.state = "d"
+            out .= (out = "" ? "" : "`r`n") ln.time " - " ln.text
+    return out
+}
+
+ScRefresh() {
+    if !IsObject(ScWin)
+        return
+    lv := ScWin.lv
+    nx := ScNext()
+    try {
+        lv.Opt("-Redraw")
+        lv.Delete()
+        for ln in ScLines
+            lv.Add(, ln.state = "d" ? "done" : ln.state = "s" ? "skipped" : A_Index = nx ? "NEXT" : "", ln.time, ln.text)
+        if nx
+            lv.Modify(nx, "Select Focus Vis")
+        lv.Opt("+Redraw")
+    }
+}
+
+; Ctrl+Alt+Shift+T: the sheet itself
+ShowCountSheet(*) {
+    global ScWin
+    ScLoad()
+    if !ScLines.Length {
+        ScSetup()
+        return
+    }
+    if IsObject(ScWin) {
+        ScRefresh()
+        try ScWin.gui.Show()
+        return
+    }
+    g := WGui("+ToolWindow", "Count sheet")
+    g.SetFont("s10", "Segoe UI")
+    g.MarginX := 14, g.MarginY := 12
+    g.AddText("w600", "In iTrak: reopen the count log, click at the end of the Synopsis and press " HK("count") ". The next line is typed there with the time now. Here, Enter stamps the picked line and copies it.")
+    lv := g.AddListView("w600 r15 -Multi NoSortHdr", ["", "Time", "Line"])
+    lv.ModifyCol(1, 65), lv.ModifyCol(2, 55), lv.ModifyCol(3, 455)
+    g.AddButton("xm y+10 w110 Default", "Stamp").OnEvent("Click", StampIt)
+    g.AddButton("x+6 yp w110", "Skip / unskip").OnEvent("Click", SkipIt)
+    g.AddButton("x+6 yp w100", "Undo last").OnEvent("Click", UndoIt)
+    g.AddButton("x+6 yp w80", "Edit...").OnEvent("Click", EditIt)
+    g.AddButton("x+6 yp w120", "Copy whole log").OnEvent("Click", CopyAll)
+    g.AddText("xm y+14", "Add:")
+    g.AddButton("x+8 yp-4 w100", "Tables Buy").OnEvent("Click", AddBuy)
+    g.AddButton("x+6 yp w120", "Emergency pull").OnEvent("Click", AddPull)
+    g.AddButton("x+6 yp w80", "Note...").OnEvent("Click", AddNote)
+    g.AddButton("x+60 yp w100", "New count").OnEvent("Click", NewOne)
+    g.AddButton("x+6 yp w70", "Close").OnEvent("Click", HideIt)
+    g.OnEvent("Escape", HideIt)
+    g.OnEvent("Close", HideIt)
+    ScWin := {gui: g, lv: lv}
+    ScRefresh()
+    g.Show()
+
+    HideIt(*) {
+        g.Hide()
+    }
+    Picked() {
+        row := lv.GetNext()
+        return row && row <= ScLines.Length ? row : 0
+    }
+    StampIt(*) {
+        row := Picked()
+        if row && ScLines[row].state != "p"
+            row := 0
+        if !row && !ScNext() {
+            Tip("Every line is done. Copy whole log, or New count.", 3000)
+            return
+        }
+        ScStamp(row, 0)
+    }
+    SkipIt(*) {
+        row := Picked()
+        if !row || ScLines[row].state = "d"
+            row := ScNext()
+        if !row
+            return
+        ScLines[row].state := ScLines[row].state = "s" ? "p" : "s"
+        ScSave()
+        ScRefresh()
+    }
+    UndoIt(*) {
+        row := ScLastDone()
+        if !row
+            return
+        was := ScLines[row].time " - " ScLines[row].text
+        ScLines[row].state := "p", ScLines[row].time := ""
+        ScSave()
+        ScRefresh()
+        Activity("Count sheet: last stamp undone")
+        Tip("Undone here: " was "`nIf it's already in the log, take it out there too.", 5000)
+    }
+    EditIt(*) {
+        row := Picked()
+        if !row
+            return
+        ln := ScLines[row]
+        g.Opt("+OwnDialogs")
+        ib := InputBox(ln.state = "d" ? "Change the time or the wording of this line:" : "Change the wording of this line ($___ asks for the amount):", "Watchlog - Count sheet", "w560 h140", ln.state = "d" ? ln.time " - " ln.text : ln.text)
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        val := StrReplace(Trim(ib.Value), "|", "/")
+        if ln.state = "d" && RegExMatch(val, "^(\d{1,2}:\d{2})\s*-\s*(.+)$", &mt)
+            ln.time := mt[1], ln.text := mt[2]
+        else
+            ln.text := val
+        ScSave()
+        ScRefresh()
+        try lv.Modify(row, "Select Focus Vis")
+    }
+    CopyAll(*) {
+        global LeftOnClip
+        all := ScLogText()
+        if all = "" {
+            Tip("Nothing is stamped yet.")
+            return
+        }
+        A_Clipboard := all
+        LeftOnClip := all
+        Tip("The whole count log is copied. Paste it with Ctrl+V.", 3000)
+    }
+    AddAt(texts) {
+        pos := ScNext()
+        if !pos
+            pos := ScLines.Length + 1
+        for text in texts
+            ScLines.InsertAt(pos + A_Index - 1, {state: "p", time: "", text: StrReplace(text, "|", "/")})
+        ScSave()
+        ScRefresh()
+        return pos
+    }
+    AddBuy(*) {
+        texts := []
+        for text in ScWording("tablesbuy")
+            texts.Push(ScFillIn(text, ScFirstPod()))
+        AddAt(texts)
+        Tip("Tables Buy lines added as the next ones.", 3000)
+    }
+    AddPull(*) {
+        g.Opt("+OwnDialogs")
+        ib := InputBox("Machine of the emergency pull:", "Watchlog - Count sheet", "w360 h120")
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        ScStamp(AddAt(["Completed emergency pull for " StrUpper(Trim(ib.Value)) "."]), 0)
+    }
+    AddNote(*) {
+        g.Opt("+OwnDialogs")
+        ib := InputBox("A line of your own, stamped with the time now:", "Watchlog - Count sheet", "w560 h120")
+        if ib.Result != "OK" || Trim(ib.Value) = ""
+            return
+        ScStamp(AddAt([Trim(ib.Value)]), 0)
+    }
+    NewOne(*) {
+        g.Opt("+OwnDialogs")
+        if MsgBox("Clear this count sheet and start a new count?", "Watchlog - Count sheet", "YesNo Icon? Default2") != "Yes"
+            return
+        ScReset()
+        ScSetup()
+    }
+}
+
 ; The tray icon's hover text: version, and break time once a break was taken
 SetIconTip() {
     iconTxt := "Watchlog v" VERSION "  (" VERSION_DATE ")" (OutOfDate() ? "  - UPDATE NEEDED" : "")
@@ -6999,6 +7483,14 @@ RegisterStamps() {
     Hotstring(":*:" TrigKey(";t"), StampTime)
     Hotstring(":*:" TrigKey(";dd"), StampDate)
     Hotstring(":*:" TrigKey(";dt"), StampDateTime)
+    ; ;count opens the count sheet (v3.39.0), unless an older templates.txt
+    ; still has code words that start with it (;countstep ...)
+    clash := false
+    for t in TemplateList
+        if InStr(StrLower(t.trig), ";count") = 1
+            clash := true
+    if !clash
+        Hotstring(":*:" TrigKey(";count"), (*) => ShowCountSheet())
     HotIf
 }
 
@@ -7244,6 +7736,7 @@ BrowserOpen() {
 
 StartOfShift() {
     BreakReset()
+    ScShiftReset()
     sites := true
     if BrowserOpen()
         sites := MsgBox("Edge is already open, so the Citrix page is probably open too.`n`n"
@@ -11622,6 +12115,7 @@ BuildTrayMenu() {
     MenuItem(tm, "Shift count", (*) => ShowShiftCount(), 0xE9D2)
     MenuItem(tm, "Shift dashboard  (" HK("dashboard") ")", (*) => ShowDashboard(), 0xE9D9)
     MenuItem(tm, "Change break time...", (*) => BreakEdit(), 0xE916)
+    MenuItem(tm, "Count sheet  (" HK("countsheet") ")", (*) => ShowCountSheet(), 0xE9D5)
     tm.Add()
     MenuItem(tm, "Start of shift  (" HK("start") ")", (*) => StartOfShift(), 0xE768)
     MenuItem(tm, "End of shift  (close apps)", (*) => EndOfShift(), 0xE7E8)
