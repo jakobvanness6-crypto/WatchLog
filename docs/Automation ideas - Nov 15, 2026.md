@@ -1,6 +1,6 @@
 # Watchlog: more automation from context (Nov 15, 2026)
 
-Written after reading all of Watchlog.ahk (v3.39.0), templates.txt and incidents.txt. Nothing here is built. Each idea says what Watchlog already knows at that moment, what it would fill in from it, and what I'd need from you.
+Written after reading all of Watchlog.ahk (v3.39.0), templates.txt and incidents.txt. **Built so far: ideas 1, 2 and 3, in v3.40.0 (Nov 15). Idea 5 is on hold.** Nothing else here is built. Each idea says what Watchlog already knows at that moment, what it would fill in from it, and what I'd need from you.
 
 **The rule I kept to:** everything comes from what you type into Watchlog, what it has already logged this shift, the clock, or the PC it is running on. Nothing reads people's names or numbers out of iTrak, CMP or the Alert Grid, and nothing about a person is kept between shifts.
 

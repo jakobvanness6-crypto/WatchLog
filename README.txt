@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.39.0  -  README
+  WATCHLOG  v3.40.0  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1204,6 +1204,15 @@ Save it and it reloads itself.
   ResignMinutes=   minutes after an SDS login before it signs back in
                    (default 62, 0 = off)
 
+[Bays]
+  PCNAME=          the bay of a PC, by its Windows name (v3.40.0). Filled in when
+                   you answer the bay question once; also read from
+                   team-settings.ini. Tray > Advanced > This PC's bay.
+
+[Tables]
+  OpenWord=        the word that means a table opened in a log (default Opened)
+  CloseWord=       ... and closed (default Closed). See section 19, v3.40.0.
+
 [Count]
   NewLine=         before (default: a new line before each count sheet line
                    but the first) or none. See COUNT SHEET in section 19.
@@ -1481,8 +1490,58 @@ Something else broke
 
 
 -----------------------------------------------------------------------
- 19. NEWER FEATURES  (v3.12 to v3.39, newest first)
+ 19. NEWER FEATURES  (v3.12 to v3.40, newest first)
 -----------------------------------------------------------------------
+BOXES FILLED FROM WHAT WATCHLOG ALREADY KNOWS  (v3.40.0)
+  Three of the Nov 15 automation ideas (docs: Automation ideas - Nov 15, 2026).
+
+  1. BOXES THAT REMEMBER THEIR PARTNER (recall)
+  - A box marked  recall <other box>  keeps one answer for each value of the
+    other box and fills it in next time. Type over it to change it; what you
+    type becomes the new answer for that table, machine or place.
+  - Reference (monitor and cameras) now has a box on ;jack ;fill ;mfill ;bv
+    ;aml ;abandon ;found, remembered for each machine or table, and on
+    ;medical (with the daily log Location) for each place. Type the Reference
+    once for BJ205 and every later BJ205 fill has it.
+  - ;bv: the Asset # is remembered for each machine.
+  - To teach one: type the code word (like ;fill), pick the table, type the
+    Reference, Enter. Call pad shorthand (fill 205 5.5) still goes straight
+    in: it uses the Reference when one is remembered and leaves it empty when
+    not, as before.
+  - Kept in remembered.ini beside templates.txt, so OneDrive takes it to
+    every bay you sign in on. A remembered.ini in the team folder is read
+    when yours has nothing for that table or machine. Tray > Advanced >
+    Remembered boxes opens the file to fix or delete a line. It is in the
+    daily backups. Tables, machines, places and cameras only: nothing about
+    people.
+  - In templates.txt:  {Reference: recall Table | blank=}
+
+  2. THE BAY OF THIS PC
+  - Watchlog asks the bay once on each PC and keeps it for that PC
+    (settings.ini [Bays] PCNAME=2, which follows you across the bays). After
+    that ;start, ;end and the Start and End full-entry logs never ask.
+  - Tray > Advanced > This PC's bay... changes it (empty = ask each shift).
+  - A supervisor can list every PC under [Bays] in team-settings.ini so no
+    operator is asked at all.
+
+  3. OPEN TABLES ARE KNOWN FOR THE SHIFT
+  - Every log that says a table Opened or Closed (;open ;oc ;auto, pad
+    shorthand too) updates the list.
+  - ;auto and the Closed box of ;oc list the open tables first, with
+    "All open (BJ205, RO204)" as the first choice when two or more are open.
+    ;open and the Opened box list the ones not open yet first.
+  - ;cards ;fill ;player list open tables first. A table you logged closed
+    this shift gets a note on the form ("you logged BJ205 closed at 03:10");
+    it is only a note.
+  - The list shows on the home window, the shift dashboard and the tray icon
+    hover text. It only knows the tables YOU logged this shift: tables open
+    since before your shift are simply in the normal order.
+  - Cleared 14 hours after the first table, or at Start of shift when it is
+    8 hours old or more. settings.ini [Tables] OpenWord= / CloseWord= if the
+    wording of your open and close logs ever changes.
+  - In templates.txt:  {Table: @tables | openfirst}  or  closedfirst
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 COUNT SHEET: THE SOFT COUNT AS ONE CHECKLIST  (v3.39.0)
   Jakob (Nov 15): the four count code words were messy to use. They are
   gone (;countstep ;counttables ;countslots ;countpull); the count is one
