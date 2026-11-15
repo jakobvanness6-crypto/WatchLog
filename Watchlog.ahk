@@ -32,8 +32,8 @@ KeyHistory 0
 
 ; The version shows on the tray icon (hover over it), at the top of the
 ; tray menu, in a note in the corner every time it loads, and on the cheat sheet.
-VERSION := "3.38.2"
-VERSION_DATE := "Nov 14, 2026"
+VERSION := "3.38.3"
+VERSION_DATE := "Nov 15, 2026"
 ; Colours of the dark look (see LOOK at the end of the file)
 global LOOK_BG := "1B1F24", LOOK_FIELD := "2A3038", LOOK_FG := "E6EAEE", LOOK_MUTED := "9AA5B1", LOOK_ACCENT := "4C9AFF"
 ; Who owns Watchlog: shown in About Watchlog, the tutorial, the cheat sheet and Security and status
@@ -5800,16 +5800,21 @@ BreakUsedSecs() {
 
 BreakLeftSecs() => BreakAllowed() - BreakUsedSecs()
 
-; "Break left: 42 min (18 of 60 used)" or "On break 12 min, 30 min left"
+; Seconds as minutes and seconds: 725 -> "12 m 05 s" (v3.38.3)
+BreakFmt(secs) {
+    secs := Max(Integer(secs), 0)
+    return (secs // 60) " m " Format("{:02}", Mod(secs, 60)) " s"
+}
+
+; "Break: 41 m 05 s left (18 m 55 s of 60 m used)" or "On break 12 m 05 s, 30 m 00 s left"
 BreakText() {
     left := BreakLeftSecs()
     openAt := ""
     try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
-    mins := (left >= 0 ? left : -left) // 60
-    tail := left >= 0 ? mins " min left" : "over by " mins " min"
+    tail := left >= 0 ? BreakFmt(left) " left" : "over by " BreakFmt(-left)
     if openAt != ""
-        return "On break " DateDiff(A_Now, openAt, "Seconds") // 60 " min, " tail
-    return "Break: " tail " (" BreakUsedSecs() // 60 " of " BreakAllowed() // 60 " used)"
+        return "On break " BreakFmt(DateDiff(A_Now, openAt, "Seconds")) ", " tail
+    return "Break: " tail " (" BreakFmt(BreakUsedSecs()) " of " BreakAllowed() // 60 " m used)"
 }
 
 ; Clears a tally from an earlier shift (14 hours after the first break)
@@ -5850,36 +5855,37 @@ BreakBegin(win) {
 ; now, it keeps counting on from the new number.
 BreakEdit(*) {
     allowed := BreakAllowed() // 60
-    before := BreakUsedSecs() // 60
+    before := BreakUsedSecs()
     openAt := ""
     try openAt := IniRead(LastUsedFile, "Break", "OpenSince", "")
-    ib := InputBox("Minutes of break used so far this shift (you get " allowed ")."
-        . "`nOr type the minutes left, like  15 left"
+    ib := InputBox("Break time used so far this shift (you get " allowed " minutes)."
+        . "`nType minutes, like  45  or minutes and seconds, like  45:30"
+        . "`nOr type the time left, like  15 left  or  14:55 left"
         . (openAt != "" ? "`n`nYou're on break now: it keeps counting on from this number." : "")
-        . "`n`n0 starts the shift's break time fresh.", "Watchlog - Break time", "w400 h" (openAt != "" ? 230 : 200), String(before))
+        . "`n`n0 starts the shift's break time fresh.", "Watchlog - Break time", "w400 h" (openAt != "" ? 230 : 200), before // 60 ":" Format("{:02}", Mod(before, 60)))
     if ib.Result != "OK"
         return false
     v := StrLower(Trim(ib.Value))
-    if !RegExMatch(v, "^(\d{1,3})\s*(min|mins|minutes)?\s*(left)?$", &m) {
-        MsgBox "Type a number of minutes, like  45  (used) or  15 left.", "Watchlog - Break time", "Icon!"
+    if !RegExMatch(v, "^(\d{1,3})(?:\s*:\s*(\d{1,2}))?\s*(min|mins|minutes)?\s*(left)?$", &m) {
+        MsgBox "Type minutes, like  45  (used), minutes and seconds, like  45:30  or  15 left.", "Watchlog - Break time", "Icon!"
         return false
     }
-    mins := Integer(m[1])
-    if m[3] != ""
-        mins := Max(allowed - mins, 0)
+    newSecs := Integer(m[1]) * 60 + (m[2] != "" ? Min(Integer(m[2]), 59) : 0)
+    if m[4] != ""
+        newSecs := Max(allowed * 60 - newSecs, 0)
     try {
         if !DirExist(DataDir)
             DirCreate DataDir
         if IniRead(LastUsedFile, "Break", "Since", "") = ""
             IniWrite A_Now, LastUsedFile, "Break", "Since"
-        IniWrite mins * 60, LastUsedFile, "Break", "Used"
+        IniWrite newSecs, LastUsedFile, "Break", "Used"
         if openAt != ""
             IniWrite A_Now, LastUsedFile, "Break", "OpenSince"
     } catch as e {
         MsgBox "Couldn't save the break time:`n" e.Message, "Watchlog - Break time", "Icon!"
         return false
     }
-    Activity("Break time changed by hand: " before " -> " mins " min used (" BreakText() ")")
+    Activity("Break time changed by hand: " BreakFmt(before) " -> " BreakFmt(newSecs) " used (" BreakText() ")")
     SetIconTip()
     Tip(BreakText(), 3000)
     return true
@@ -5921,8 +5927,8 @@ BreakEnd() {
         IniDelete LastUsedFile, "Break", "Win"
     }
     SetTimer BreakWatch, 0
-    Activity("Break ended after " secs // 60 " min (" BreakText() ")")
-    Tip("Break " secs // 60 " min. " BreakText(), 4000)
+    Activity("Break ended after " BreakFmt(secs) " (" BreakText() ")")
+    Tip("Break " BreakFmt(secs) ". " BreakText(), 4000)
     SetIconTip()
 }
 

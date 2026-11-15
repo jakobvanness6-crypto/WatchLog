@@ -1,5 +1,5 @@
 =======================================================================
-  WATCHLOG  v3.38.2  -  README
+  WATCHLOG  v3.38.3  -  README
   Shortcuts for surveillance log entries, logins and shift start/end
 =======================================================================
 Copyright (c) 2026 Jakob Blair Vanness. All rights reserved.
@@ -1479,6 +1479,16 @@ Something else broke
 -----------------------------------------------------------------------
  19. NEWER FEATURES  (v3.12 to v3.38, newest first)
 -----------------------------------------------------------------------
+BREAK TIME TRACKER SHOWS SECONDS  (v3.38.3)
+  - Break time is now shown as minutes and seconds, like "12 m 05 s", on the home window,
+    the shift dashboard, the tray icon hover text, the Break started/ended pop-ups and the
+    activity journal. While you're on break the tray text counts up every couple of seconds.
+  - Change break time... (tray menu, dashboard Change... button) still takes plain minutes
+    (45 or 15 left) and now also minutes:seconds (45:30 or 14:55 left).
+  - Nothing stored changed: the count was always kept in seconds, and [Break] Minutes=60
+    works as before.
+  Built, NOT run (the sandbox can't run AutoHotkey).
+
 MACHINE FILLS: SEVERAL MACHINES ON ONE PAD LINE  (v3.38.2)
   Jakob (Nov 14) typed several machines on one call pad line and the log
   came out as one garbled line. Now a line holding several machines is cut
@@ -1862,8 +1872,8 @@ BREAK TIME TRACKER  (v3.29.0)
   - ;break (or the Break full-entry log) starts the clock when it fills the daily log. The
     break ends when you Save & Close that Daily Log Entry window. Nothing else to press.
   - Break time left shows on the home window, the shift dashboard ("This shift" tab) and when
-    you hover over the tray icon, e.g. "Break: 42 min left (18 of 60 used)" or
-    "On break 12 min, 30 min left".
+    you hover over the tray icon, e.g. "Break: 41 m 05 s left (18 m 55 s of 60 m used)" or
+    "On break 12 m 05 s, 30 m 00 s left" (seconds since v3.38.3).
   - Ctrl+Alt+Shift+E clicks End Time's Now button in the daily log in front (or the break
     log). It uses the spot taught with Ctrl+Alt+Shift+F.
   - The count starts over at Start of shift (Ctrl+Alt+L), or 14 hours after the first break.
