@@ -3,6 +3,9 @@
 Suggestions collected for the next version. Nothing here is built yet.
 When Jakob says to build, all of these go into one new version and this list is cleared.
 
+## AUTOMATION FROM CONTEXT: 32 ideas (Nov 15, 2026), waiting on Jakob's picks and "build it"
+Full list: docs/Automation ideas - Nov 15, 2026.md. Suggested first: recall boxes (Reference per table/machine, Asset # per machine), bay from the PC name, daily log to incident carry-over, open tables for the shift, count sheet finds the log. Part 2 needs his camera/reference lists.
+
 ## OVERHAUL PLAN (Nov 14, 2026; planning only, NOT built). Full write-up: docs/Watchlog - Overhaul plan.md
 Jakob (Nov 14): "bring it to its maximum potential. I need it to save as much time as possible throughout a shift and make the workflow effortless."
 Where a shift still costs time: a form for 29 of 37 code words (only fill/open/auto/jack/bv/mfill/account/oc have shorthand lines), a Save click per log, soft count = 9 forms with Location/Topic/Reference by hand (the count code words have no >>), nothing measures which steps are slow.
